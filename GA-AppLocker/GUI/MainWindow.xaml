@@ -352,16 +352,18 @@
                                        Foreground="{StaticResource MutedBrush}"
                                        Margin="0,30,0,15"/>
 
-                            <Border Style="{StaticResource CardStyle}">
-                                <StackPanel>
-                                    <TextBlock Text="No recent activity"
+                            <Border Background="{StaticResource SidebarBrush}"
+                                    CornerRadius="8"
+                                    Padding="20"
+                                    Margin="0,0,0,15"
+                                    MaxHeight="200">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <TextBlock x:Name="RecentActivityText"
+                                               Text="No recent activity&#x0a;Start by running a scan or importing artifacts"
                                                Foreground="{StaticResource MutedBrush}"
-                                               FontStyle="Italic"/>
-                                    <TextBlock Text="Start by running a scan or importing artifacts"
-                                               Foreground="{StaticResource MutedBrush}"
-                                               FontSize="11"
-                                               Margin="0,5,0,0"/>
-                                </StackPanel>
+                                               FontStyle="Italic"
+                                               TextWrapping="Wrap"/>
+                                </ScrollViewer>
                             </Border>
                         </StackPanel>
                     </ScrollViewer>
