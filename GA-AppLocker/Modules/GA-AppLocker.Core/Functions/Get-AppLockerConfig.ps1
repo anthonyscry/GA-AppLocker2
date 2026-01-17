@@ -96,10 +96,11 @@ function Get-AppLockerConfig {
 
     if (Test-Path $configFile) {
         try {
-            $savedConfig = Get-Content -Path $configFile -Raw | ConvertFrom-Json -AsHashtable
-            # Merge saved config over defaults
-            foreach ($savedKey in $savedConfig.Keys) {
-                $config[$savedKey] = $savedConfig[$savedKey]
+            $jsonContent = Get-Content -Path $configFile -Raw
+            $savedConfig = $jsonContent | ConvertFrom-Json
+            # Convert PSCustomObject to hashtable for PS 5.1 compatibility
+            $savedConfig.PSObject.Properties | ForEach-Object {
+                $config[$_.Name] = $_.Value
             }
         }
         catch {
@@ -112,6 +113,7 @@ function Get-AppLockerConfig {
     if ($Key) {
         return $config[$Key]
     }
-    return $config
+    # Return as PSCustomObject for easier property access
+    return [PSCustomObject]$config
     #endregion
 }

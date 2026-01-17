@@ -28,6 +28,7 @@ function Get-ComputersByOU {
     [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
         [string[]]$OUDistinguishedNames,
 
         [Parameter()]
@@ -38,6 +39,13 @@ function Get-ComputersByOU {
         Success = $false
         Data    = @()
         Error   = $null
+    }
+
+    # Handle empty input gracefully
+    if (-not $OUDistinguishedNames -or $OUDistinguishedNames.Count -eq 0) {
+        $result.Success = $true
+        $result.Data = @()
+        return $result
     }
 
     try {

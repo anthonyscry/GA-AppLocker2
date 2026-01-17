@@ -258,7 +258,7 @@ function Start-ArtifactScan {
     [PSCustomObject] Scan data.
 #>
 function Get-ScanResults {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'List')]
     param(
         [Parameter(ParameterSetName = 'ById')]
         [string]$ScanId,

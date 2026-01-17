@@ -56,16 +56,26 @@ function Set-AppLockerConfig {
         $config = Get-AppLockerConfig
         #endregion
 
+        #region --- Convert to hashtable for modification ---
+        $configHash = @{}
+        $config.PSObject.Properties | ForEach-Object {
+            $configHash[$_.Name] = $_.Value
+        }
+        #endregion
+
         #region --- Apply Changes ---
         if ($PSCmdlet.ParameterSetName -eq 'SingleKey') {
-            $config[$Key] = $Value
+            $configHash[$Key] = $Value
         }
         else {
             foreach ($settingKey in $Settings.Keys) {
-                $config[$settingKey] = $Settings[$settingKey]
+                $configHash[$settingKey] = $Settings[$settingKey]
             }
         }
         #endregion
+
+        # Convert back to config object
+        $config = [PSCustomObject]$configHash
 
         #region --- Save to File ---
         $dataPath = Get-AppLockerDataPath
