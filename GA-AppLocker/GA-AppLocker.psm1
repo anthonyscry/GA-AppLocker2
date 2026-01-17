@@ -229,6 +229,17 @@ Export-ModuleMember -Function @(
     'Get-AllRules',
     'Remove-Rule',
     'Export-RulesToXml',
-    'Set-RuleStatus'
+    'Set-RuleStatus',
+    # Policy module
+    'New-Policy',
+    'Get-Policy',
+    'Get-AllPolicies',
+    'Remove-Policy',
+    'Set-PolicyStatus',
+    'Add-RuleToPolicy',
+    'Remove-RuleFromPolicy',
+    'Set-PolicyTarget',
+    'Export-PolicyToXml',
+    'Test-PolicyCompliance'
 )
 #endregion

@@ -51,9 +51,8 @@ Features:
         'Modules\GA-AppLocker.Discovery\GA-AppLocker.Discovery.psd1',
         'Modules\GA-AppLocker.Credentials\GA-AppLocker.Credentials.psd1',
         'Modules\GA-AppLocker.Scanning\GA-AppLocker.Scanning.psd1',
-        'Modules\GA-AppLocker.Rules\GA-AppLocker.Rules.psd1'
-        # Future modules will be added here:
-        # 'Modules\GA-AppLocker.Policy\GA-AppLocker.Policy.psd1'
+        'Modules\GA-AppLocker.Rules\GA-AppLocker.Rules.psd1',
+        'Modules\GA-AppLocker.Policy\GA-AppLocker.Policy.psd1'
     )
 
     # Functions to export from this module (re-export from nested modules + GUI)
@@ -94,6 +93,17 @@ Features:
         'Remove-Rule',
         'Export-RulesToXml',
         'Set-RuleStatus',
+        # Policy module
+        'New-Policy',
+        'Get-Policy',
+        'Get-AllPolicies',
+        'Remove-Policy',
+        'Set-PolicyStatus',
+        'Add-RuleToPolicy',
+        'Remove-RuleFromPolicy',
+        'Set-PolicyTarget',
+        'Export-PolicyToXml',
+        'Test-PolicyCompliance',
         # Main module
         'Start-AppLockerDashboard'
     )
