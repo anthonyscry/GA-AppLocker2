@@ -23,10 +23,11 @@ function script:Write-Log {
 
 #region ===== BUTTON ACTION DISPATCHER =====
 # Central dispatcher for button clicks - avoids closure scope issues
-function script:Invoke-ButtonAction {
+# Using global scope so scriptblocks can access it
+function global:Invoke-ButtonAction {
     param([string]$Action)
 
-    $win = $script:MainWindow
+    $win = $global:GA_MainWindow
     if (-not $win) { return }
 
     switch ($Action) {
@@ -44,7 +45,8 @@ function script:Invoke-ButtonAction {
 #endregion
 
 #region ===== SCRIPT-LEVEL VARIABLES =====
-# Store window reference for event handlers
+# Store window reference for event handlers (global for scriptblock access)
+$global:GA_MainWindow = $null
 $script:MainWindow = $null
 $script:DiscoveredOUs = @()
 $script:DiscoveredMachines = @()
@@ -118,6 +120,7 @@ function Initialize-Navigation {
     # Store window reference for use in closures
     $win = $Window
     $script:MainWindow = $Window
+    $global:GA_MainWindow = $Window
 
     # All panel and nav button names
     $allPanels = @('PanelDashboard', 'PanelDiscovery', 'PanelScanner', 'PanelRules', 'PanelPolicy', 'PanelDeploy', 'PanelSettings')
@@ -366,7 +369,12 @@ function Initialize-CredentialsPanel {
     }
 
     # Load existing credentials
-    Update-CredentialsDataGrid -Window $Window
+    try {
+        Update-CredentialsDataGrid -Window $Window
+    }
+    catch {
+        Write-Log -Level Error -Message "Failed to load credentials: $($_.Exception.Message)"
+    }
 }
 
 function Invoke-SaveCredential {
@@ -615,8 +623,9 @@ function Initialize-MainWindow {
         [System.Windows.Window]$Window
     )
 
-    # Store window reference for script-level access
+    # Store window reference for script-level and global access
     $script:MainWindow = $Window
+    $global:GA_MainWindow = $Window
 
     # Set up navigation
     Initialize-Navigation -Window $Window
