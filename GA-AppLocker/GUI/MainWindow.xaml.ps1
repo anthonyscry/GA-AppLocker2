@@ -21,6 +21,28 @@ function script:Write-Log {
 }
 #endregion
 
+#region ===== BUTTON ACTION DISPATCHER =====
+# Central dispatcher for button clicks - avoids closure scope issues
+function script:Invoke-ButtonAction {
+    param([string]$Action)
+
+    $win = $script:MainWindow
+    if (-not $win) { return }
+
+    switch ($Action) {
+        # Discovery panel
+        'RefreshDomain' { Invoke-DomainRefresh -Window $win }
+        'TestConnectivity' { Invoke-ConnectivityTest -Window $win }
+        # Credentials panel
+        'SaveCredential' { Invoke-SaveCredential -Window $win }
+        'RefreshCredentials' { Update-CredentialsDataGrid -Window $win }
+        'TestCredential' { Invoke-TestSelectedCredential -Window $win }
+        'DeleteCredential' { Invoke-DeleteSelectedCredential -Window $win }
+        'SetDefaultCredential' { Invoke-SetDefaultCredential -Window $win }
+    }
+}
+#endregion
+
 #region ===== SCRIPT-LEVEL VARIABLES =====
 # Store window reference for event handlers
 $script:MainWindow = $null
@@ -139,25 +161,16 @@ function Initialize-Navigation {
 function Initialize-DiscoveryPanel {
     param([System.Windows.Window]$Window)
 
-    # Store window and function refs for closures
-    $win = $Window
-
     # Wire up Refresh Domain button
     $btnRefresh = $Window.FindName('BtnRefreshDomain')
     if ($btnRefresh) {
-        $refreshFn = ${function:Invoke-DomainRefresh}
-        $btnRefresh.Add_Click({
-            & $refreshFn -Window $win
-        }.GetNewClosure())
+        $btnRefresh.Add_Click({ Invoke-ButtonAction -Action 'RefreshDomain' })
     }
 
     # Wire up Test Connectivity button
     $btnTest = $Window.FindName('BtnTestConnectivity')
     if ($btnTest) {
-        $testFn = ${function:Invoke-ConnectivityTest}
-        $btnTest.Add_Click({
-            & $testFn -Window $win
-        }.GetNewClosure())
+        $btnTest.Add_Click({ Invoke-ButtonAction -Action 'TestConnectivity' })
     }
 }
 
@@ -322,52 +335,34 @@ function Invoke-ConnectivityTest {
 function Initialize-CredentialsPanel {
     param([System.Windows.Window]$Window)
 
-    # Store window and function refs for closures
-    $win = $Window
-    $saveFn = ${function:Invoke-SaveCredential}
-    $refreshFn = ${function:Update-CredentialsDataGrid}
-    $testFn = ${function:Invoke-TestSelectedCredential}
-    $deleteFn = ${function:Invoke-DeleteSelectedCredential}
-    $defaultFn = ${function:Invoke-SetDefaultCredential}
-
     # Wire up Save Credential button
     $btnSave = $Window.FindName('BtnSaveCredential')
     if ($btnSave) {
-        $btnSave.Add_Click({
-            & $saveFn -Window $win
-        }.GetNewClosure())
+        $btnSave.Add_Click({ Invoke-ButtonAction -Action 'SaveCredential' })
     }
 
     # Wire up Refresh Credentials button
     $btnRefresh = $Window.FindName('BtnRefreshCredentials')
     if ($btnRefresh) {
-        $btnRefresh.Add_Click({
-            & $refreshFn -Window $win
-        }.GetNewClosure())
+        $btnRefresh.Add_Click({ Invoke-ButtonAction -Action 'RefreshCredentials' })
     }
 
     # Wire up Test Credential button
     $btnTest = $Window.FindName('BtnTestCredential')
     if ($btnTest) {
-        $btnTest.Add_Click({
-            & $testFn -Window $win
-        }.GetNewClosure())
+        $btnTest.Add_Click({ Invoke-ButtonAction -Action 'TestCredential' })
     }
 
     # Wire up Delete Credential button
     $btnDelete = $Window.FindName('BtnDeleteCredential')
     if ($btnDelete) {
-        $btnDelete.Add_Click({
-            & $deleteFn -Window $win
-        }.GetNewClosure())
+        $btnDelete.Add_Click({ Invoke-ButtonAction -Action 'DeleteCredential' })
     }
 
     # Wire up Set Default button
     $btnSetDefault = $Window.FindName('BtnSetDefaultCredential')
     if ($btnSetDefault) {
-        $btnSetDefault.Add_Click({
-            & $defaultFn -Window $win
-        }.GetNewClosure())
+        $btnSetDefault.Add_Click({ Invoke-ButtonAction -Action 'SetDefaultCredential' })
     }
 
     # Load existing credentials
