@@ -72,6 +72,36 @@
             <Setter Property="Padding" Value="20"/>
             <Setter Property="Margin" Value="0,0,15,15"/>
         </Style>
+
+        <!-- Action Button Style (for Quick Action cards) -->
+        <Style x:Key="ActionButtonStyle" TargetType="Button">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="15,10"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Opacity" Value="0.85"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Opacity" Value="0.7"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid>
@@ -161,66 +191,84 @@
 
                             <WrapPanel>
                                 <!-- Full Scan Card -->
-                                <Border Style="{StaticResource CardStyle}" Width="200">
-                                    <StackPanel>
-                                        <TextBlock Text="&#x1F50D;" FontSize="28" Margin="0,0,0,10"/>
-                                        <TextBlock Text="Full Scan"
+                                <Border Style="{StaticResource CardStyle}" Width="200" Height="180">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Text="&#x1F50D;" FontSize="28" Margin="0,0,0,10"/>
+                                        <TextBlock Grid.Row="1" Text="Full Scan"
                                                    FontSize="16"
                                                    FontWeight="SemiBold"
                                                    Foreground="{StaticResource ForegroundBrush}"/>
-                                        <TextBlock Text="Scan all machines with auto-credentials"
+                                        <TextBlock Grid.Row="2" Text="Scan all machines with auto-credentials"
                                                    TextWrapping="Wrap"
                                                    FontSize="11"
                                                    Foreground="{StaticResource MutedBrush}"
-                                                   Margin="0,5,0,15"/>
-                                        <Button Content="Start Scan"
-                                                Background="{StaticResource PrimaryBrush}"
-                                                Foreground="White"
-                                                Padding="15,8"
-                                                BorderThickness="0"/>
-                                    </StackPanel>
+                                                   Margin="0,5,0,0"
+                                                   VerticalAlignment="Top"/>
+                                        <Button Grid.Row="3"
+                                                Content="Start Scan"
+                                                Style="{StaticResource ActionButtonStyle}"
+                                                Background="{StaticResource PrimaryBrush}"/>
+                                    </Grid>
                                 </Border>
 
                                 <!-- Import Card -->
-                                <Border Style="{StaticResource CardStyle}" Width="200">
-                                    <StackPanel>
-                                        <TextBlock Text="&#x1F4E5;" FontSize="28" Margin="0,0,0,10"/>
-                                        <TextBlock Text="Import &amp; Generate"
+                                <Border Style="{StaticResource CardStyle}" Width="200" Height="180">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Text="&#x1F4E5;" FontSize="28" Margin="0,0,0,10"/>
+                                        <TextBlock Grid.Row="1" Text="Import &amp; Generate"
                                                    FontSize="16"
                                                    FontWeight="SemiBold"
                                                    Foreground="{StaticResource ForegroundBrush}"/>
-                                        <TextBlock Text="Import file and generate rules"
+                                        <TextBlock Grid.Row="2" Text="Import file and generate rules"
                                                    TextWrapping="Wrap"
                                                    FontSize="11"
                                                    Foreground="{StaticResource MutedBrush}"
-                                                   Margin="0,5,0,15"/>
-                                        <Button Content="Browse..."
-                                                Background="{StaticResource SecondaryBrush}"
-                                                Foreground="White"
-                                                Padding="15,8"
-                                                BorderThickness="0"/>
-                                    </StackPanel>
+                                                   Margin="0,5,0,0"
+                                                   VerticalAlignment="Top"/>
+                                        <Button Grid.Row="3"
+                                                Content="Browse..."
+                                                Style="{StaticResource ActionButtonStyle}"
+                                                Background="{StaticResource SecondaryBrush}"/>
+                                    </Grid>
                                 </Border>
 
                                 <!-- Deploy Card -->
-                                <Border Style="{StaticResource CardStyle}" Width="200">
-                                    <StackPanel>
-                                        <TextBlock Text="&#x1F680;" FontSize="28" Margin="0,0,0,10"/>
-                                        <TextBlock Text="Deploy All"
+                                <Border Style="{StaticResource CardStyle}" Width="200" Height="180">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Text="&#x1F680;" FontSize="28" Margin="0,0,0,10"/>
+                                        <TextBlock Grid.Row="1" Text="Deploy All"
                                                    FontSize="16"
                                                    FontWeight="SemiBold"
                                                    Foreground="{StaticResource ForegroundBrush}"/>
-                                        <TextBlock Text="Deploy pending policies to OUs"
+                                        <TextBlock Grid.Row="2" Text="Deploy pending policies to OUs"
                                                    TextWrapping="Wrap"
                                                    FontSize="11"
                                                    Foreground="{StaticResource MutedBrush}"
-                                                   Margin="0,5,0,15"/>
-                                        <Button Content="Deploy"
-                                                Background="{StaticResource SuccessBrush}"
-                                                Foreground="White"
-                                                Padding="15,8"
-                                                BorderThickness="0"/>
-                                    </StackPanel>
+                                                   Margin="0,5,0,0"
+                                                   VerticalAlignment="Top"/>
+                                        <Button Grid.Row="3"
+                                                Content="Deploy"
+                                                Style="{StaticResource ActionButtonStyle}"
+                                                Background="{StaticResource SuccessBrush}"/>
+                                    </Grid>
                                 </Border>
                             </WrapPanel>
 
