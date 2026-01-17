@@ -199,7 +199,7 @@
                                             <RowDefinition Height="*"/>
                                             <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
-                                        <TextBlock Grid.Row="0" Text="&#x1F50D;" FontSize="28" Margin="0,0,0,10"/>
+                                        <TextBlock Grid.Row="0" Text="&#x1F50D;" FontSize="28" Margin="0,0,0,10" Foreground="{StaticResource PrimaryBrush}"/>
                                         <TextBlock Grid.Row="1" Text="Full Scan"
                                                    FontSize="16"
                                                    FontWeight="SemiBold"
@@ -226,7 +226,7 @@
                                             <RowDefinition Height="*"/>
                                             <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
-                                        <TextBlock Grid.Row="0" Text="&#x1F4E5;" FontSize="28" Margin="0,0,0,10"/>
+                                        <TextBlock Grid.Row="0" Text="&#x1F4E5;" FontSize="28" Margin="0,0,0,10" Foreground="{StaticResource SecondaryBrush}"/>
                                         <TextBlock Grid.Row="1" Text="Import &amp; Generate"
                                                    FontSize="16"
                                                    FontWeight="SemiBold"
@@ -253,7 +253,7 @@
                                             <RowDefinition Height="*"/>
                                             <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
-                                        <TextBlock Grid.Row="0" Text="&#x1F680;" FontSize="28" Margin="0,0,0,10"/>
+                                        <TextBlock Grid.Row="0" Text="&#x1F680;" FontSize="28" Margin="0,0,0,10" Foreground="{StaticResource SuccessBrush}"/>
                                         <TextBlock Grid.Row="1" Text="Deploy All"
                                                    FontSize="16"
                                                    FontWeight="SemiBold"
