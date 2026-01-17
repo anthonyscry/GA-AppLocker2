@@ -116,7 +116,14 @@ function Start-AppLockerDashboard {
 
         # Load code-behind (contains navigation helpers)
         if (Test-Path $codeBehindPath) {
-            . $codeBehindPath
+            try {
+                . $codeBehindPath
+                Write-AppLockerLog -Message 'Code-behind loaded successfully'
+            }
+            catch {
+                Write-AppLockerLog -Level Error -Message "Code-behind load failed: $($_.Exception.Message)"
+                throw
+            }
         }
 
         # Load XAML
@@ -134,10 +141,18 @@ function Start-AppLockerDashboard {
 
         # Initialize window (wire up navigation, etc.)
         if (Get-Command -Name 'Initialize-MainWindow' -ErrorAction SilentlyContinue) {
-            Initialize-MainWindow -Window $window
+            try {
+                Initialize-MainWindow -Window $window
+                Write-AppLockerLog -Message 'Window initialization completed'
+            }
+            catch {
+                Write-AppLockerLog -Level Error -Message "Window initialization failed: $($_.Exception.Message)"
+                Write-AppLockerLog -Level Error -Message "Stack trace: $($_.ScriptStackTrace)"
+            }
         }
 
         # Show window
+        Write-AppLockerLog -Message 'Showing dialog...'
         $window.ShowDialog() | Out-Null
 
         Write-AppLockerLog -Message 'Application closed'

@@ -626,15 +626,34 @@ function Initialize-MainWindow {
     # Store window reference for script-level and global access
     $script:MainWindow = $Window
     $global:GA_MainWindow = $Window
+    Write-Log -Message 'Window references stored'
 
     # Set up navigation
-    Initialize-Navigation -Window $Window
+    try {
+        Initialize-Navigation -Window $Window
+        Write-Log -Message 'Navigation initialized'
+    }
+    catch {
+        Write-Log -Level Error -Message "Navigation init failed: $($_.Exception.Message)"
+    }
 
     # Initialize Discovery panel
-    Initialize-DiscoveryPanel -Window $Window
+    try {
+        Initialize-DiscoveryPanel -Window $Window
+        Write-Log -Message 'Discovery panel initialized'
+    }
+    catch {
+        Write-Log -Level Error -Message "Discovery panel init failed: $($_.Exception.Message)"
+    }
 
     # Initialize Credentials panel
-    Initialize-CredentialsPanel -Window $Window
+    try {
+        Initialize-CredentialsPanel -Window $Window
+        Write-Log -Message 'Credentials panel initialized'
+    }
+    catch {
+        Write-Log -Level Error -Message "Credentials panel init failed: $($_.Exception.Message)"
+    }
 
     # Update domain info in status bar
     try {
