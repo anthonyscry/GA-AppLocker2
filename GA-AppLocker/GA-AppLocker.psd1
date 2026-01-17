@@ -47,13 +47,13 @@ Features:
 
     # Nested modules to load
     NestedModules = @(
-        'Modules\GA-AppLocker.Core\GA-AppLocker.Core.psd1'
+        'Modules\GA-AppLocker.Core\GA-AppLocker.Core.psd1',
+        'Modules\GA-AppLocker.Discovery\GA-AppLocker.Discovery.psd1',
+        'Modules\GA-AppLocker.Credentials\GA-AppLocker.Credentials.psd1'
         # Future modules will be added here:
-        # 'Modules\GA-AppLocker.Discovery\GA-AppLocker.Discovery.psd1'
         # 'Modules\GA-AppLocker.Scanning\GA-AppLocker.Scanning.psd1'
         # 'Modules\GA-AppLocker.Rules\GA-AppLocker.Rules.psd1'
         # 'Modules\GA-AppLocker.Policy\GA-AppLocker.Policy.psd1'
-        # 'Modules\GA-AppLocker.Credentials\GA-AppLocker.Credentials.psd1'
     )
 
     # Functions to export from this module (re-export from nested modules + GUI)
@@ -64,6 +64,19 @@ Features:
         'Set-AppLockerConfig',
         'Test-Prerequisites',
         'Get-AppLockerDataPath',
+        # Discovery module
+        'Get-DomainInfo',
+        'Get-OUTree',
+        'Get-ComputersByOU',
+        'Test-MachineConnectivity',
+        # Credentials module
+        'New-CredentialProfile',
+        'Get-CredentialProfile',
+        'Get-AllCredentialProfiles',
+        'Remove-CredentialProfile',
+        'Test-CredentialProfile',
+        'Get-CredentialForTier',
+        'Get-CredentialStoragePath',
         # Main module
         'Start-AppLockerDashboard'
     )
@@ -106,16 +119,26 @@ Features:
 
             # ReleaseNotes of this module
             ReleaseNotes = @'
-Version 1.0.0 - Initial Release
-================================
-Phase 1: Foundation
+Version 1.0.0 - Development
+============================
+Phase 1: Foundation (Complete)
 - Core module with logging, configuration, and prerequisites check
 - Basic WPF window shell with navigation
 - Session context persistence
 
+Phase 2: AD Discovery (Complete)
+- Domain info retrieval
+- OU tree discovery
+- Machine enumeration by OU
+- Connectivity testing (ping/WinRM)
+
+Phase 3: Credential Management (Complete)
+- Tiered credential model (T0: DCs, T1: Servers, T2: Workstations)
+- DPAPI-encrypted credential storage
+- Credential testing against target machines
+- Settings panel with credential UI
+
 Planned:
-- Phase 2: AD Discovery
-- Phase 3: Credential Management
 - Phase 4: Artifact Scanning
 - Phase 5: Rule Generation
 - Phase 6: Policy & Deployment

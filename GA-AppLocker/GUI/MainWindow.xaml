@@ -600,34 +600,297 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- Settings Panel (Placeholder) -->
+                <!-- Settings Panel -->
                 <Grid x:Name="PanelSettings" Visibility="Collapsed">
-                    <StackPanel>
-                        <TextBlock Text="Settings" Style="{StaticResource HeaderStyle}"/>
-                        <Border Style="{StaticResource CardStyle}">
-                            <StackPanel>
-                                <TextBlock Text="Application Settings"
-                                           FontSize="16"
-                                           FontWeight="SemiBold"
-                                           Foreground="{StaticResource ForegroundBrush}"
-                                           Margin="0,0,0,15"/>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <TextBlock Text="Settings" Style="{StaticResource HeaderStyle}"/>
 
-                                <TextBlock Text="Data Directory:"
-                                           Foreground="{StaticResource MutedBrush}"
-                                           Margin="0,0,0,5"/>
-                                <TextBlock x:Name="SettingsDataPath"
-                                           Text="%LOCALAPPDATA%\GA-AppLocker"
-                                           Foreground="{StaticResource ForegroundBrush}"
-                                           Margin="0,0,0,20"/>
+                            <!-- Credentials Management Section -->
+                            <TextBlock Text="CREDENTIAL PROFILES"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       Margin="0,0,0,15"/>
 
-                                <TextBlock Text="Version: 1.0.0"
-                                           Foreground="{StaticResource MutedBrush}"/>
-                                <TextBlock Text="Phase: 1 - Foundation"
-                                           Foreground="{StaticResource MutedBrush}"
-                                           Margin="0,5,0,0"/>
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
+                            <!-- Tier Legend -->
+                            <Border Background="{StaticResource SidebarBrush}" CornerRadius="6" Padding="15" Margin="0,0,0,15">
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Background="#9C27B0" CornerRadius="4" Padding="10,5" Margin="0,0,10,0">
+                                        <TextBlock Text="Tier 0: Domain Controllers" Foreground="White" FontSize="11"/>
+                                    </Border>
+                                    <Border Background="{StaticResource WarningBrush}" CornerRadius="4" Padding="10,5" Margin="0,0,10,0">
+                                        <TextBlock Text="Tier 1: Servers" Foreground="White" FontSize="11"/>
+                                    </Border>
+                                    <Border Background="{StaticResource PrimaryBrush}" CornerRadius="4" Padding="10,5">
+                                        <TextBlock Text="Tier 2: Workstations" Foreground="White" FontSize="11"/>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Add New Credential Form -->
+                            <Border Style="{StaticResource CardStyle}" Margin="0,0,0,15">
+                                <StackPanel>
+                                    <TextBlock Text="Add New Credential Profile"
+                                               FontSize="16"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource ForegroundBrush}"
+                                               Margin="0,0,0,15"/>
+
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="15"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <!-- Profile Name -->
+                                        <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,0,15">
+                                            <TextBlock Text="Profile Name"
+                                                       Foreground="{StaticResource MutedBrush}"
+                                                       FontSize="11"
+                                                       Margin="0,0,0,5"/>
+                                            <TextBox x:Name="CredProfileName"
+                                                     Background="#1E1E1E"
+                                                     Foreground="{StaticResource ForegroundBrush}"
+                                                     BorderBrush="#3E3E42"
+                                                     Padding="10,8"/>
+                                        </StackPanel>
+
+                                        <!-- Tier Selection -->
+                                        <StackPanel Grid.Row="0" Grid.Column="2" Margin="0,0,0,15">
+                                            <TextBlock Text="Tier Level"
+                                                       Foreground="{StaticResource MutedBrush}"
+                                                       FontSize="11"
+                                                       Margin="0,0,0,5"/>
+                                            <ComboBox x:Name="CredTierCombo"
+                                                      Background="#1E1E1E"
+                                                      Foreground="{StaticResource ForegroundBrush}"
+                                                      BorderBrush="#3E3E42"
+                                                      Padding="10,8"
+                                                      SelectedIndex="2">
+                                                <ComboBoxItem Content="Tier 0 - Domain Controllers"/>
+                                                <ComboBoxItem Content="Tier 1 - Servers"/>
+                                                <ComboBoxItem Content="Tier 2 - Workstations"/>
+                                            </ComboBox>
+                                        </StackPanel>
+
+                                        <!-- Username -->
+                                        <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,0,15">
+                                            <TextBlock Text="Username (DOMAIN\User or UPN)"
+                                                       Foreground="{StaticResource MutedBrush}"
+                                                       FontSize="11"
+                                                       Margin="0,0,0,5"/>
+                                            <TextBox x:Name="CredUsername"
+                                                     Background="#1E1E1E"
+                                                     Foreground="{StaticResource ForegroundBrush}"
+                                                     BorderBrush="#3E3E42"
+                                                     Padding="10,8"/>
+                                        </StackPanel>
+
+                                        <!-- Password -->
+                                        <StackPanel Grid.Row="1" Grid.Column="2" Margin="0,0,0,15">
+                                            <TextBlock Text="Password"
+                                                       Foreground="{StaticResource MutedBrush}"
+                                                       FontSize="11"
+                                                       Margin="0,0,0,5"/>
+                                            <PasswordBox x:Name="CredPassword"
+                                                         Background="#1E1E1E"
+                                                         Foreground="{StaticResource ForegroundBrush}"
+                                                         BorderBrush="#3E3E42"
+                                                         Padding="10,8"/>
+                                        </StackPanel>
+
+                                        <!-- Description -->
+                                        <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,0,0,15">
+                                            <TextBlock Text="Description (optional)"
+                                                       Foreground="{StaticResource MutedBrush}"
+                                                       FontSize="11"
+                                                       Margin="0,0,0,5"/>
+                                            <TextBox x:Name="CredDescription"
+                                                     Background="#1E1E1E"
+                                                     Foreground="{StaticResource ForegroundBrush}"
+                                                     BorderBrush="#3E3E42"
+                                                     Padding="10,8"/>
+                                        </StackPanel>
+
+                                        <!-- Buttons -->
+                                        <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal">
+                                            <Button x:Name="BtnSaveCredential"
+                                                    Content="&#x1F4BE; Save Credential"
+                                                    Style="{StaticResource ActionButtonStyle}"
+                                                    Background="{StaticResource SuccessBrush}"
+                                                    Padding="15,10"
+                                                    Margin="0,0,10,0"/>
+                                            <CheckBox x:Name="CredSetAsDefault"
+                                                      Content="Set as default for this tier"
+                                                      Foreground="{StaticResource ForegroundBrush}"
+                                                      VerticalAlignment="Center"
+                                                      Margin="10,0,0,0"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Saved Credentials List -->
+                            <Border Style="{StaticResource CardStyle}" Margin="0,0,0,15">
+                                <DockPanel>
+                                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,15">
+                                        <TextBlock Text="Saved Credential Profiles"
+                                                   FontSize="16"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource ForegroundBrush}"
+                                                   VerticalAlignment="Center"/>
+                                        <Button x:Name="BtnRefreshCredentials"
+                                                Content="&#x1F504; Refresh"
+                                                Background="Transparent"
+                                                Foreground="{StaticResource PrimaryBrush}"
+                                                BorderThickness="0"
+                                                Padding="10,5"
+                                                Cursor="Hand"
+                                                Margin="15,0,0,0"/>
+                                    </StackPanel>
+
+                                    <!-- Credentials DataGrid -->
+                                    <Border Background="#1E1E1E" CornerRadius="4" Padding="0">
+                                        <DataGrid x:Name="CredentialsDataGrid"
+                                                  AutoGenerateColumns="False"
+                                                  Background="Transparent"
+                                                  BorderThickness="0"
+                                                  RowBackground="#252526"
+                                                  AlternatingRowBackground="#2D2D30"
+                                                  GridLinesVisibility="None"
+                                                  HeadersVisibility="Column"
+                                                  SelectionMode="Single"
+                                                  CanUserAddRows="False"
+                                                  IsReadOnly="True"
+                                                  MinHeight="150"
+                                                  MaxHeight="250">
+                                            <DataGrid.ColumnHeaderStyle>
+                                                <Style TargetType="DataGridColumnHeader">
+                                                    <Setter Property="Background" Value="#1E1E1E"/>
+                                                    <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
+                                                    <Setter Property="Padding" Value="10,8"/>
+                                                    <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                                    <Setter Property="BorderBrush" Value="#3E3E42"/>
+                                                </Style>
+                                            </DataGrid.ColumnHeaderStyle>
+                                            <DataGrid.CellStyle>
+                                                <Style TargetType="DataGridCell">
+                                                    <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}"/>
+                                                    <Setter Property="BorderThickness" Value="0"/>
+                                                    <Setter Property="Padding" Value="10,8"/>
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsSelected" Value="True">
+                                                            <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </DataGrid.CellStyle>
+                                            <DataGrid.Columns>
+                                                <DataGridTextColumn Header="Name" Width="150" Binding="{Binding Name}"/>
+                                                <DataGridTextColumn Header="Tier" Width="60" Binding="{Binding Tier}"/>
+                                                <DataGridTextColumn Header="Username" Width="180" Binding="{Binding Username}"/>
+                                                <DataGridTextColumn Header="Default" Width="70" Binding="{Binding IsDefaultDisplay}"/>
+                                                <DataGridTextColumn Header="Last Test" Width="150" Binding="{Binding LastTestDisplay}"/>
+                                                <DataGridTextColumn Header="Description" Width="*" Binding="{Binding Description}"/>
+                                            </DataGrid.Columns>
+                                        </DataGrid>
+                                    </Border>
+                                </DockPanel>
+                            </Border>
+
+                            <!-- Credential Actions -->
+                            <Border Style="{StaticResource CardStyle}" Margin="0,0,0,15">
+                                <StackPanel>
+                                    <TextBlock Text="Credential Actions"
+                                               FontSize="14"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource ForegroundBrush}"
+                                               Margin="0,0,0,15"/>
+
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button x:Name="BtnTestCredential"
+                                                Content="&#x1F50D; Test Selected"
+                                                Style="{StaticResource ActionButtonStyle}"
+                                                Background="{StaticResource SecondaryBrush}"
+                                                Padding="15,10"
+                                                Margin="0,0,10,0"/>
+                                        <Button x:Name="BtnDeleteCredential"
+                                                Content="&#x1F5D1; Delete Selected"
+                                                Style="{StaticResource ActionButtonStyle}"
+                                                Background="{StaticResource ErrorBrush}"
+                                                Padding="15,10"
+                                                Margin="0,0,10,0"/>
+                                        <Button x:Name="BtnSetDefaultCredential"
+                                                Content="&#x2B50; Set as Default"
+                                                Style="{StaticResource ActionButtonStyle}"
+                                                Background="{StaticResource WarningBrush}"
+                                                Padding="15,10"/>
+                                    </StackPanel>
+
+                                    <!-- Test Target -->
+                                    <StackPanel Orientation="Horizontal" Margin="0,15,0,0">
+                                        <TextBlock Text="Test Target:"
+                                                   Foreground="{StaticResource MutedBrush}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,0,10,0"/>
+                                        <TextBox x:Name="CredTestTarget"
+                                                 Width="250"
+                                                 Background="#1E1E1E"
+                                                 Foreground="{StaticResource ForegroundBrush}"
+                                                 BorderBrush="#3E3E42"
+                                                 Padding="10,8"
+                                                 ToolTip="Enter hostname to test credential against"/>
+                                    </StackPanel>
+
+                                    <!-- Test Result -->
+                                    <Border x:Name="CredTestResultBorder"
+                                            Background="#1E1E1E"
+                                            CornerRadius="4"
+                                            Padding="15"
+                                            Margin="0,15,0,0"
+                                            Visibility="Collapsed">
+                                        <TextBlock x:Name="CredTestResultText"
+                                                   Text=""
+                                                   Foreground="{StaticResource ForegroundBrush}"
+                                                   TextWrapping="Wrap"/>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Application Settings -->
+                            <TextBlock Text="APPLICATION SETTINGS"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       Margin="0,15,0,15"/>
+
+                            <Border Style="{StaticResource CardStyle}">
+                                <StackPanel>
+                                    <TextBlock Text="Data Directory:"
+                                               Foreground="{StaticResource MutedBrush}"
+                                               Margin="0,0,0,5"/>
+                                    <TextBlock x:Name="SettingsDataPath"
+                                               Text="%LOCALAPPDATA%\GA-AppLocker"
+                                               Foreground="{StaticResource ForegroundBrush}"
+                                               Margin="0,0,0,20"/>
+
+                                    <TextBlock Text="Version: 1.0.0"
+                                               Foreground="{StaticResource MutedBrush}"/>
+                                    <TextBlock Text="Phase: 3 - Credentials"
+                                               Foreground="{StaticResource MutedBrush}"
+                                               Margin="0,5,0,0"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
                 </Grid>
             </Grid>
         </Border>
