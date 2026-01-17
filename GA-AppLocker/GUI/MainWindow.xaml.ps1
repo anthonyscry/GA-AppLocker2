@@ -58,6 +58,16 @@ function global:Invoke-ButtonAction {
         'DeleteScan' { Invoke-DeleteSelectedScan -Window $win }
         'SelectMachines' { Invoke-SelectMachinesForScan -Window $win }
         'FilterArtifacts' { Update-ArtifactFilter -Window $win -Filter $args[0] }
+        # Rules panel
+        'GenerateFromArtifacts' { Invoke-GenerateRulesFromArtifacts -Window $win }
+        'CreateManualRule' { Invoke-CreateManualRule -Window $win }
+        'ExportRulesXml' { Invoke-ExportRulesToXml -Window $win }
+        'RefreshRules' { Update-RulesDataGrid -Window $win }
+        'ApproveRule' { Set-SelectedRuleStatus -Window $win -Status 'Approved' }
+        'RejectRule' { Set-SelectedRuleStatus -Window $win -Status 'Rejected' }
+        'ReviewRule' { Set-SelectedRuleStatus -Window $win -Status 'Review' }
+        'DeleteRule' { Invoke-DeleteSelectedRules -Window $win }
+        'ViewRuleDetails' { Show-RuleDetails -Window $win }
     }
 }
 #endregion
@@ -71,6 +81,8 @@ $script:DiscoveredMachines = @()
 $script:SelectedScanMachines = @()
 $script:CurrentScanArtifacts = @()
 $script:ScanInProgress = $false
+$script:CurrentRulesFilter = 'All'
+$script:CurrentRulesTypeFilter = 'All'
 #endregion
 
 #region ===== NAVIGATION HANDLERS =====
@@ -1179,6 +1191,430 @@ function Invoke-SelectMachinesForScan {
 
 #endregion
 
+#region ===== RULES PANEL HANDLERS =====
+
+function Initialize-RulesPanel {
+    param([System.Windows.Window]$Window)
+
+    # Wire up filter buttons
+    $filterButtons = @(
+        'BtnFilterAllRules', 'BtnFilterPublisher', 'BtnFilterHash', 'BtnFilterPath',
+        'BtnFilterPending', 'BtnFilterApproved', 'BtnFilterRejected'
+    )
+
+    foreach ($btnName in $filterButtons) {
+        $btn = $Window.FindName($btnName)
+        if ($btn) {
+            $btn.Add_Click({
+                param($sender, $e)
+                $tag = $sender.Tag
+                if ($tag -match 'FilterRules(.+)') {
+                    $filter = $Matches[1]
+                    Update-RulesFilter -Window $global:GA_MainWindow -Filter $filter
+                }
+            }.GetNewClosure())
+        }
+    }
+
+    # Wire up action buttons
+    $actionButtons = @(
+        'BtnGenerateFromArtifacts', 'BtnCreateManualRule', 'BtnExportRulesXml',
+        'BtnRefreshRules', 'BtnApproveRule', 'BtnRejectRule', 'BtnReviewRule',
+        'BtnDeleteRule', 'BtnViewRuleDetails'
+    )
+
+    foreach ($btnName in $actionButtons) {
+        $btn = $Window.FindName($btnName)
+        if ($btn -and $btn.Tag) {
+            $btn.Add_Click({
+                param($sender, $e)
+                Invoke-ButtonAction -Action $sender.Tag
+            }.GetNewClosure())
+        }
+    }
+
+    # Wire up text filter
+    $filterBox = $Window.FindName('TxtRuleFilter')
+    if ($filterBox) {
+        $filterBox.Add_TextChanged({
+            Update-RulesDataGrid -Window $global:GA_MainWindow
+        })
+    }
+
+    # Initial load
+    Update-RulesDataGrid -Window $Window
+}
+
+function global:Update-RulesDataGrid {
+    param([System.Windows.Window]$Window)
+
+    $dataGrid = $Window.FindName('RulesDataGrid')
+    if (-not $dataGrid) { return }
+
+    # Check if module function is available
+    if (-not (Get-Command -Name 'Get-AllRules' -ErrorAction SilentlyContinue)) {
+        $dataGrid.ItemsSource = $null
+        return
+    }
+
+    try {
+        $result = Get-AllRules
+        if (-not $result.Success) {
+            $dataGrid.ItemsSource = $null
+            return
+        }
+
+        $rules = $result.Data
+
+        # Apply type filter
+        if ($script:CurrentRulesTypeFilter -and $script:CurrentRulesTypeFilter -ne 'All') {
+            $rules = $rules | Where-Object { $_.RuleType -eq $script:CurrentRulesTypeFilter }
+        }
+
+        # Apply status filter
+        if ($script:CurrentRulesFilter -and $script:CurrentRulesFilter -notin @('All', 'Publisher', 'Hash', 'Path')) {
+            $rules = $rules | Where-Object { $_.Status -eq $script:CurrentRulesFilter }
+        }
+
+        # Apply text filter
+        $filterBox = $Window.FindName('TxtRuleFilter')
+        if ($filterBox -and -not [string]::IsNullOrWhiteSpace($filterBox.Text)) {
+            $filterText = $filterBox.Text.ToLower()
+            $rules = $rules | Where-Object {
+                $_.Name.ToLower().Contains($filterText) -or
+                $_.Collection.ToLower().Contains($filterText) -or
+                ($_.Description -and $_.Description.ToLower().Contains($filterText))
+            }
+        }
+
+        # Add display property for dates
+        $displayData = $rules | ForEach-Object {
+            $rule = $_
+            $props = @{}
+            $_.PSObject.Properties | ForEach-Object { $props[$_.Name] = $_.Value }
+            $props['CreatedDisplay'] = if ($_.CreatedAt) { ([datetime]$_.CreatedAt).ToString('MM/dd HH:mm') } else { '' }
+            [PSCustomObject]$props
+        }
+
+        $dataGrid.ItemsSource = @($displayData)
+
+        # Update counters
+        $allRules = (Get-AllRules).Data
+        Update-RuleCounters -Window $Window -Rules $allRules
+    }
+    catch {
+        Write-Log -Level Error -Message "Failed to update rules grid: $($_.Exception.Message)"
+        $dataGrid.ItemsSource = $null
+    }
+}
+
+function Update-RuleCounters {
+    param(
+        [System.Windows.Window]$Window,
+        [array]$Rules
+    )
+
+    $total = if ($Rules) { $Rules.Count } else { 0 }
+    $pending = if ($Rules) { ($Rules | Where-Object { $_.Status -eq 'Pending' }).Count } else { 0 }
+    $approved = if ($Rules) { ($Rules | Where-Object { $_.Status -eq 'Approved' }).Count } else { 0 }
+    $rejected = if ($Rules) { ($Rules | Where-Object { $_.Status -eq 'Rejected' }).Count } else { 0 }
+
+    $Window.FindName('TxtRuleTotalCount').Text = "$total"
+    $Window.FindName('TxtRulePendingCount').Text = "$pending"
+    $Window.FindName('TxtRuleApprovedCount').Text = "$approved"
+    $Window.FindName('TxtRuleRejectedCount').Text = "$rejected"
+}
+
+function global:Update-RulesFilter {
+    param(
+        [System.Windows.Window]$Window,
+        [string]$Filter
+    )
+
+    # Type filters
+    if ($Filter -in @('All', 'Publisher', 'Hash', 'Path')) {
+        $script:CurrentRulesTypeFilter = $Filter
+        if ($Filter -eq 'All') { $script:CurrentRulesFilter = 'All' }
+    }
+    # Status filters
+    elseif ($Filter -in @('Pending', 'Approved', 'Rejected', 'Review')) {
+        $script:CurrentRulesFilter = $Filter
+    }
+
+    Update-RulesDataGrid -Window $Window
+}
+
+function Invoke-GenerateRulesFromArtifacts {
+    param([System.Windows.Window]$Window)
+
+    if (-not $script:CurrentScanArtifacts -or $script:CurrentScanArtifacts.Count -eq 0) {
+        [System.Windows.MessageBox]::Show(
+            'No artifacts loaded. Please run a scan or load saved scan results first.',
+            'No Artifacts',
+            'OK',
+            'Warning'
+        )
+        return
+    }
+
+    if (-not (Get-Command -Name 'ConvertFrom-Artifact' -ErrorAction SilentlyContinue)) {
+        [System.Windows.MessageBox]::Show('Rules module not loaded.', 'Error', 'OK', 'Error')
+        return
+    }
+
+    # Get options
+    $collection = $Window.FindName('TxtRuleCollectionName').Text
+    if ([string]::IsNullOrWhiteSpace($collection)) { $collection = 'Default' }
+
+    $modeCombo = $Window.FindName('CboRuleGenMode')
+    $modeIndex = $modeCombo.SelectedIndex
+
+    $mode = switch ($modeIndex) {
+        0 { 'Smart' }
+        1 { 'Publisher' }
+        2 { 'Hash' }
+        3 { 'Path' }
+        default { 'Smart' }
+    }
+
+    $action = if ($Window.FindName('RbRuleAllow').IsChecked) { 'Allow' } else { 'Deny' }
+
+    # Generate rules
+    $generated = 0
+    $failed = 0
+
+    foreach ($artifact in $script:CurrentScanArtifacts) {
+        try {
+            $ruleType = switch ($mode) {
+                'Smart' { if ($artifact.IsSigned) { 'Publisher' } else { 'Hash' } }
+                'Publisher' { if ($artifact.IsSigned) { 'Publisher' } else { $null } }
+                'Hash' { 'Hash' }
+                'Path' { 'Path' }
+            }
+
+            if (-not $ruleType) { continue }
+
+            $result = ConvertFrom-Artifact -Artifact $artifact -RuleType $ruleType -Collection $collection -Action $action
+            if ($result.Success) { $generated++ } else { $failed++ }
+        }
+        catch {
+            $failed++
+        }
+    }
+
+    Update-RulesDataGrid -Window $Window
+
+    [System.Windows.MessageBox]::Show(
+        "Generated $generated rules from $($script:CurrentScanArtifacts.Count) artifacts.`n$(if ($failed -gt 0) { "Failed: $failed" })",
+        'Generation Complete',
+        'OK',
+        'Information'
+    )
+}
+
+function Invoke-CreateManualRule {
+    param([System.Windows.Window]$Window)
+
+    $typeCombo = $Window.FindName('CboManualRuleType')
+    $value = $Window.FindName('TxtManualRuleValue').Text
+    $desc = $Window.FindName('TxtManualRuleDesc').Text
+    $collection = $Window.FindName('TxtRuleCollectionName').Text
+    $action = if ($Window.FindName('RbRuleAllow').IsChecked) { 'Allow' } else { 'Deny' }
+
+    if ([string]::IsNullOrWhiteSpace($value)) {
+        [System.Windows.MessageBox]::Show('Please enter a path, hash, or publisher value.', 'Missing Value', 'OK', 'Warning')
+        return
+    }
+
+    if ([string]::IsNullOrWhiteSpace($collection)) { $collection = 'Default' }
+
+    $ruleType = switch ($typeCombo.SelectedIndex) {
+        0 { 'Path' }
+        1 { 'Hash' }
+        2 { 'Publisher' }
+        default { 'Path' }
+    }
+
+    try {
+        $result = switch ($ruleType) {
+            'Path' {
+                if (-not (Get-Command -Name 'New-PathRule' -ErrorAction SilentlyContinue)) { throw 'New-PathRule not available' }
+                New-PathRule -Path $value -Action $action -Collection $collection -Description $desc -RuleCollection 'Exe'
+            }
+            'Hash' {
+                if (-not (Get-Command -Name 'New-HashRule' -ErrorAction SilentlyContinue)) { throw 'New-HashRule not available' }
+                New-HashRule -Hash $value -FileName 'Manual' -Action $action -Collection $collection -Description $desc -RuleCollection 'Exe'
+            }
+            'Publisher' {
+                if (-not (Get-Command -Name 'New-PublisherRule' -ErrorAction SilentlyContinue)) { throw 'New-PublisherRule not available' }
+                $parts = $value -split ','
+                New-PublisherRule -Publisher ($parts[0].Trim()) -ProductName ($parts[1] | Select-Object -First 1) `
+                    -Action $action -Collection $collection -Description $desc -RuleCollection 'Exe'
+            }
+        }
+
+        if ($result.Success) {
+            $Window.FindName('TxtManualRuleValue').Text = ''
+            $Window.FindName('TxtManualRuleDesc').Text = ''
+            Update-RulesDataGrid -Window $Window
+            [System.Windows.MessageBox]::Show("$ruleType rule created successfully.", 'Success', 'OK', 'Information')
+        }
+        else {
+            [System.Windows.MessageBox]::Show("Failed: $($result.Error)", 'Error', 'OK', 'Error')
+        }
+    }
+    catch {
+        [System.Windows.MessageBox]::Show("Error: $($_.Exception.Message)", 'Error', 'OK', 'Error')
+    }
+}
+
+function Set-SelectedRuleStatus {
+    param(
+        [System.Windows.Window]$Window,
+        [string]$Status
+    )
+
+    $dataGrid = $Window.FindName('RulesDataGrid')
+    $selectedItems = $dataGrid.SelectedItems
+
+    if ($selectedItems.Count -eq 0) {
+        [System.Windows.MessageBox]::Show('Please select one or more rules.', 'No Selection', 'OK', 'Information')
+        return
+    }
+
+    if (-not (Get-Command -Name 'Set-RuleStatus' -ErrorAction SilentlyContinue)) {
+        [System.Windows.MessageBox]::Show('Set-RuleStatus function not available.', 'Error', 'OK', 'Error')
+        return
+    }
+
+    $updated = 0
+    foreach ($item in $selectedItems) {
+        try {
+            $result = Set-RuleStatus -RuleId $item.RuleId -Status $Status
+            if ($result.Success) { $updated++ }
+        }
+        catch { }
+    }
+
+    Update-RulesDataGrid -Window $Window
+    [System.Windows.MessageBox]::Show("Updated $updated rule(s) to '$Status'.", 'Status Updated', 'OK', 'Information')
+}
+
+function Invoke-DeleteSelectedRules {
+    param([System.Windows.Window]$Window)
+
+    $dataGrid = $Window.FindName('RulesDataGrid')
+    $selectedItems = $dataGrid.SelectedItems
+
+    if ($selectedItems.Count -eq 0) {
+        [System.Windows.MessageBox]::Show('Please select one or more rules to delete.', 'No Selection', 'OK', 'Information')
+        return
+    }
+
+    $confirm = [System.Windows.MessageBox]::Show(
+        "Are you sure you want to delete $($selectedItems.Count) rule(s)?",
+        'Confirm Delete',
+        'YesNo',
+        'Warning'
+    )
+
+    if ($confirm -ne 'Yes') { return }
+
+    if (-not (Get-Command -Name 'Remove-Rule' -ErrorAction SilentlyContinue)) {
+        [System.Windows.MessageBox]::Show('Remove-Rule function not available.', 'Error', 'OK', 'Error')
+        return
+    }
+
+    $deleted = 0
+    foreach ($item in $selectedItems) {
+        try {
+            $result = Remove-Rule -RuleId $item.RuleId
+            if ($result.Success) { $deleted++ }
+        }
+        catch { }
+    }
+
+    Update-RulesDataGrid -Window $Window
+    [System.Windows.MessageBox]::Show("Deleted $deleted rule(s).", 'Deleted', 'OK', 'Information')
+}
+
+function Invoke-ExportRulesToXml {
+    param([System.Windows.Window]$Window)
+
+    if (-not (Get-Command -Name 'Export-RulesToXml' -ErrorAction SilentlyContinue)) {
+        [System.Windows.MessageBox]::Show('Export-RulesToXml function not available.', 'Error', 'OK', 'Error')
+        return
+    }
+
+    $approvedOnly = $Window.FindName('ChkExportApprovedOnly').IsChecked
+
+    Add-Type -AssemblyName System.Windows.Forms
+
+    $dialog = [System.Windows.Forms.SaveFileDialog]::new()
+    $dialog.Title = 'Export AppLocker Rules'
+    $dialog.Filter = 'XML Files (*.xml)|*.xml'
+    $dialog.FileName = "AppLockerRules_$(Get-Date -Format 'yyyyMMdd_HHmmss').xml"
+
+    if ($dialog.ShowDialog() -eq 'OK') {
+        try {
+            $result = Export-RulesToXml -OutputPath $dialog.FileName -ApprovedOnly:$approvedOnly
+            
+            if ($result.Success) {
+                [System.Windows.MessageBox]::Show(
+                    "Exported rules to:`n$($dialog.FileName)`n`nRules exported: $($result.Data.Count)",
+                    'Export Complete',
+                    'OK',
+                    'Information'
+                )
+            }
+            else {
+                [System.Windows.MessageBox]::Show("Export failed: $($result.Error)", 'Error', 'OK', 'Error')
+            }
+        }
+        catch {
+            [System.Windows.MessageBox]::Show("Export failed: $($_.Exception.Message)", 'Error', 'OK', 'Error')
+        }
+    }
+}
+
+function Show-RuleDetails {
+    param([System.Windows.Window]$Window)
+
+    $dataGrid = $Window.FindName('RulesDataGrid')
+    $selectedItem = $dataGrid.SelectedItem
+
+    if (-not $selectedItem) {
+        [System.Windows.MessageBox]::Show('Please select a rule to view details.', 'No Selection', 'OK', 'Information')
+        return
+    }
+
+    $details = @"
+Rule Details
+============
+
+ID: $($selectedItem.RuleId)
+Name: $($selectedItem.Name)
+Type: $($selectedItem.RuleType)
+Action: $($selectedItem.Action)
+Status: $($selectedItem.Status)
+Collection: $($selectedItem.Collection)
+Rule Collection: $($selectedItem.RuleCollection)
+
+Description:
+$($selectedItem.Description)
+
+Created: $($selectedItem.CreatedAt)
+Modified: $($selectedItem.ModifiedAt)
+
+Condition Data:
+$($selectedItem | Select-Object -Property Publisher*, Hash*, Path* | Format-List | Out-String)
+"@
+
+    [System.Windows.MessageBox]::Show($details.Trim(), 'Rule Details', 'OK', 'Information')
+}
+
+#endregion
+
 #region ===== WINDOW INITIALIZATION =====
 function Initialize-MainWindow {
     param(
@@ -1223,6 +1659,15 @@ function Initialize-MainWindow {
     }
     catch {
         Write-Log -Level Error -Message "Scanner panel init failed: $($_.Exception.Message)"
+    }
+
+    # Initialize Rules panel
+    try {
+        Initialize-RulesPanel -Window $Window
+        Write-Log -Message 'Rules panel initialized'
+    }
+    catch {
+        Write-Log -Level Error -Message "Rules panel init failed: $($_.Exception.Message)"
     }
 
     # Update domain info in status bar and dashboard

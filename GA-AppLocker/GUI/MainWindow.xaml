@@ -18,6 +18,7 @@
         <SolidColorBrush x:Key="ContentBrush" Color="#2D2D30"/>
         <SolidColorBrush x:Key="ForegroundBrush" Color="#FFFFFF"/>
         <SolidColorBrush x:Key="MutedBrush" Color="#9E9E9E"/>
+        <SolidColorBrush x:Key="BorderBrush" Color="#3E3E42"/>
         <SolidColorBrush x:Key="SuccessBrush" Color="#4CAF50"/>
         <SolidColorBrush x:Key="WarningBrush" Color="#FF9800"/>
         <SolidColorBrush x:Key="ErrorBrush" Color="#F44336"/>
@@ -101,6 +102,92 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+        </Style>
+
+        <!-- TextBox Style -->
+        <Style x:Key="TextBoxStyle" TargetType="TextBox">
+            <Setter Property="Background" Value="#1E1E1E"/>
+            <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}"/>
+            <Setter Property="BorderBrush" Value="#3E3E42"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="CaretBrush" Value="{StaticResource ForegroundBrush}"/>
+        </Style>
+
+        <!-- ComboBox Style -->
+        <Style x:Key="ComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="Background" Value="#1E1E1E"/>
+            <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}"/>
+            <Setter Property="BorderBrush" Value="#3E3E42"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,6"/>
+        </Style>
+
+        <!-- Button Style -->
+        <Style x:Key="ButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#3E3E42"/>
+            <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="3"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#4E4E52"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#2E2E32"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Primary Button Style -->
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource ButtonStyle}">
+            <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="3"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Opacity" Value="0.85"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Opacity" Value="0.7"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- DataGrid Style -->
+        <Style x:Key="DataGridStyle" TargetType="DataGrid">
+            <Setter Property="Background" Value="#1E1E1E"/>
+            <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}"/>
+            <Setter Property="BorderBrush" Value="#3E3E42"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="#3E3E42"/>
+            <Setter Property="RowBackground" Value="#1E1E1E"/>
+            <Setter Property="AlternatingRowBackground" Value="#252526"/>
+            <Setter Property="HeadersVisibility" Value="Column"/>
         </Style>
     </Window.Resources>
 
@@ -857,16 +944,257 @@
                     </Border>
                 </Grid>
 
-                <!-- Rule Generator Panel (Placeholder) -->
+                <!-- Rule Generator Panel -->
                 <Grid x:Name="PanelRules" Visibility="Collapsed">
-                    <StackPanel>
-                        <TextBlock Text="Rule Generator" Style="{StaticResource HeaderStyle}"/>
-                        <Border Style="{StaticResource CardStyle}">
-                            <TextBlock Text="Rule Generator panel - Coming in Phase 5"
-                                       Foreground="{StaticResource MutedBrush}"
-                                       FontStyle="Italic"/>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Header -->
+                    <TextBlock Grid.Row="0" Text="Rule Generator" Style="{StaticResource HeaderStyle}"/>
+
+                    <!-- Main Content -->
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="320"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Left: Rule Generation Options -->
+                        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Margin="0,0,10,0">
+                            <StackPanel>
+                                <!-- Generate from Artifacts -->
+                                <Border Style="{StaticResource CardStyle}">
+                                    <StackPanel>
+                                        <TextBlock Text="GENERATE FROM ARTIFACTS" 
+                                                   FontSize="11" FontWeight="SemiBold" 
+                                                   Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
+                                        
+                                        <TextBlock Text="Collection Name:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                        <TextBox x:Name="TxtRuleCollectionName" 
+                                                 Style="{StaticResource TextBoxStyle}"
+                                                 Text="Default" Margin="0,0,0,10"/>
+
+                                        <TextBlock Text="Generation Mode:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                        <ComboBox x:Name="CboRuleGenMode" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,10">
+                                            <ComboBoxItem Content="Smart (Publisher if signed, Hash if not)" IsSelected="True"/>
+                                            <ComboBoxItem Content="Publisher Only (signed files only)"/>
+                                            <ComboBoxItem Content="Hash Only (all files)"/>
+                                            <ComboBoxItem Content="Path Only (folder-based)"/>
+                                        </ComboBox>
+
+                                        <TextBlock Text="Rule Action:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                            <RadioButton x:Name="RbRuleAllow" Content="Allow" IsChecked="True"
+                                                         Foreground="{StaticResource ForegroundBrush}" Margin="0,0,15,0"/>
+                                            <RadioButton x:Name="RbRuleDeny" Content="Deny"
+                                                         Foreground="{StaticResource ForegroundBrush}"/>
+                                        </StackPanel>
+
+                                        <Button x:Name="BtnGenerateFromArtifacts" 
+                                                Content="Generate Rules from Current Scan"
+                                                Style="{StaticResource PrimaryButtonStyle}"
+                                                Tag="GenerateFromArtifacts"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Manual Rule Creation -->
+                                <Border Style="{StaticResource CardStyle}">
+                                    <StackPanel>
+                                        <TextBlock Text="MANUAL RULE CREATION" 
+                                                   FontSize="11" FontWeight="SemiBold" 
+                                                   Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
+
+                                        <TextBlock Text="Rule Type:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                        <ComboBox x:Name="CboManualRuleType" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,10">
+                                            <ComboBoxItem Content="Path Rule" IsSelected="True"/>
+                                            <ComboBoxItem Content="Hash Rule"/>
+                                            <ComboBoxItem Content="Publisher Rule"/>
+                                        </ComboBox>
+
+                                        <TextBlock Text="Path / Hash / Publisher:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                        <TextBox x:Name="TxtManualRuleValue" 
+                                                 Style="{StaticResource TextBoxStyle}"
+                                                 Height="60" TextWrapping="Wrap" AcceptsReturn="True"
+                                                 VerticalContentAlignment="Top" Margin="0,0,0,10"/>
+
+                                        <TextBlock Text="Description:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                        <TextBox x:Name="TxtManualRuleDesc" 
+                                                 Style="{StaticResource TextBoxStyle}" Margin="0,0,0,10"/>
+
+                                        <Button x:Name="BtnCreateManualRule" 
+                                                Content="Create Rule"
+                                                Style="{StaticResource ButtonStyle}"
+                                                Tag="CreateManualRule"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Export Options -->
+                                <Border Style="{StaticResource CardStyle}">
+                                    <StackPanel>
+                                        <TextBlock Text="EXPORT" 
+                                                   FontSize="11" FontWeight="SemiBold" 
+                                                   Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
+
+                                        <CheckBox x:Name="ChkExportApprovedOnly" 
+                                                  Content="Export approved rules only"
+                                                  IsChecked="True"
+                                                  Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,10"/>
+
+                                        <Button x:Name="BtnExportRulesXml" 
+                                                Content="Export to AppLocker XML"
+                                                Style="{StaticResource PrimaryButtonStyle}"
+                                                Tag="ExportRulesXml"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <!-- Right: Rules DataGrid -->
+                        <Border Grid.Column="1" Style="{StaticResource CardStyle}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- Filter Bar -->
+                                <Grid Grid.Row="0" Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBox x:Name="TxtRuleFilter" 
+                                             Style="{StaticResource TextBoxStyle}"
+                                             Tag="Filter rules..."/>
+
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="10,0,0,0">
+                                        <Button x:Name="BtnRefreshRules" Content="Refresh" 
+                                                Style="{StaticResource ButtonStyle}" Width="70" Tag="RefreshRules"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- Type/Status Filter Buttons -->
+                                <WrapPanel Grid.Row="1" Margin="0,0,0,10">
+                                    <Button x:Name="BtnFilterAllRules" Content="All" 
+                                            Style="{StaticResource ButtonStyle}" Width="50" Margin="0,0,5,5" Tag="FilterRulesAll"/>
+                                    <Button x:Name="BtnFilterPublisher" Content="Publisher" 
+                                            Style="{StaticResource ButtonStyle}" Width="70" Margin="0,0,5,5" Tag="FilterRulesPublisher"/>
+                                    <Button x:Name="BtnFilterHash" Content="Hash" 
+                                            Style="{StaticResource ButtonStyle}" Width="50" Margin="0,0,5,5" Tag="FilterRulesHash"/>
+                                    <Button x:Name="BtnFilterPath" Content="Path" 
+                                            Style="{StaticResource ButtonStyle}" Width="50" Margin="0,0,5,5" Tag="FilterRulesPath"/>
+                                    <Border Width="1" Background="{StaticResource BorderBrush}" Margin="5,0,10,5"/>
+                                    <Button x:Name="BtnFilterPending" Content="Pending" 
+                                            Style="{StaticResource ButtonStyle}" Width="60" Margin="0,0,5,5" 
+                                            Background="#7D5A00" Tag="FilterRulesPending"/>
+                                    <Button x:Name="BtnFilterApproved" Content="Approved" 
+                                            Style="{StaticResource ButtonStyle}" Width="70" Margin="0,0,5,5" 
+                                            Background="#1B5E20" Tag="FilterRulesApproved"/>
+                                    <Button x:Name="BtnFilterRejected" Content="Rejected" 
+                                            Style="{StaticResource ButtonStyle}" Width="65" Margin="0,0,5,5" 
+                                            Background="#8B0000" Tag="FilterRulesRejected"/>
+                                </WrapPanel>
+
+                                <!-- Rules DataGrid -->
+                                <DataGrid x:Name="RulesDataGrid" Grid.Row="2"
+                                          Style="{StaticResource DataGridStyle}"
+                                          AutoGenerateColumns="False"
+                                          SelectionMode="Extended"
+                                          IsReadOnly="True">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Type" Binding="{Binding RuleType}" Width="70"/>
+                                        <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
+                                        <DataGridTextColumn Header="Collection" Binding="{Binding Collection}" Width="90"/>
+                                        <DataGridTextColumn Header="Action" Binding="{Binding Action}" Width="55"/>
+                                        <DataGridTemplateColumn Header="Status" Width="75">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Border CornerRadius="3" Padding="5,2" HorizontalAlignment="Center">
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="Pending">
+                                                                        <Setter Property="Background" Value="#7D5A00"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="Approved">
+                                                                        <Setter Property="Background" Value="#1B5E20"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="Rejected">
+                                                                        <Setter Property="Background" Value="#8B0000"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="Review">
+                                                                        <Setter Property="Background" Value="#1565C0"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+                                                        <TextBlock Text="{Binding Status}" Foreground="White" FontSize="10"/>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTextColumn Header="Created" Binding="{Binding CreatedDisplay}" Width="85"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+
+                                <!-- Action Buttons -->
+                                <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,10,0,0">
+                                    <Button x:Name="BtnApproveRule" Content="Approve" 
+                                            Style="{StaticResource ButtonStyle}" Width="75" Margin="0,0,5,0"
+                                            Background="#1B5E20" Tag="ApproveRule"/>
+                                    <Button x:Name="BtnRejectRule" Content="Reject" 
+                                            Style="{StaticResource ButtonStyle}" Width="75" Margin="0,0,5,0"
+                                            Background="#8B0000" Tag="RejectRule"/>
+                                    <Button x:Name="BtnReviewRule" Content="Review" 
+                                            Style="{StaticResource ButtonStyle}" Width="75" Margin="0,0,5,0"
+                                            Background="#1565C0" Tag="ReviewRule"/>
+                                    <Border Width="1" Background="{StaticResource BorderBrush}" Margin="5,0,10,0"/>
+                                    <Button x:Name="BtnDeleteRule" Content="Delete" 
+                                            Style="{StaticResource ButtonStyle}" Width="75" Margin="0,0,5,0"
+                                            Tag="DeleteRule"/>
+                                    <Button x:Name="BtnViewRuleDetails" Content="Details" 
+                                            Style="{StaticResource ButtonStyle}" Width="75"
+                                            Tag="ViewRuleDetails"/>
+                                </StackPanel>
+                            </Grid>
                         </Border>
-                    </StackPanel>
+                    </Grid>
+
+                    <!-- Status Bar -->
+                    <Border Grid.Row="2" Background="{StaticResource SidebarBrush}" Padding="10,8" Margin="0,10,0,0" CornerRadius="4">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,20,0">
+                                <TextBlock Text="Total:" Foreground="{StaticResource MutedBrush}" Margin="0,0,5,0"/>
+                                <TextBlock x:Name="TxtRuleTotalCount" Text="0" Foreground="{StaticResource ForegroundBrush}" FontWeight="SemiBold"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,0,20,0">
+                                <TextBlock Text="Pending:" Foreground="#FFD54F" Margin="0,0,5,0"/>
+                                <TextBlock x:Name="TxtRulePendingCount" Text="0" Foreground="#FFD54F" FontWeight="SemiBold"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="0,0,20,0">
+                                <TextBlock Text="Approved:" Foreground="#81C784" Margin="0,0,5,0"/>
+                                <TextBlock x:Name="TxtRuleApprovedCount" Text="0" Foreground="#81C784" FontWeight="SemiBold"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="3" Orientation="Horizontal">
+                                <TextBlock Text="Rejected:" Foreground="#E57373" Margin="0,0,5,0"/>
+                                <TextBlock x:Name="TxtRuleRejectedCount" Text="0" Foreground="#E57373" FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
                 </Grid>
 
                 <!-- Policy Builder Panel (Placeholder) -->
