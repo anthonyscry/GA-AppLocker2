@@ -614,7 +614,7 @@ function Initialize-MainWindow {
 
     # Update data path in settings
     $settingsPath = $Window.FindName('SettingsDataPath')
-    if ($settingsPath) {
+    if ($settingsPath -and (Get-Command -Name 'Get-AppLockerDataPath' -ErrorAction SilentlyContinue)) {
         $settingsPath.Text = Get-AppLockerDataPath
     }
 
