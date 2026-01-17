@@ -859,7 +859,7 @@ function Update-ScanProgress {
     [System.Windows.Forms.Application]::DoEvents()
 }
 
-function Update-ArtifactDataGrid {
+function global:Update-ArtifactDataGrid {
     param([System.Windows.Window]$Window)
 
     $dataGrid = $Window.FindName('ArtifactDataGrid')
@@ -892,7 +892,7 @@ function Update-ArtifactDataGrid {
     $dataGrid.ItemsSource = $displayData
 }
 
-function Update-ArtifactFilter {
+function global:Update-ArtifactFilter {
     param(
         [System.Windows.Window]$Window,
         [string]$Filter
