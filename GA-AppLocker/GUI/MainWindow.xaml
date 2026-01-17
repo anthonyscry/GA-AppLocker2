@@ -357,7 +357,7 @@
                                     Padding="20"
                                     Margin="0,0,0,15"
                                     MaxHeight="200"
-                                    Width="630"
+                                    Width="615"
                                     HorizontalAlignment="Left">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                                     <TextBlock x:Name="RecentActivityText"
