@@ -84,7 +84,7 @@ function Get-CredentialProfile {
     }
     catch {
         $result.Error = "Failed to retrieve credential profiles: $($_.Exception.Message)"
-        Write-AppLockerLog -Level Error -Message $result.Error
+        Write-CredLog -Level Error -Message $result.Error
     }
 
     return $result
@@ -200,7 +200,7 @@ function Get-CredentialForTier {
     }
     catch {
         $result.Error = "Failed to get credential for tier: $($_.Exception.Message)"
-        Write-AppLockerLog -Level Error -Message $result.Error
+        Write-CredLog -Level Error -Message $result.Error
     }
 
     return $result

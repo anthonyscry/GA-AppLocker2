@@ -107,11 +107,11 @@ function Test-CredentialProfile {
         $result.Data = $testResult
 
         $status = if ($testResult.WinRMSuccess) { 'passed' } else { 'failed' }
-        Write-AppLockerLog -Message "Credential test $status for '$Name' on $ComputerName" -NoConsole
+        Write-CredLog -Message "Credential test $status for '$Name' on $ComputerName"
     }
     catch {
         $result.Error = "Credential test failed: $($_.Exception.Message)"
-        Write-AppLockerLog -Level Error -Message $result.Error
+        Write-CredLog -Level Error -Message $result.Error
     }
 
     return $result

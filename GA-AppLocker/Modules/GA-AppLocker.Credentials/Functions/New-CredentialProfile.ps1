@@ -107,11 +107,11 @@ function New-CredentialProfile {
         $result.Success = $true
         $result.Data = $profile
 
-        Write-AppLockerLog -Message "Created credential profile: $Name (Tier $Tier)" -NoConsole
+        Write-CredLog -Message "Created credential profile: $Name (Tier $Tier)"
     }
     catch {
         $result.Error = "Failed to create credential profile: $($_.Exception.Message)"
-        Write-AppLockerLog -Level Error -Message $result.Error
+        Write-CredLog -Level Error -Message $result.Error
     }
 
     return $result

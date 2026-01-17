@@ -77,7 +77,7 @@ function Remove-CredentialProfile {
         if (Test-Path $profilePath) {
             Remove-Item -Path $profilePath -Force
             $result.Success = $true
-            Write-AppLockerLog -Message "Removed credential profile: $($profile.Name)" -NoConsole
+            Write-CredLog -Message "Removed credential profile: $($profile.Name)"
         }
         else {
             $result.Error = "Profile file not found"
@@ -86,7 +86,7 @@ function Remove-CredentialProfile {
     }
     catch {
         $result.Error = "Failed to remove credential profile: $($_.Exception.Message)"
-        Write-AppLockerLog -Level Error -Message $result.Error
+        Write-CredLog -Level Error -Message $result.Error
     }
 
     return $result

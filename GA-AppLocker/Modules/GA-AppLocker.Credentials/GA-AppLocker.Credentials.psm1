@@ -33,6 +33,15 @@ $script:CredentialTiers = @{
 }
 #endregion
 
+#region ===== SAFE LOGGING WRAPPER =====
+function script:Write-CredLog {
+    param([string]$Message, [string]$Level = 'Info')
+    if (Get-Command -Name 'Write-AppLockerLog' -ErrorAction SilentlyContinue) {
+        Write-AppLockerLog -Message $Message -Level $Level -NoConsole
+    }
+}
+#endregion
+
 #region ===== FUNCTION LOADING =====
 $functionPath = Join-Path $PSScriptRoot 'Functions'
 
