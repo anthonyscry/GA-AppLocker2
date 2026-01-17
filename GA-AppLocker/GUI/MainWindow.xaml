@@ -178,197 +178,284 @@
             <Grid x:Name="ContentArea">
                 <!-- Dashboard Panel (Default) -->
                 <Grid x:Name="PanelDashboard" Visibility="Visible">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <StackPanel>
-                            <TextBlock Text="Dashboard" Style="{StaticResource HeaderStyle}"/>
-
-                            <!-- Quick Actions Row -->
-                            <TextBlock Text="QUICK ACTIONS"
-                                       FontSize="12"
-                                       FontWeight="SemiBold"
-                                       Foreground="{StaticResource MutedBrush}"
-                                       Margin="0,0,0,15"/>
-
-                            <WrapPanel>
-                                <!-- Full Scan Card -->
-                                <Border Style="{StaticResource CardStyle}" Width="200" Height="180">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="*"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-                                        <TextBlock Grid.Row="0" Text="&#x1F50D;" FontSize="28" Margin="0,0,0,10" Foreground="{StaticResource PrimaryBrush}"/>
-                                        <TextBlock Grid.Row="1" Text="Full Scan"
-                                                   FontSize="16"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{StaticResource ForegroundBrush}"/>
-                                        <TextBlock Grid.Row="2" Text="Scan all machines with auto-credentials"
-                                                   TextWrapping="Wrap"
-                                                   FontSize="11"
-                                                   Foreground="{StaticResource MutedBrush}"
-                                                   Margin="0,5,0,0"
-                                                   VerticalAlignment="Top"/>
-                                        <Button Grid.Row="3"
-                                                Content="Start Scan"
-                                                Style="{StaticResource ActionButtonStyle}"
-                                                Background="{StaticResource PrimaryBrush}"/>
-                                    </Grid>
-                                </Border>
-
-                                <!-- Import Card -->
-                                <Border Style="{StaticResource CardStyle}" Width="200" Height="180">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="*"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-                                        <TextBlock Grid.Row="0" Text="&#x1F4E5;" FontSize="28" Margin="0,0,0,10" Foreground="{StaticResource SecondaryBrush}"/>
-                                        <TextBlock Grid.Row="1" Text="Import &amp; Generate"
-                                                   FontSize="16"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{StaticResource ForegroundBrush}"/>
-                                        <TextBlock Grid.Row="2" Text="Import file and generate rules"
-                                                   TextWrapping="Wrap"
-                                                   FontSize="11"
-                                                   Foreground="{StaticResource MutedBrush}"
-                                                   Margin="0,5,0,0"
-                                                   VerticalAlignment="Top"/>
-                                        <Button Grid.Row="3"
-                                                Content="Browse..."
-                                                Style="{StaticResource ActionButtonStyle}"
-                                                Background="{StaticResource SecondaryBrush}"/>
-                                    </Grid>
-                                </Border>
-
-                                <!-- Deploy Card -->
-                                <Border Style="{StaticResource CardStyle}" Width="200" Height="180">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="*"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-                                        <TextBlock Grid.Row="0" Text="&#x1F680;" FontSize="28" Margin="0,0,0,10" Foreground="{StaticResource SuccessBrush}"/>
-                                        <TextBlock Grid.Row="1" Text="Deploy All"
-                                                   FontSize="16"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{StaticResource ForegroundBrush}"/>
-                                        <TextBlock Grid.Row="2" Text="Deploy pending policies to OUs"
-                                                   TextWrapping="Wrap"
-                                                   FontSize="11"
-                                                   Foreground="{StaticResource MutedBrush}"
-                                                   Margin="0,5,0,0"
-                                                   VerticalAlignment="Top"/>
-                                        <Button Grid.Row="3"
-                                                Content="Deploy"
-                                                Style="{StaticResource ActionButtonStyle}"
-                                                Background="{StaticResource SuccessBrush}"/>
-                                    </Grid>
-                                </Border>
-                            </WrapPanel>
-
-                            <!-- Stats Row -->
-                            <TextBlock Text="CURRENT STATUS"
-                                       FontSize="12"
-                                       FontWeight="SemiBold"
-                                       Foreground="{StaticResource MutedBrush}"
-                                       Margin="0,30,0,15"/>
-
-                            <WrapPanel>
-                                <!-- Machines Stat -->
-                                <Border Style="{StaticResource CardStyle}" Width="150">
-                                    <StackPanel HorizontalAlignment="Center">
-                                        <TextBlock x:Name="StatMachines"
-                                                   Text="0"
-                                                   FontSize="36"
-                                                   FontWeight="Light"
-                                                   Foreground="{StaticResource PrimaryBrush}"
-                                                   HorizontalAlignment="Center"/>
-                                        <TextBlock Text="Machines"
-                                                   FontSize="12"
-                                                   Foreground="{StaticResource MutedBrush}"
-                                                   HorizontalAlignment="Center"/>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    
+                    <!-- Header -->
+                    <TextBlock Grid.Row="0" Text="Dashboard" Style="{StaticResource HeaderStyle}"/>
+                    
+                    <!-- Main Content - Two Column Layout with matched rows -->
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        
+                        <!-- Row 0: Section Headers -->
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="QUICK ACTIONS"
+                                   FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,15"/>
+                        <TextBlock Grid.Row="0" Grid.Column="2" Text="GETTING STARTED"
+                                   FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,15"/>
+                        
+                        <!-- Row 1: Quick Actions (left) / Workflow Steps (right) - Use shared row so heights match -->
+                        <!-- Left: Quick Actions -->
+                        <Border Grid.Row="1" Grid.Column="0" Background="{StaticResource SidebarBrush}" CornerRadius="8" Padding="20">
+                            <Grid VerticalAlignment="Stretch">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                
+                                <!-- Full Scan -->
+                                <Grid Grid.Row="0" VerticalAlignment="Center">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="&#x1F50D;" FontSize="28" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="Full Scan" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource ForegroundBrush}"/>
+                                        <TextBlock Text="Scan all machines with auto-credentials" FontSize="11" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="2" Content="Start" Style="{StaticResource ActionButtonStyle}" Background="{StaticResource PrimaryBrush}" Width="70" VerticalAlignment="Center"/>
+                                </Grid>
+                                
+                                <!-- Import -->
+                                <Grid Grid.Row="1" VerticalAlignment="Center">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="&#x1F4E5;" FontSize="28" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="Import &amp; Generate" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource ForegroundBrush}"/>
+                                        <TextBlock Text="Import artifacts and generate rules" FontSize="11" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="2" Content="Browse" Style="{StaticResource ActionButtonStyle}" Background="{StaticResource SecondaryBrush}" Width="70" VerticalAlignment="Center"/>
+                                </Grid>
+                                
+                                <!-- Deploy -->
+                                <Grid Grid.Row="2" VerticalAlignment="Center">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="&#x1F680;" FontSize="28" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="Deploy Policies" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource ForegroundBrush}"/>
+                                        <TextBlock Text="Deploy pending policies to OUs" FontSize="11" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="2" Content="Deploy" Style="{StaticResource ActionButtonStyle}" Background="{StaticResource SuccessBrush}" Width="70" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Grid>
+                        </Border>
+                        
+                        <!-- Right: Workflow Steps -->
+                        <Border Grid.Row="1" Grid.Column="2" Background="{StaticResource SidebarBrush}" CornerRadius="8" Padding="20">
+                            <Grid VerticalAlignment="Stretch">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                
+                                <!-- Step 1 -->
+                                <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border Background="{StaticResource PrimaryBrush}" CornerRadius="11" Width="22" Height="22" Margin="0,0,12,0">
+                                        <TextBlock Text="1" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" FontSize="11"/>
+                                    </Border>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Discover Machines" FontSize="13" Foreground="{StaticResource ForegroundBrush}" FontWeight="SemiBold"/>
+                                        <TextBlock Text="Scan AD for computers by OU" FontSize="10" Foreground="{StaticResource MutedBrush}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                                <!-- Step 2 -->
+                                <StackPanel Grid.Row="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border Background="{StaticResource SecondaryBrush}" CornerRadius="11" Width="22" Height="22" Margin="0,0,12,0">
+                                        <TextBlock Text="2" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" FontSize="11"/>
+                                    </Border>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Configure Credentials" FontSize="13" Foreground="{StaticResource ForegroundBrush}" FontWeight="SemiBold"/>
+                                        <TextBlock Text="Set up tiered admin accounts" FontSize="10" Foreground="{StaticResource MutedBrush}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                                <!-- Step 3 -->
+                                <StackPanel Grid.Row="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border Background="{StaticResource WarningBrush}" CornerRadius="11" Width="22" Height="22" Margin="0,0,12,0">
+                                        <TextBlock Text="3" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" FontSize="11"/>
+                                    </Border>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Scan Artifacts" FontSize="13" Foreground="{StaticResource ForegroundBrush}" FontWeight="SemiBold"/>
+                                        <TextBlock Text="Collect executables via WinRM" FontSize="10" Foreground="{StaticResource MutedBrush}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                                <!-- Step 4 -->
+                                <StackPanel Grid.Row="3" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border Background="{StaticResource SuccessBrush}" CornerRadius="11" Width="22" Height="22" Margin="0,0,12,0">
+                                        <TextBlock Text="4" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" FontSize="11"/>
+                                    </Border>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Generate Rules" FontSize="13" Foreground="{StaticResource ForegroundBrush}" FontWeight="SemiBold"/>
+                                        <TextBlock Text="Auto-create publisher/hash rules" FontSize="10" Foreground="{StaticResource MutedBrush}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                                <!-- Step 5 -->
+                                <StackPanel Grid.Row="4" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border Background="#9C27B0" CornerRadius="11" Width="22" Height="22" Margin="0,0,12,0">
+                                        <TextBlock Text="5" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" FontSize="11"/>
+                                    </Border>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Deploy to GPO" FontSize="13" Foreground="{StaticResource ForegroundBrush}" FontWeight="SemiBold"/>
+                                        <TextBlock Text="Push policies to production" FontSize="10" Foreground="{StaticResource MutedBrush}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        
+                        <!-- Row 2: Section Headers -->
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="CURRENT STATUS"
+                                   FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,20,0,15"/>
+                        <TextBlock Grid.Row="2" Grid.Column="2" Text="SYSTEM INFORMATION"
+                                   FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,20,0,15"/>
+                        
+                        <!-- Row 3: Stats (left) / System Info (right) - Both stretch to fill same height -->
+                        <!-- Left: Stats Grid -->
+                        <Border Grid.Row="3" Grid.Column="0" Background="{StaticResource SidebarBrush}" CornerRadius="8" Padding="15">
+                            <Grid VerticalAlignment="Stretch">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="12"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                
+                                <!-- Machines -->
+                                <Border Grid.Row="0" Grid.Column="0" Background="{StaticResource ContentBrush}" CornerRadius="6" Padding="10">
+                                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <TextBlock x:Name="StatMachines" Text="0" FontSize="28" FontWeight="Light" Foreground="{StaticResource PrimaryBrush}" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="Machines" FontSize="11" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Center"/>
                                     </StackPanel>
                                 </Border>
-
-                                <!-- Artifacts Stat -->
-                                <Border Style="{StaticResource CardStyle}" Width="150">
-                                    <StackPanel HorizontalAlignment="Center">
-                                        <TextBlock x:Name="StatArtifacts"
-                                                   Text="0"
-                                                   FontSize="36"
-                                                   FontWeight="Light"
-                                                   Foreground="{StaticResource WarningBrush}"
-                                                   HorizontalAlignment="Center"/>
-                                        <TextBlock Text="Artifacts"
-                                                   FontSize="12"
-                                                   Foreground="{StaticResource MutedBrush}"
-                                                   HorizontalAlignment="Center"/>
+                                
+                                <!-- Artifacts -->
+                                <Border Grid.Row="0" Grid.Column="2" Background="{StaticResource ContentBrush}" CornerRadius="6" Padding="10">
+                                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <TextBlock x:Name="StatArtifacts" Text="0" FontSize="28" FontWeight="Light" Foreground="{StaticResource WarningBrush}" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="Artifacts" FontSize="11" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Center"/>
                                     </StackPanel>
                                 </Border>
-
-                                <!-- Rules Stat -->
-                                <Border Style="{StaticResource CardStyle}" Width="150">
-                                    <StackPanel HorizontalAlignment="Center">
-                                        <TextBlock x:Name="StatRules"
-                                                   Text="0"
-                                                   FontSize="36"
-                                                   FontWeight="Light"
-                                                   Foreground="{StaticResource SuccessBrush}"
-                                                   HorizontalAlignment="Center"/>
-                                        <TextBlock Text="Rules"
-                                                   FontSize="12"
-                                                   Foreground="{StaticResource MutedBrush}"
-                                                   HorizontalAlignment="Center"/>
+                                
+                                <!-- Rules -->
+                                <Border Grid.Row="2" Grid.Column="0" Background="{StaticResource ContentBrush}" CornerRadius="6" Padding="10">
+                                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <TextBlock x:Name="StatRules" Text="0" FontSize="28" FontWeight="Light" Foreground="{StaticResource SuccessBrush}" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="Rules" FontSize="11" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Center"/>
                                     </StackPanel>
                                 </Border>
-
-                                <!-- Policies Stat -->
-                                <Border Style="{StaticResource CardStyle}" Width="150">
-                                    <StackPanel HorizontalAlignment="Center">
-                                        <TextBlock x:Name="StatPolicies"
-                                                   Text="0"
-                                                   FontSize="36"
-                                                   FontWeight="Light"
-                                                   Foreground="#9C27B0"
-                                                   HorizontalAlignment="Center"/>
-                                        <TextBlock Text="Policies"
-                                                   FontSize="12"
-                                                   Foreground="{StaticResource MutedBrush}"
-                                                   HorizontalAlignment="Center"/>
+                                
+                                <!-- Policies -->
+                                <Border Grid.Row="2" Grid.Column="2" Background="{StaticResource ContentBrush}" CornerRadius="6" Padding="10">
+                                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <TextBlock x:Name="StatPolicies" Text="0" FontSize="28" FontWeight="Light" Foreground="#9C27B0" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="Policies" FontSize="11" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Center"/>
                                     </StackPanel>
                                 </Border>
-                            </WrapPanel>
-
-                            <!-- Recent Activity -->
-                            <TextBlock Text="RECENT ACTIVITY"
-                                       FontSize="12"
-                                       FontWeight="SemiBold"
-                                       Foreground="{StaticResource MutedBrush}"
-                                       Margin="0,30,0,15"/>
-
-                            <Border Background="{StaticResource SidebarBrush}"
-                                    CornerRadius="8"
-                                    Padding="20"
-                                    Margin="0,0,15,15"
-                                    MaxHeight="200"
-                                    Width="645"
-                                    HorizontalAlignment="Left">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                    <TextBlock x:Name="RecentActivityText"
-                                               Text="No recent activity&#x0a;Start by running a scan or importing artifacts"
-                                               Foreground="{StaticResource MutedBrush}"
-                                               FontStyle="Italic"
-                                               TextWrapping="Wrap"/>
-                                </ScrollViewer>
-                            </Border>
-                        </StackPanel>
-                    </ScrollViewer>
+                            </Grid>
+                        </Border>
+                        
+                        <!-- Right: System Info -->
+                        <Border Grid.Row="3" Grid.Column="2" Background="{StaticResource SidebarBrush}" CornerRadius="8" Padding="20">
+                            <Grid VerticalAlignment="Stretch">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                
+                                <Grid Grid.Row="0" VerticalAlignment="Center">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Computer:" Foreground="{StaticResource MutedBrush}"/>
+                                    <TextBlock x:Name="SysInfoComputer" Grid.Column="1" Text="Loading..." Foreground="{StaticResource ForegroundBrush}"/>
+                                </Grid>
+                                <Grid Grid.Row="1" VerticalAlignment="Center">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Domain:" Foreground="{StaticResource MutedBrush}"/>
+                                    <TextBlock x:Name="SysInfoDomain" Grid.Column="1" Text="Loading..." Foreground="{StaticResource ForegroundBrush}"/>
+                                </Grid>
+                                <Grid Grid.Row="2" VerticalAlignment="Center">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="User:" Foreground="{StaticResource MutedBrush}"/>
+                                    <TextBlock x:Name="SysInfoUser" Grid.Column="1" Text="Loading..." Foreground="{StaticResource ForegroundBrush}"/>
+                                </Grid>
+                                <Grid Grid.Row="3" VerticalAlignment="Center">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Data Path:" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Top"/>
+                                    <TextBlock x:Name="SysInfoDataPath" Grid.Column="1" Text="Loading..." Foreground="{StaticResource ForegroundBrush}" TextWrapping="Wrap" FontSize="11"/>
+                                </Grid>
+                                <Grid Grid.Row="4" VerticalAlignment="Center">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Version:" Foreground="{StaticResource MutedBrush}"/>
+                                    <TextBlock Grid.Column="1" Text="1.0.0" Foreground="{StaticResource ForegroundBrush}"/>
+                                </Grid>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                    
+                    <!-- Bottom: Recent Activity (spans full width) -->
+                    <StackPanel Grid.Row="2" Margin="0,20,0,0">
+                        <TextBlock Text="RECENT ACTIVITY"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   Margin="0,0,0,10"/>
+                        
+                        <Border Background="{StaticResource SidebarBrush}" CornerRadius="8" Padding="15" MaxHeight="100">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <TextBlock x:Name="RecentActivityText"
+                                           Text="No recent activity. Start by navigating to AD Discovery to scan your domain for machines."
+                                           Foreground="{StaticResource MutedBrush}"
+                                           FontStyle="Italic"
+                                           TextWrapping="Wrap"/>
+                            </ScrollViewer>
+                        </Border>
+                    </StackPanel>
                 </Grid>
 
                 <!-- AD Discovery Panel -->

@@ -650,12 +650,37 @@ function Initialize-MainWindow {
         Write-Log -Level Error -Message "Credentials panel init failed: $($_.Exception.Message)"
     }
 
-    # Update domain info in status bar
+    # Update domain info in status bar and dashboard
     try {
         $computerSystem = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
+        
+        # Status bar
         $domainText = $Window.FindName('DomainText')
         if ($domainText -and $computerSystem.PartOfDomain) {
             $domainText.Text = "Domain: $($computerSystem.Domain)"
+        }
+        
+        # Dashboard System Info
+        $sysComputer = $Window.FindName('SysInfoComputer')
+        if ($sysComputer) { $sysComputer.Text = $env:COMPUTERNAME }
+        
+        $sysDomain = $Window.FindName('SysInfoDomain')
+        if ($sysDomain) {
+            if ($computerSystem.PartOfDomain) {
+                $sysDomain.Text = $computerSystem.Domain
+            } else {
+                $sysDomain.Text = "Not domain joined"
+            }
+        }
+        
+        $sysUser = $Window.FindName('SysInfoUser')
+        if ($sysUser) { $sysUser.Text = "$env:USERDOMAIN\$env:USERNAME" }
+        
+        $sysDataPath = $Window.FindName('SysInfoDataPath')
+        if ($sysDataPath -and (Get-Command -Name 'Get-AppLockerDataPath' -ErrorAction SilentlyContinue)) {
+            $dataPath = Get-AppLockerDataPath
+            # Insert line break after AppData for better display
+            $sysDataPath.Text = $dataPath -replace '(AppData\\)', "`$1`n"
         }
     }
     catch {
