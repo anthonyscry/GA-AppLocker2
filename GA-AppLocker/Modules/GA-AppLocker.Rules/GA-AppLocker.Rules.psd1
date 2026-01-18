@@ -18,7 +18,9 @@
         'Get-AllRules',
         'Remove-Rule',
         'Export-RulesToXml',
-        'Set-RuleStatus'
+        'Set-RuleStatus',
+        'Get-SuggestedGroup',
+        'Get-KnownVendors'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()

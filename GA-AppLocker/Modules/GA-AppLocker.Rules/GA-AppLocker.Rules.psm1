@@ -227,6 +227,8 @@ Export-ModuleMember -Function @(
     'Get-AllRules',
     'Remove-Rule',
     'Export-RulesToXml',
-    'Set-RuleStatus'
+    'Set-RuleStatus',
+    'Get-SuggestedGroup',
+    'Get-KnownVendors'
 )
 #endregion

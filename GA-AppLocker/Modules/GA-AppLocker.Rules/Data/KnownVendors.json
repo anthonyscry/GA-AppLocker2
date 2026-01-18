@@ -1,0 +1,296 @@
+{
+  "_comment": "Known vendor patterns for Smart Group Assignment in GA-AppLocker",
+  "_version": "1.0",
+  
+  "Microsoft": {
+    "Patterns": ["*MICROSOFT*", "*MS-*"],
+    "RiskLevel": "Low",
+    "Categories": {
+      "Office": {
+        "ProductPatterns": ["*Office*", "*Word*", "*Excel*", "*PowerPoint*", "*Outlook*", "*Access*", "*Publisher*", "*OneNote*", "*Teams*"],
+        "Description": "Microsoft Office Suite applications"
+      },
+      "Windows": {
+        "ProductPatterns": ["*Windows*", "*Shell*", "*Explorer*", "*System*", "*Kernel*", "*Driver*", "*Service*"],
+        "PathPatterns": ["*\\Windows\\*", "*\\System32\\*", "*\\SysWOW64\\*"],
+        "Description": "Windows operating system components"
+      },
+      "Browser": {
+        "ProductPatterns": ["*Edge*", "*Internet Explorer*"],
+        "Description": "Microsoft web browsers"
+      },
+      "Development": {
+        "ProductPatterns": ["*Visual Studio*", "*VS Code*", "*VSCode*", "*.NET*", "*SDK*", "*MSBuild*", "*NuGet*"],
+        "Description": "Development tools and SDKs"
+      },
+      "Server": {
+        "ProductPatterns": ["*SQL Server*", "*Exchange*", "*SharePoint*", "*IIS*"],
+        "Description": "Server applications"
+      },
+      "Security": {
+        "ProductPatterns": ["*Defender*", "*Security*", "*Antimalware*", "*SmartScreen*"],
+        "Description": "Security applications"
+      },
+      "Runtime": {
+        "ProductPatterns": ["*Runtime*", "*Framework*", "*Redistributable*", "*VC++*", "*MSVC*"],
+        "Description": "Runtime libraries and frameworks"
+      }
+    }
+  },
+
+  "Adobe": {
+    "Patterns": ["*ADOBE*"],
+    "RiskLevel": "Low",
+    "Categories": {
+      "PDF": {
+        "ProductPatterns": ["*Acrobat*", "*Reader*", "*PDF*"],
+        "Description": "PDF applications"
+      },
+      "Creative": {
+        "ProductPatterns": ["*Photoshop*", "*Illustrator*", "*InDesign*", "*Premiere*", "*After Effects*", "*Lightroom*", "*XD*", "*Animate*", "*Audition*", "*Bridge*", "*Creative Cloud*"],
+        "Description": "Creative Suite applications"
+      },
+      "Flash": {
+        "ProductPatterns": ["*Flash*", "*AIR*", "*Shockwave*"],
+        "Description": "Flash and AIR runtime (legacy)"
+      }
+    }
+  },
+
+  "Google": {
+    "Patterns": ["*GOOGLE*"],
+    "RiskLevel": "Low",
+    "Categories": {
+      "Browser": {
+        "ProductPatterns": ["*Chrome*"],
+        "Description": "Google Chrome browser"
+      },
+      "Drive": {
+        "ProductPatterns": ["*Drive*", "*Backup*"],
+        "Description": "Google Drive and backup tools"
+      },
+      "Earth": {
+        "ProductPatterns": ["*Earth*"],
+        "Description": "Google Earth"
+      }
+    }
+  },
+
+  "Mozilla": {
+    "Patterns": ["*MOZILLA*"],
+    "RiskLevel": "Low",
+    "Categories": {
+      "Browser": {
+        "ProductPatterns": ["*Firefox*"],
+        "Description": "Firefox browser"
+      },
+      "Email": {
+        "ProductPatterns": ["*Thunderbird*"],
+        "Description": "Thunderbird email client"
+      }
+    }
+  },
+
+  "Apple": {
+    "Patterns": ["*APPLE*"],
+    "RiskLevel": "Low",
+    "Categories": {
+      "iTunes": {
+        "ProductPatterns": ["*iTunes*", "*Apple Music*"],
+        "Description": "iTunes and Apple Music"
+      },
+      "QuickTime": {
+        "ProductPatterns": ["*QuickTime*"],
+        "Description": "QuickTime media player"
+      },
+      "iCloud": {
+        "ProductPatterns": ["*iCloud*"],
+        "Description": "iCloud services"
+      },
+      "Support": {
+        "ProductPatterns": ["*Support*", "*Update*", "*Bonjour*"],
+        "Description": "Apple support utilities"
+      }
+    }
+  },
+
+  "Oracle": {
+    "Patterns": ["*ORACLE*", "*SUN MICROSYSTEMS*"],
+    "RiskLevel": "Low",
+    "Categories": {
+      "Java": {
+        "ProductPatterns": ["*Java*", "*JRE*", "*JDK*"],
+        "Description": "Java runtime and development kit"
+      },
+      "VirtualBox": {
+        "ProductPatterns": ["*VirtualBox*"],
+        "Description": "VirtualBox virtualization"
+      },
+      "MySQL": {
+        "ProductPatterns": ["*MySQL*"],
+        "Description": "MySQL database"
+      }
+    }
+  },
+
+  "Cisco": {
+    "Patterns": ["*CISCO*"],
+    "RiskLevel": "Low",
+    "Categories": {
+      "VPN": {
+        "ProductPatterns": ["*AnyConnect*", "*VPN*", "*Jabber*", "*Webex*"],
+        "Description": "Cisco VPN and collaboration"
+      },
+      "Security": {
+        "ProductPatterns": ["*Secure*", "*Umbrella*", "*AMP*"],
+        "Description": "Cisco security products"
+      }
+    }
+  },
+
+  "VMware": {
+    "Patterns": ["*VMWARE*"],
+    "RiskLevel": "Low",
+    "Categories": {
+      "Virtualization": {
+        "ProductPatterns": ["*Workstation*", "*Player*", "*Fusion*", "*Tools*"],
+        "Description": "Desktop virtualization"
+      },
+      "Horizon": {
+        "ProductPatterns": ["*Horizon*", "*View*"],
+        "Description": "VDI solutions"
+      }
+    }
+  },
+
+  "Citrix": {
+    "Patterns": ["*CITRIX*"],
+    "RiskLevel": "Low",
+    "Categories": {
+      "Workspace": {
+        "ProductPatterns": ["*Workspace*", "*Receiver*", "*HDX*"],
+        "Description": "Citrix Workspace and receiver"
+      },
+      "VDI": {
+        "ProductPatterns": ["*XenApp*", "*XenDesktop*", "*Virtual*"],
+        "Description": "Citrix VDI solutions"
+      }
+    }
+  },
+
+  "Zoom": {
+    "Patterns": ["*ZOOM*"],
+    "RiskLevel": "Low",
+    "Categories": {
+      "Meetings": {
+        "ProductPatterns": ["*Zoom*", "*Meeting*"],
+        "Description": "Zoom video conferencing"
+      }
+    }
+  },
+
+  "Slack": {
+    "Patterns": ["*SLACK*", "*SALESFORCE*"],
+    "RiskLevel": "Low",
+    "Categories": {
+      "Collaboration": {
+        "ProductPatterns": ["*Slack*"],
+        "Description": "Slack messaging"
+      }
+    }
+  },
+
+  "7-Zip": {
+    "Patterns": ["*IGOR PAVLOV*", "*7-ZIP*"],
+    "RiskLevel": "Low",
+    "Categories": {
+      "Archive": {
+        "ProductPatterns": ["*7-Zip*", "*7z*"],
+        "Description": "7-Zip archiver"
+      }
+    }
+  },
+
+  "Notepad++": {
+    "Patterns": ["*NOTEPAD++*", "*DON HO*"],
+    "RiskLevel": "Low",
+    "Categories": {
+      "Editor": {
+        "ProductPatterns": ["*Notepad++*"],
+        "Description": "Notepad++ text editor"
+      }
+    }
+  },
+
+  "Git": {
+    "Patterns": ["*GIT*", "*GITHUB*", "*ATLASSIAN*"],
+    "RiskLevel": "Low",
+    "Categories": {
+      "VersionControl": {
+        "ProductPatterns": ["*Git*", "*GitHub*", "*Sourcetree*"],
+        "Description": "Git version control tools"
+      }
+    }
+  },
+
+  "JetBrains": {
+    "Patterns": ["*JETBRAINS*"],
+    "RiskLevel": "Low",
+    "Categories": {
+      "IDE": {
+        "ProductPatterns": ["*IntelliJ*", "*PyCharm*", "*WebStorm*", "*Rider*", "*DataGrip*", "*GoLand*", "*RubyMine*", "*PhpStorm*", "*CLion*"],
+        "Description": "JetBrains IDEs"
+      }
+    }
+  },
+
+  "NodeJS": {
+    "Patterns": ["*NODEJS*", "*NODE.JS*", "*OPENJS*"],
+    "RiskLevel": "Medium",
+    "Categories": {
+      "Runtime": {
+        "ProductPatterns": ["*Node*", "*npm*"],
+        "Description": "Node.js runtime"
+      }
+    }
+  },
+
+  "Python": {
+    "Patterns": ["*PYTHON*"],
+    "RiskLevel": "Medium",
+    "Categories": {
+      "Runtime": {
+        "ProductPatterns": ["*Python*", "*pip*"],
+        "Description": "Python runtime"
+      }
+    }
+  },
+
+  "_PathCategories": {
+    "Windows": {
+      "Patterns": ["C:\\Windows\\*", "%WINDIR%\\*", "%SYSTEMROOT%\\*"],
+      "RiskLevel": "Low",
+      "Description": "Windows system files"
+    },
+    "ProgramFiles": {
+      "Patterns": ["C:\\Program Files\\*", "C:\\Program Files (x86)\\*", "%PROGRAMFILES%\\*", "%PROGRAMFILES(X86)%\\*"],
+      "RiskLevel": "Low",
+      "Description": "Standard program installations"
+    },
+    "UserInstalled": {
+      "Patterns": ["*\\Users\\*\\AppData\\*", "*\\AppData\\Local\\*", "*\\AppData\\Roaming\\*"],
+      "RiskLevel": "Medium",
+      "Description": "User-installed applications"
+    },
+    "Temp": {
+      "Patterns": ["*\\Temp\\*", "*\\tmp\\*", "%TEMP%\\*"],
+      "RiskLevel": "High",
+      "Description": "Temporary directories"
+    },
+    "Downloads": {
+      "Patterns": ["*\\Downloads\\*", "*\\Desktop\\*"],
+      "RiskLevel": "High",
+      "Description": "User download locations"
+    }
+  }
+}

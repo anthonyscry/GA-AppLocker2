@@ -548,6 +548,52 @@ catch {
 }
 
 # ============================================================
+# PHASE-BASED ENFORCEMENT TESTS
+# ============================================================
+Write-Section "PHASE-BASED ENFORCEMENT TESTS"
+
+# Test: New-Policy with Phase parameter
+$phasePolicyId = $null
+try {
+    $phasePolicy = New-Policy -Name "PhaseTestPolicy_$(Get-Date -Format 'HHmmss')" -Phase 1 -Description "Phase 1 test"
+    $hasResult = $phasePolicy.Success -and ($phasePolicy.Data.Phase -eq 1) -and ($phasePolicy.Data.EnforcementMode -eq 'AuditOnly')
+    if ($hasResult) { $phasePolicyId = $phasePolicy.Data.PolicyId }
+    Write-TestResult -TestName "New-Policy (Phase 1)" -Passed $hasResult -Message "Phase 1 creates AuditOnly policy" -Details "Phase: $($phasePolicy.Data.Phase), Mode: $($phasePolicy.Data.EnforcementMode)"
+}
+catch {
+    Write-TestResult -TestName "New-Policy (Phase 1)" -Passed $false -Message "Exception" -Details $_.Exception.Message
+}
+
+# Test: Phase 4 sets Enabled mode
+try {
+    $phase4Policy = New-Policy -Name "Phase4TestPolicy_$(Get-Date -Format 'HHmmss')" -Phase 4
+    $hasResult = $phase4Policy.Success -and ($phase4Policy.Data.Phase -eq 4) -and ($phase4Policy.Data.EnforcementMode -eq 'Enabled')
+    Write-TestResult -TestName "New-Policy (Phase 4)" -Passed $hasResult -Message "Phase 4 creates Enabled policy" -Details "Phase: $($phase4Policy.Data.Phase), Mode: $($phase4Policy.Data.EnforcementMode)"
+    # Cleanup
+    if ($phase4Policy.Success) { Remove-Policy -PolicyId $phase4Policy.Data.PolicyId -Force | Out-Null }
+}
+catch {
+    Write-TestResult -TestName "New-Policy (Phase 4)" -Passed $false -Message "Exception" -Details $_.Exception.Message
+}
+
+# Test: Phase 2 policy
+try {
+    $phase2Policy = New-Policy -Name "Phase2TestPolicy_$(Get-Date -Format 'HHmmss')" -Phase 2
+    $hasResult = $phase2Policy.Success -and ($phase2Policy.Data.Phase -eq 2) -and ($phase2Policy.Data.EnforcementMode -eq 'AuditOnly')
+    Write-TestResult -TestName "New-Policy (Phase 2)" -Passed $hasResult -Message "Phase 2 creates AuditOnly policy" -Details "Phase: $($phase2Policy.Data.Phase)"
+    # Cleanup
+    if ($phase2Policy.Success) { Remove-Policy -PolicyId $phase2Policy.Data.PolicyId -Force | Out-Null }
+}
+catch {
+    Write-TestResult -TestName "New-Policy (Phase 2)" -Passed $false -Message "Exception" -Details $_.Exception.Message
+}
+
+# Cleanup phase test policy
+if ($phasePolicyId) {
+    try { Remove-Policy -PolicyId $phasePolicyId -Force | Out-Null } catch { }
+}
+
+# ============================================================
 # DEPLOYMENT MODULE TESTS
 # ============================================================
 Write-Section "DEPLOYMENT MODULE TESTS"

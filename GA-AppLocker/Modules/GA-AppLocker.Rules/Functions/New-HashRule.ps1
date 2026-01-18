@@ -81,6 +81,12 @@ function New-HashRule {
         [string]$SourceArtifactId,
 
         [Parameter()]
+        [string]$GroupName,
+
+        [Parameter()]
+        [PSCustomObject]$GroupSuggestion,
+
+        [Parameter()]
         [switch]$Save
     )
 
@@ -126,6 +132,11 @@ function New-HashRule {
             SourceArtifactId = $SourceArtifactId
             GeneratedBy      = $env:USERNAME
             MachineName      = $env:COMPUTERNAME
+            # Smart Group Assignment
+            GroupName        = if ($GroupName) { $GroupName } elseif ($GroupSuggestion) { $GroupSuggestion.SuggestedGroup } else { $null }
+            GroupVendor      = if ($GroupSuggestion) { $GroupSuggestion.Vendor } else { $null }
+            GroupCategory    = if ($GroupSuggestion) { $GroupSuggestion.Category } else { $null }
+            GroupRiskLevel   = if ($GroupSuggestion) { $GroupSuggestion.RiskLevel } else { $null }
         }
 
         if ($Save) {

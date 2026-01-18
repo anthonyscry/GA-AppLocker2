@@ -8,6 +8,12 @@ function Export-PolicyToXml {
         imported into Group Policy. Uses the canonical rule schema
         from GA-AppLocker.Rules module.
 
+        Supports phase-based filtering:
+        - Phase 1: EXE rules only (AuditOnly)
+        - Phase 2: EXE + Script rules (AuditOnly)
+        - Phase 3: EXE + Script + MSI rules (AuditOnly)
+        - Phase 4: All rules including DLL/Appx (Enabled)
+
     .PARAMETER PolicyId
         The unique identifier of the policy.
 
@@ -17,8 +23,15 @@ function Export-PolicyToXml {
     .PARAMETER IncludeRejected
         Include rejected rules in export (default: false).
 
+    .PARAMETER PhaseOverride
+        Override the policy's Phase setting for this export.
+        Useful for testing different phases without modifying the policy.
+
     .EXAMPLE
         Export-PolicyToXml -PolicyId "abc123" -OutputPath "C:\Policies\baseline.xml"
+
+    .EXAMPLE
+        Export-PolicyToXml -PolicyId "abc123" -OutputPath "C:\Policies\phase2.xml" -PhaseOverride 2
     #>
     [CmdletBinding()]
     param(
@@ -29,7 +42,11 @@ function Export-PolicyToXml {
         [string]$OutputPath,
 
         [Parameter(Mandatory = $false)]
-        [switch]$IncludeRejected
+        [switch]$IncludeRejected,
+
+        [Parameter(Mandatory = $false)]
+        [ValidateRange(1, 4)]
+        [int]$PhaseOverride
     )
 
     try {
@@ -66,6 +83,15 @@ function Export-PolicyToXml {
             }
         }
 
+        # Determine effective phase (override or from policy)
+        $effectivePhase = if ($PSBoundParameters.ContainsKey('PhaseOverride')) {
+            $PhaseOverride
+        } elseif ($policy.Phase) {
+            $policy.Phase
+        } else {
+            4  # Default to full export if no phase specified
+        }
+
         # Group rules by collection type (use CollectionType from Rules schema)
         $exeRules = $rules | Where-Object { $_.CollectionType -eq 'Exe' }
         $dllRules = $rules | Where-Object { $_.CollectionType -eq 'Dll' }
@@ -73,11 +99,43 @@ function Export-PolicyToXml {
         $scriptRules = $rules | Where-Object { $_.CollectionType -eq 'Script' }
         $appxRules = $rules | Where-Object { $_.CollectionType -eq 'Appx' }
 
-        # Determine enforcement mode
-        $enforcementValue = switch ($policy.EnforcementMode) {
-            'Enabled' { 'Enabled' }
-            'AuditOnly' { 'AuditOnly' }
-            default { 'NotConfigured' }
+        # Phase-based filtering:
+        # Phase 1: EXE only
+        # Phase 2: EXE + Script
+        # Phase 3: EXE + Script + MSI
+        # Phase 4: All (EXE + Script + MSI + DLL + Appx)
+        switch ($effectivePhase) {
+            1 {
+                # Phase 1: EXE only
+                $scriptRules = @()
+                $msiRules = @()
+                $dllRules = @()
+                $appxRules = @()
+            }
+            2 {
+                # Phase 2: EXE + Script
+                $msiRules = @()
+                $dllRules = @()
+                $appxRules = @()
+            }
+            3 {
+                # Phase 3: EXE + Script + MSI
+                $dllRules = @()
+                $appxRules = @()
+            }
+            # Phase 4: All rules (no filtering)
+        }
+
+        # Determine enforcement mode based on phase
+        # Phase 1-3: AuditOnly, Phase 4: Enabled (unless explicitly overridden in policy)
+        $enforcementValue = if ($effectivePhase -lt 4) {
+            'AuditOnly'
+        } elseif ($policy.EnforcementMode -eq 'Enabled') {
+            'Enabled'
+        } elseif ($policy.EnforcementMode -eq 'AuditOnly') {
+            'AuditOnly'
+        } else {
+            'NotConfigured'
         }
 
         # Build XML
@@ -110,14 +168,27 @@ $(Build-PolicyRuleCollectionXml -Rules $appxRules)
 
         $xmlContent | Set-Content -Path $OutputPath -Encoding UTF8
 
+        # Count actually exported rules (after phase filtering)
+        $exportedRuleCount = @($exeRules).Count + @($scriptRules).Count + @($msiRules).Count + @($dllRules).Count + @($appxRules).Count
+
         return @{
             Success = $true
             Data    = @{
-                Path      = $OutputPath
-                RuleCount = $rules.Count
-                Policy    = $policy.Name
+                Path            = $OutputPath
+                RuleCount       = $exportedRuleCount
+                TotalRules      = $rules.Count
+                Policy          = $policy.Name
+                Phase           = $effectivePhase
+                EnforcementMode = $enforcementValue
+                RuleBreakdown   = @{
+                    Exe    = @($exeRules).Count
+                    Script = @($scriptRules).Count
+                    Msi    = @($msiRules).Count
+                    Dll    = @($dllRules).Count
+                    Appx   = @($appxRules).Count
+                }
             }
-            Message = "Exported $($rules.Count) rules to $OutputPath"
+            Message = "Exported $exportedRuleCount rules (Phase $effectivePhase) to $OutputPath"
         }
     }
     catch {

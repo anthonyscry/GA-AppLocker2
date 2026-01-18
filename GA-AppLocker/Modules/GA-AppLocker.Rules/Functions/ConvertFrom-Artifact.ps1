@@ -121,6 +121,15 @@ function ConvertFrom-Artifact {
                     }
                 }
 
+                # Get smart group suggestion for this artifact
+                $groupSuggestion = Get-SuggestedGroup `
+                    -PublisherName $art.SignerCertificate `
+                    -ProductName $art.ProductName `
+                    -FilePath $art.FilePath `
+                    -IsSigned $art.IsSigned
+                
+                $suggestedGroup = if ($groupSuggestion.Success) { $groupSuggestion.Data } else { $null }
+
                 # Get collection type from extension
                 $extension = $art.Extension
                 if (-not $extension) {
@@ -180,6 +189,7 @@ function ConvertFrom-Artifact {
                                 -Status $Status `
                                 -UserOrGroupSid $UserOrGroupSid `
                                 -SourceArtifactId $art.SHA256Hash `
+                                -GroupSuggestion $suggestedGroup `
                                 -Save:$Save
 
                             if ($pubResult.Success) {
@@ -202,6 +212,7 @@ function ConvertFrom-Artifact {
                             -Status $Status `
                             -UserOrGroupSid $UserOrGroupSid `
                             -SourceArtifactId $art.SHA256Hash `
+                            -GroupSuggestion $suggestedGroup `
                             -Save:$Save
 
                         if ($hashResult.Success) {
@@ -216,6 +227,7 @@ function ConvertFrom-Artifact {
                             -Status $Status `
                             -UserOrGroupSid $UserOrGroupSid `
                             -SourceArtifactId $art.SHA256Hash `
+                            -GroupSuggestion $suggestedGroup `
                             -Save:$Save
 
                         if ($pathResult.Success) {
@@ -236,6 +248,12 @@ function ConvertFrom-Artifact {
                         $minVer = if ($prod.MinVersion) { $prod.MinVersion } else { '*' }
                         $maxVer = if ($prod.MaxVersion) { $prod.MaxVersion } else { '*' }
                         
+                        # Get group suggestion for this publisher/product combo
+                        $groupSuggestion = Get-SuggestedGroup `
+                            -PublisherName $group.Publisher `
+                            -ProductName $prodKey
+                        $groupSuggestData = if ($groupSuggestion.Success) { $groupSuggestion.Data } else { $null }
+                        
                         $pubResult = New-PublisherRule `
                             -PublisherName $group.Publisher `
                             -ProductName $prodKey `
@@ -247,6 +265,7 @@ function ConvertFrom-Artifact {
                             -Status $Status `
                             -UserOrGroupSid $UserOrGroupSid `
                             -Description "Auto-generated from $($group.Artifacts.Count) artifacts" `
+                            -GroupSuggestion $groupSuggestData `
                             -Save:$Save
 
                         if ($pubResult.Success) {

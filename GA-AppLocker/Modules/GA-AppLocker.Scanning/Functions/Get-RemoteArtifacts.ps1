@@ -214,8 +214,30 @@ function Get-RemoteArtifacts {
             }
         }
 
-        # Process errors - machines that failed
+        # Process errors - machines that failed with better classification
         if ($remoteErrors) {
+            # Error classification patterns
+            $transientPatterns = @(
+                'The WinRM client cannot process the request',
+                'The client cannot connect to the destination',
+                'WinRM cannot complete the operation',
+                'The operation has timed out',
+                'The semaphore timeout period has expired',
+                'A connection attempt failed'
+            )
+            $accessPatterns = @(
+                'Access is denied',
+                'The user name or password is incorrect',
+                'Logon failure'
+            )
+            $networkPatterns = @(
+                'The network path was not found',
+                'The network name cannot be found',
+                'The RPC server is unavailable',
+                'The remote computer is not available',
+                'The server is not operational'
+            )
+            
             foreach ($err in $remoteErrors) {
                 # Extract computer name from error
                 $failedComputer = if ($err.TargetObject) { 
@@ -228,12 +250,46 @@ function Get-RemoteArtifacts {
                 }
                 
                 if ($failedComputer -and -not $machineResults.ContainsKey($failedComputer)) {
+                    # Classify error for better user feedback
+                    $errorMsg = $err.Exception.Message
+                    $errorCategory = 'Unknown'
+                    $userFriendlyMsg = $errorMsg
+                    
+                    foreach ($pattern in $transientPatterns) {
+                        if ($errorMsg -match $pattern) {
+                            $errorCategory = 'Transient'
+                            $userFriendlyMsg = "Connection timed out or temporarily unavailable. Try again later."
+                            break
+                        }
+                    }
+                    if ($errorCategory -eq 'Unknown') {
+                        foreach ($pattern in $accessPatterns) {
+                            if ($errorMsg -match $pattern) {
+                                $errorCategory = 'AccessDenied'
+                                $userFriendlyMsg = "Access denied. Check credentials and permissions."
+                                break
+                            }
+                        }
+                    }
+                    if ($errorCategory -eq 'Unknown') {
+                        foreach ($pattern in $networkPatterns) {
+                            if ($errorMsg -match $pattern) {
+                                $errorCategory = 'NetworkError'
+                                $userFriendlyMsg = "Network error - machine may be offline or unreachable."
+                                break
+                            }
+                        }
+                    }
+                    
                     $machineResults[$failedComputer] = @{
                         Success       = $false
                         ArtifactCount = 0
-                        Error         = $err.Exception.Message
+                        Error         = $errorMsg
+                        ErrorCategory = $errorCategory
+                        UserMessage   = $userFriendlyMsg
+                        IsRetryable   = ($errorCategory -eq 'Transient')
                     }
-                    Write-ScanLog -Level Warning -Message "Failed to scan $failedComputer`: $($err.Exception.Message)"
+                    Write-ScanLog -Level Warning -Message "Failed to scan $failedComputer [$errorCategory]: $userFriendlyMsg"
                 }
             }
         }
