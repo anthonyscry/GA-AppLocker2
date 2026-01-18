@@ -1,0 +1,514 @@
+{
+  "_comment": "Pre-built AppLocker rule templates for common enterprise applications",
+  "_version": "1.0",
+  "_usage": "Import with Import-RuleTemplates or use New-RuleFromTemplate",
+
+  "Microsoft Office": {
+    "Description": "Microsoft Office 365/2019/2021 applications",
+    "Rules": [
+      {
+        "Name": "Microsoft Office - Publisher Rules",
+        "Type": "Publisher",
+        "Publisher": "O=MICROSOFT CORPORATION, L=REDMOND, S=WASHINGTON, C=US",
+        "ProductName": "*OFFICE*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "Microsoft Office - Path Rules",
+        "Type": "Path",
+        "Path": "%PROGRAMFILES%\\Microsoft Office\\*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "Microsoft Office x86 - Path Rules",
+        "Type": "Path",
+        "Path": "%PROGRAMFILES(X86)%\\Microsoft Office\\*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      }
+    ]
+  },
+
+  "Google Chrome": {
+    "Description": "Google Chrome browser",
+    "Rules": [
+      {
+        "Name": "Google Chrome - Publisher Rules",
+        "Type": "Publisher",
+        "Publisher": "O=GOOGLE LLC, L=MOUNTAIN VIEW, S=CALIFORNIA, C=US",
+        "ProductName": "*CHROME*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "Google Chrome - Program Files Path",
+        "Type": "Path",
+        "Path": "%PROGRAMFILES%\\Google\\Chrome\\*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "Google Chrome - x86 Path",
+        "Type": "Path",
+        "Path": "%PROGRAMFILES(X86)%\\Google\\Chrome\\*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      }
+    ]
+  },
+
+  "Mozilla Firefox": {
+    "Description": "Mozilla Firefox browser",
+    "Rules": [
+      {
+        "Name": "Mozilla Firefox - Publisher Rules",
+        "Type": "Publisher",
+        "Publisher": "O=MOZILLA CORPORATION",
+        "ProductName": "*FIREFOX*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "Mozilla Firefox - Path Rules",
+        "Type": "Path",
+        "Path": "%PROGRAMFILES%\\Mozilla Firefox\\*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      }
+    ]
+  },
+
+  "Adobe Acrobat Reader": {
+    "Description": "Adobe Acrobat Reader DC",
+    "Rules": [
+      {
+        "Name": "Adobe Reader - Publisher Rules",
+        "Type": "Publisher",
+        "Publisher": "O=ADOBE INC., L=SAN JOSE, S=CALIFORNIA, C=US",
+        "ProductName": "*ACROBAT*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "Adobe Reader - Path Rules",
+        "Type": "Path",
+        "Path": "%PROGRAMFILES%\\Adobe\\Acrobat*\\*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "Adobe Reader x86 - Path Rules",
+        "Type": "Path",
+        "Path": "%PROGRAMFILES(X86)%\\Adobe\\Acrobat*\\*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      }
+    ]
+  },
+
+  "7-Zip": {
+    "Description": "7-Zip file archiver",
+    "Rules": [
+      {
+        "Name": "7-Zip - Publisher Rules",
+        "Type": "Publisher",
+        "Publisher": "O=IGOR PAVLOV",
+        "ProductName": "*7-ZIP*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "7-Zip - Path Rules",
+        "Type": "Path",
+        "Path": "%PROGRAMFILES%\\7-Zip\\*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      }
+    ]
+  },
+
+  "Notepad++": {
+    "Description": "Notepad++ text editor",
+    "Rules": [
+      {
+        "Name": "Notepad++ - Publisher Rules",
+        "Type": "Publisher",
+        "Publisher": "O=NOTEPAD++",
+        "ProductName": "*NOTEPAD++*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "Notepad++ - Path Rules",
+        "Type": "Path",
+        "Path": "%PROGRAMFILES%\\Notepad++\\*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      }
+    ]
+  },
+
+  "Zoom": {
+    "Description": "Zoom video conferencing",
+    "Rules": [
+      {
+        "Name": "Zoom - Publisher Rules",
+        "Type": "Publisher",
+        "Publisher": "O=ZOOM VIDEO COMMUNICATIONS, INC.",
+        "ProductName": "*ZOOM*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "Zoom - AppData Path",
+        "Type": "Path",
+        "Path": "%LOCALAPPDATA%\\Zoom\\*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "Zoom - Program Files Path",
+        "Type": "Path",
+        "Path": "%PROGRAMFILES%\\Zoom\\*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      }
+    ]
+  },
+
+  "Microsoft Teams": {
+    "Description": "Microsoft Teams collaboration",
+    "Rules": [
+      {
+        "Name": "Microsoft Teams - Publisher Rules",
+        "Type": "Publisher",
+        "Publisher": "O=MICROSOFT CORPORATION",
+        "ProductName": "*TEAMS*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "Microsoft Teams - AppData Path",
+        "Type": "Path",
+        "Path": "%LOCALAPPDATA%\\Microsoft\\Teams\\*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "Microsoft Teams - Program Files Path",
+        "Type": "Path",
+        "Path": "%PROGRAMFILES%\\Microsoft\\Teams\\*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      }
+    ]
+  },
+
+  "Slack": {
+    "Description": "Slack messaging",
+    "Rules": [
+      {
+        "Name": "Slack - Publisher Rules",
+        "Type": "Publisher",
+        "Publisher": "O=SLACK TECHNOLOGIES*",
+        "ProductName": "*SLACK*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "Slack - AppData Path",
+        "Type": "Path",
+        "Path": "%LOCALAPPDATA%\\slack\\*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      }
+    ]
+  },
+
+  "Visual Studio Code": {
+    "Description": "Visual Studio Code editor",
+    "Rules": [
+      {
+        "Name": "VS Code - Publisher Rules",
+        "Type": "Publisher",
+        "Publisher": "O=MICROSOFT CORPORATION",
+        "ProductName": "*VISUAL STUDIO CODE*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "VS Code - Program Files Path",
+        "Type": "Path",
+        "Path": "%PROGRAMFILES%\\Microsoft VS Code\\*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "VS Code - AppData Path",
+        "Type": "Path",
+        "Path": "%LOCALAPPDATA%\\Programs\\Microsoft VS Code\\*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      }
+    ]
+  },
+
+  "Java Runtime": {
+    "Description": "Oracle Java Runtime Environment",
+    "Rules": [
+      {
+        "Name": "Java - Publisher Rules",
+        "Type": "Publisher",
+        "Publisher": "O=ORACLE*",
+        "ProductName": "*JAVA*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "Java - Program Files Path",
+        "Type": "Path",
+        "Path": "%PROGRAMFILES%\\Java\\*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "Java x86 - Path Rules",
+        "Type": "Path",
+        "Path": "%PROGRAMFILES(X86)%\\Java\\*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      }
+    ]
+  },
+
+  "Cisco AnyConnect": {
+    "Description": "Cisco AnyConnect VPN client",
+    "Rules": [
+      {
+        "Name": "Cisco AnyConnect - Publisher Rules",
+        "Type": "Publisher",
+        "Publisher": "O=CISCO SYSTEMS*",
+        "ProductName": "*ANYCONNECT*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "Cisco AnyConnect - Path Rules",
+        "Type": "Path",
+        "Path": "%PROGRAMFILES(X86)%\\Cisco\\Cisco AnyConnect*\\*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      }
+    ]
+  },
+
+  "Python": {
+    "Description": "Python programming language",
+    "Rules": [
+      {
+        "Name": "Python - Publisher Rules",
+        "Type": "Publisher",
+        "Publisher": "O=PYTHON SOFTWARE FOUNDATION",
+        "ProductName": "*PYTHON*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "Python - Program Files Path",
+        "Type": "Path",
+        "Path": "%PROGRAMFILES%\\Python*\\*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "Python - AppData Path",
+        "Type": "Path",
+        "Path": "%LOCALAPPDATA%\\Programs\\Python\\*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      }
+    ]
+  },
+
+  "Git": {
+    "Description": "Git version control",
+    "Rules": [
+      {
+        "Name": "Git - Publisher Rules",
+        "Type": "Publisher",
+        "Publisher": "O=JOHANNES SCHINDELIN",
+        "ProductName": "*GIT*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "Git - Program Files Path",
+        "Type": "Path",
+        "Path": "%PROGRAMFILES%\\Git\\*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      }
+    ]
+  },
+
+  "Windows Default Allow": {
+    "Description": "Default Windows allow rules for system paths",
+    "Rules": [
+      {
+        "Name": "Windows - System32",
+        "Type": "Path",
+        "Path": "%SYSTEMROOT%\\System32\\*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "Windows - SysWOW64",
+        "Type": "Path",
+        "Path": "%SYSTEMROOT%\\SysWOW64\\*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "Windows - Program Files",
+        "Type": "Path",
+        "Path": "%PROGRAMFILES%\\*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "Windows - Program Files x86",
+        "Type": "Path",
+        "Path": "%PROGRAMFILES(X86)%\\*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "Windows - Microsoft Signed",
+        "Type": "Publisher",
+        "Publisher": "O=MICROSOFT CORPORATION*",
+        "ProductName": "*",
+        "Action": "Allow",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      }
+    ]
+  },
+
+  "Block High Risk Locations": {
+    "Description": "Block execution from commonly abused locations",
+    "Rules": [
+      {
+        "Name": "Block - User Temp Folder",
+        "Type": "Path",
+        "Path": "%TEMP%\\*",
+        "Action": "Deny",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "Block - User Downloads",
+        "Type": "Path",
+        "Path": "%USERPROFILE%\\Downloads\\*",
+        "Action": "Deny",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "Block - User Desktop",
+        "Type": "Path",
+        "Path": "%USERPROFILE%\\Desktop\\*",
+        "Action": "Deny",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "Block - AppData Local Temp",
+        "Type": "Path",
+        "Path": "%LOCALAPPDATA%\\Temp\\*",
+        "Action": "Deny",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      },
+      {
+        "Name": "Block - Public Folder",
+        "Type": "Path",
+        "Path": "C:\\Users\\Public\\*",
+        "Action": "Deny",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Exe"
+      }
+    ]
+  },
+
+  "Block Script Locations": {
+    "Description": "Block scripts from user-writable locations",
+    "Rules": [
+      {
+        "Name": "Block Scripts - Temp",
+        "Type": "Path",
+        "Path": "%TEMP%\\*",
+        "Action": "Deny",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Script"
+      },
+      {
+        "Name": "Block Scripts - Downloads",
+        "Type": "Path",
+        "Path": "%USERPROFILE%\\Downloads\\*",
+        "Action": "Deny",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Script"
+      },
+      {
+        "Name": "Block Scripts - AppData",
+        "Type": "Path",
+        "Path": "%APPDATA%\\*",
+        "Action": "Deny",
+        "UserOrGroup": "Everyone",
+        "CollectionType": "Script"
+      }
+    ]
+  }
+}
