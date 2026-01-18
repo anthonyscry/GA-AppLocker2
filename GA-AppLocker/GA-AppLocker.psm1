@@ -42,6 +42,68 @@ Add-Type -AssemblyName PresentationCore
 Add-Type -AssemblyName WindowsBase
 #endregion
 
+#region ===== LOAD NESTED MODULES =====
+# Explicitly import nested modules in dependency order
+# Core first (no dependencies), then others
+$modulePath = Split-Path -Parent $PSScriptRoot
+
+try {
+    # Core module - foundation for all other modules
+    $coreModulePath = Join-Path $modulePath 'Modules\GA-AppLocker.Core\GA-AppLocker.Core.psd1'
+    if (Test-Path $coreModulePath) {
+        Import-Module $coreModulePath -ErrorAction Stop
+    }
+    
+    # Discovery module - depends on Core
+    $discoveryModulePath = Join-Path $modulePath 'Modules\GA-AppLocker.Discovery\GA-AppLocker.Discovery.psd1'
+    if (Test-Path $discoveryModulePath) {
+        Import-Module $discoveryModulePath -ErrorAction Stop
+    }
+    
+    # Credentials module - depends on Core
+    $credModulePath = Join-Path $modulePath 'Modules\GA-AppLocker.Credentials\GA-AppLocker.Credentials.psd1'
+    if (Test-Path $credModulePath) {
+        Import-Module $credModulePath -ErrorAction Stop
+    }
+    
+    # Scanning module - depends on Core, Discovery
+    $scanModulePath = Join-Path $modulePath 'Modules\GA-AppLocker.Scanning\GA-AppLocker.Scanning.psd1'
+    if (Test-Path $scanModulePath) {
+        Import-Module $scanModulePath -ErrorAction Stop
+    }
+    
+    # Rules module - depends on Core
+    $rulesModulePath = Join-Path $modulePath 'Modules\GA-AppLocker.Rules\GA-AppLocker.Rules.psd1'
+    if (Test-Path $rulesModulePath) {
+        Import-Module $rulesModulePath -ErrorAction Stop
+    }
+    
+    # Policy module - depends on Core, Rules
+    $policyModulePath = Join-Path $modulePath 'Modules\GA-AppLocker.Policy\GA-AppLocker.Policy.psd1'
+    if (Test-Path $policyModulePath) {
+        Import-Module $policyModulePath -ErrorAction Stop
+    }
+    
+    # Deployment module - depends on Core, Policy
+    $deployModulePath = Join-Path $modulePath 'Modules\GA-AppLocker.Deployment\GA-AppLocker.Deployment.psd1'
+    if (Test-Path $deployModulePath) {
+        Import-Module $deployModulePath -ErrorAction Stop
+    }
+    
+    # Setup module - loads functions directly (no manifest)
+    $setupModulePath = Join-Path $modulePath 'Modules\GA-AppLocker.Setup\GA-AppLocker.Setup.psm1'
+    if (Test-Path $setupModulePath) {
+        . $setupModulePath
+    }
+    
+    Write-AppLockerLog -Message 'All nested modules loaded successfully' -NoConsole
+}
+catch {
+    Write-AppLockerLog -Level Error -Message "Failed to load nested modules: $($_.Exception.Message)"
+    throw
+}
+#endregion
+
 #region ===== GUI ENTRY POINT =====
 <#
 .SYNOPSIS
