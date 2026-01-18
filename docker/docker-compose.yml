@@ -1,0 +1,96 @@
+# GA-AppLocker Docker Test Environment
+# Provides Samba AD DC for testing Active Directory integration
+#
+# Usage:
+#   docker-compose up -d          # Start AD environment
+#   docker-compose down           # Stop and remove
+#   docker-compose logs -f samba  # View Samba logs
+#
+# AD Credentials:
+#   Domain: YOURLAB.LOCAL
+#   Admin: Administrator
+#   Password: P@ssw0rd123!
+
+version: '3.8'
+
+services:
+  # Samba Active Directory Domain Controller
+  samba-ad:
+    image: nowsci/samba-domain
+    container_name: ga-applocker-ad
+    hostname: dc1
+    domainname: yourlab.local
+    privileged: true
+    environment:
+      # Domain Configuration
+      - DOMAIN=YOURLAB.LOCAL
+      - DOMAINPASS=P@ssw0rd123!
+      - DNSFORWARDER=8.8.8.8
+      - HOSTIP=172.28.0.10
+      # Join mode (false = create new domain)
+      - JOIN=false
+      # Insecure LDAP for testing (not for production!)
+      - INSECURE_LDAP=true
+      - INSECURE_PASSWORDSETTINGS=true
+    volumes:
+      - samba-data:/var/lib/samba
+      - samba-config:/etc/samba/external
+      - ./scripts/setup-ad.sh:/docker-entrypoint-init.d/setup-ad.sh:ro
+    networks:
+      ad-network:
+        ipv4_address: 172.28.0.10
+    ports:
+      # Using non-standard ports to avoid conflicts with Windows services
+      - "10389:389"   # LDAP (host:container)
+      - "10636:636"   # LDAPS
+      - "10088:88"    # Kerberos
+      - "10464:464"   # Kerberos password change
+      # Skip conflicting ports on Windows
+      # - "135:135"   # RPC (Windows uses this)
+      # - "139:139"   # NetBIOS (Windows uses this)
+      # - "445:445"   # SMB (Windows uses this)
+      - "13268:3268"  # Global Catalog
+      - "13269:3269"  # Global Catalog SSL
+    healthcheck:
+      test: ["CMD", "samba-tool", "domain", "info", "172.28.0.10"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    restart: unless-stopped
+
+  # PowerShell test runner container (optional - for CI)
+  powershell-test:
+    image: mcr.microsoft.com/powershell:lts-ubuntu-22.04
+    container_name: ga-applocker-test
+    hostname: testrunner
+    depends_on:
+      samba-ad:
+        condition: service_healthy
+    environment:
+      - AD_SERVER=172.28.0.10
+      - AD_DOMAIN=YOURLAB.LOCAL
+      - AD_USER=Administrator
+      - AD_PASSWORD=P@ssw0rd123!
+    volumes:
+      - ../:/workspace:ro
+      - ./scripts:/scripts:ro
+    networks:
+      ad-network:
+        ipv4_address: 172.28.0.20
+    working_dir: /workspace
+    command: ["pwsh", "-File", "/scripts/run-ad-tests.ps1"]
+    profiles:
+      - test  # Only starts with: docker-compose --profile test up
+
+networks:
+  ad-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
+          gateway: 172.28.0.1
+
+volumes:
+  samba-data:
+  samba-config:

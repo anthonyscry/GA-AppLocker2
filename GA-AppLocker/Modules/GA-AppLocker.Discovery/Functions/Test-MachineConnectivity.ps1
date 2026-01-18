@@ -32,6 +32,7 @@ function Test-MachineConnectivity {
     [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
         [array]$Machines,
 
         [Parameter()]
@@ -48,6 +49,20 @@ function Test-MachineConnectivity {
         Summary = $null
     }
 
+    # Handle empty input gracefully
+    if (-not $Machines -or $Machines.Count -eq 0) {
+        $result.Success = $true
+        $result.Data = @()
+        $result.Summary = [PSCustomObject]@{
+            TotalMachines    = 0
+            OnlineCount      = 0
+            OfflineCount     = 0
+            WinRMAvailable   = 0
+            WinRMUnavailable = 0
+        }
+        return $result
+    }
+
     try {
         $testedMachines = [System.Collections.ArrayList]::new()
         $onlineCount = 0
@@ -55,10 +70,10 @@ function Test-MachineConnectivity {
 
         foreach ($machine in $Machines) {
             #region --- Ping Test ---
+            # Note: PS 5.1 Test-Connection doesn't have TimeoutSeconds parameter
             $pingResult = Test-Connection -ComputerName $machine.Hostname `
                 -Count 1 `
                 -Quiet `
-                -TimeoutSeconds $TimeoutSeconds `
                 -ErrorAction SilentlyContinue
 
             $machine.IsOnline = $pingResult

@@ -116,7 +116,21 @@ function Start-AppLockerDashboard {
 
         # Load code-behind (contains navigation helpers)
         if (Test-Path $codeBehindPath) {
-            . $codeBehindPath
+            try {
+                . $codeBehindPath
+                Write-AppLockerLog -Message 'Code-behind loaded successfully'
+                
+                # Load toast/loading helpers
+                $toastHelpersPath = Join-Path $PSScriptRoot 'GUI\ToastHelpers.ps1'
+                if (Test-Path $toastHelpersPath) {
+                    . $toastHelpersPath
+                    Write-AppLockerLog -Message 'Toast helpers loaded successfully'
+                }
+            }
+            catch {
+                Write-AppLockerLog -Level Error -Message "Code-behind load failed: $($_.Exception.Message)"
+                throw
+            }
         }
 
         # Load XAML
@@ -134,11 +148,37 @@ function Start-AppLockerDashboard {
 
         # Initialize window (wire up navigation, etc.)
         if (Get-Command -Name 'Initialize-MainWindow' -ErrorAction SilentlyContinue) {
-            Initialize-MainWindow -Window $window
+            try {
+                Initialize-MainWindow -Window $window
+                Write-AppLockerLog -Message 'Window initialization completed'
+            }
+            catch {
+                Write-AppLockerLog -Level Error -Message "Window initialization failed: $($_.Exception.Message)"
+                Write-AppLockerLog -Level Error -Message "Stack trace: $($_.ScriptStackTrace)"
+            }
         }
 
         # Show window
-        $window.ShowDialog() | Out-Null
+        Write-AppLockerLog -Message 'Showing dialog...'
+
+        # Add handler for unhandled dispatcher exceptions
+        [System.Windows.Threading.Dispatcher]::CurrentDispatcher.add_UnhandledException({
+            param($sender, $e)
+            Write-AppLockerLog -Level Error -Message "WPF Dispatcher exception: $($e.Exception.Message)"
+            $e.Handled = $true
+        })
+
+        # Add loaded event to verify window renders
+        $window.add_Loaded({
+            Write-AppLockerLog -Message 'Window Loaded event fired'
+        })
+
+        # Ensure window is activated and visible
+        $window.Activate() | Out-Null
+        $window.Focus() | Out-Null
+
+        $result = $window.ShowDialog()
+        Write-AppLockerLog -Message "ShowDialog returned: $result"
 
         Write-AppLockerLog -Message 'Application closed'
     }
@@ -156,7 +196,74 @@ function Start-AppLockerDashboard {
 #endregion
 
 #region ===== EXPORTS =====
+# Export all functions from this module and nested modules
+# The FunctionsToExport in .psd1 filters what's actually visible
 Export-ModuleMember -Function @(
-    'Start-AppLockerDashboard'
+    # Main module
+    'Start-AppLockerDashboard',
+    # Core module
+    'Write-AppLockerLog',
+    'Get-AppLockerConfig',
+    'Set-AppLockerConfig',
+    'Test-Prerequisites',
+    'Get-AppLockerDataPath',
+    'Invoke-WithRetry',
+    'Save-SessionState',
+    'Restore-SessionState',
+    'Clear-SessionState',
+    # Discovery module
+    'Get-DomainInfo',
+    'Get-OUTree',
+    'Get-ComputersByOU',
+    'Test-MachineConnectivity',
+    # Credentials module
+    'New-CredentialProfile',
+    'Get-CredentialProfile',
+    'Get-AllCredentialProfiles',
+    'Remove-CredentialProfile',
+    'Test-CredentialProfile',
+    'Get-CredentialForTier',
+    'Get-CredentialStoragePath',
+    # Scanning module
+    'Get-LocalArtifacts',
+    'Get-RemoteArtifacts',
+    'Get-AppLockerEventLogs',
+    'Start-ArtifactScan',
+    'Get-ScanResults',
+    'Export-ScanResults',
+    # Rules module
+    'New-PublisherRule',
+    'New-HashRule',
+    'New-PathRule',
+    'ConvertFrom-Artifact',
+    'Get-Rule',
+    'Get-AllRules',
+    'Remove-Rule',
+    'Export-RulesToXml',
+    'Set-RuleStatus',
+    'Get-SuggestedGroup',
+    'Get-KnownVendors',
+    # Policy module
+    'New-Policy',
+    'Get-Policy',
+    'Get-AllPolicies',
+    'Remove-Policy',
+    'Set-PolicyStatus',
+    'Add-RuleToPolicy',
+    'Remove-RuleFromPolicy',
+    'Set-PolicyTarget',
+    'Export-PolicyToXml',
+    'Test-PolicyCompliance',
+    # Deployment module
+    'New-DeploymentJob',
+    'Get-DeploymentJob',
+    'Get-AllDeploymentJobs',
+    'Start-Deployment',
+    'Stop-Deployment',
+    'Get-DeploymentStatus',
+    'Test-GPOExists',
+    'New-AppLockerGPO',
+    'Import-PolicyToGPO',
+    'Get-DeploymentHistory'
 )
 #endregion

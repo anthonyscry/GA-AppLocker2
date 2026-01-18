@@ -33,7 +33,7 @@ Features:
 - Auto-generate rules using best practices (Publisher > Hash > Path)
 - Create and merge policies by machine type (Workstation/Server/DC)
 - Deploy to GPOs with phase-based enforcement (Audit -> Enforce)
-- WPF GUI with MVVM architecture
+- WPF GUI with code-behind pattern and central button dispatcher
 '@
 
     # Minimum version of the PowerShell engine required by this module
@@ -47,13 +47,14 @@ Features:
 
     # Nested modules to load
     NestedModules = @(
-        'Modules\GA-AppLocker.Core\GA-AppLocker.Core.psd1'
-        # Future modules will be added here:
-        # 'Modules\GA-AppLocker.Discovery\GA-AppLocker.Discovery.psd1'
-        # 'Modules\GA-AppLocker.Scanning\GA-AppLocker.Scanning.psd1'
-        # 'Modules\GA-AppLocker.Rules\GA-AppLocker.Rules.psd1'
-        # 'Modules\GA-AppLocker.Policy\GA-AppLocker.Policy.psd1'
-        # 'Modules\GA-AppLocker.Credentials\GA-AppLocker.Credentials.psd1'
+        'Modules\GA-AppLocker.Core\GA-AppLocker.Core.psd1',
+        'Modules\GA-AppLocker.Discovery\GA-AppLocker.Discovery.psd1',
+        'Modules\GA-AppLocker.Credentials\GA-AppLocker.Credentials.psd1',
+        'Modules\GA-AppLocker.Scanning\GA-AppLocker.Scanning.psd1',
+        'Modules\GA-AppLocker.Rules\GA-AppLocker.Rules.psd1',
+        'Modules\GA-AppLocker.Policy\GA-AppLocker.Policy.psd1',
+        'Modules\GA-AppLocker.Deployment\GA-AppLocker.Deployment.psd1',
+        'Modules\GA-AppLocker.Setup\GA-AppLocker.Setup.psm1'
     )
 
     # Functions to export from this module (re-export from nested modules + GUI)
@@ -64,6 +65,72 @@ Features:
         'Set-AppLockerConfig',
         'Test-Prerequisites',
         'Get-AppLockerDataPath',
+        'Invoke-WithRetry',
+        'Save-SessionState',
+        'Restore-SessionState',
+        'Clear-SessionState',
+        # Discovery module
+        'Get-DomainInfo',
+        'Get-OUTree',
+        'Get-ComputersByOU',
+        'Test-MachineConnectivity',
+        # Credentials module
+        'New-CredentialProfile',
+        'Get-CredentialProfile',
+        'Get-AllCredentialProfiles',
+        'Remove-CredentialProfile',
+        'Test-CredentialProfile',
+        'Get-CredentialForTier',
+        'Get-CredentialStoragePath',
+        # Scanning module
+        'Get-LocalArtifacts',
+        'Get-RemoteArtifacts',
+        'Get-AppLockerEventLogs',
+        'Start-ArtifactScan',
+        'Get-ScanResults',
+        'Export-ScanResults',
+        # Rules module
+        'New-PublisherRule',
+        'New-HashRule',
+        'New-PathRule',
+        'ConvertFrom-Artifact',
+        'Get-Rule',
+        'Get-AllRules',
+        'Remove-Rule',
+        'Export-RulesToXml',
+        'Set-RuleStatus',
+        'Get-SuggestedGroup',
+        'Get-KnownVendors',
+        # Policy module
+        'New-Policy',
+        'Get-Policy',
+        'Get-AllPolicies',
+        'Remove-Policy',
+        'Set-PolicyStatus',
+        'Add-RuleToPolicy',
+        'Remove-RuleFromPolicy',
+        'Set-PolicyTarget',
+        'Export-PolicyToXml',
+        'Test-PolicyCompliance',
+        # Deployment module
+        'New-DeploymentJob',
+        'Get-DeploymentJob',
+        'Get-AllDeploymentJobs',
+        'Start-Deployment',
+        'Stop-Deployment',
+        'Get-DeploymentStatus',
+        'Test-GPOExists',
+        'New-AppLockerGPO',
+        'Import-PolicyToGPO',
+        'Get-DeploymentHistory',
+        # Setup module
+        'Initialize-WinRMGPO',
+        'Initialize-AppLockerGPOs',
+        'Initialize-ADStructure',
+        'Initialize-AppLockerEnvironment',
+        'Get-SetupStatus',
+        'Enable-WinRMGPO',
+        'Disable-WinRMGPO',
         # Main module
         'Start-AppLockerDashboard'
     )
@@ -106,16 +173,26 @@ Features:
 
             # ReleaseNotes of this module
             ReleaseNotes = @'
-Version 1.0.0 - Initial Release
-================================
-Phase 1: Foundation
+Version 1.0.0 - Development
+============================
+Phase 1: Foundation (Complete)
 - Core module with logging, configuration, and prerequisites check
 - Basic WPF window shell with navigation
 - Session context persistence
 
+Phase 2: AD Discovery (Complete)
+- Domain info retrieval
+- OU tree discovery
+- Machine enumeration by OU
+- Connectivity testing (ping/WinRM)
+
+Phase 3: Credential Management (Complete)
+- Tiered credential model (T0: DCs, T1: Servers, T2: Workstations)
+- DPAPI-encrypted credential storage
+- Credential testing against target machines
+- Settings panel with credential UI
+
 Planned:
-- Phase 2: AD Discovery
-- Phase 3: Credential Management
 - Phase 4: Artifact Scanning
 - Phase 5: Rule Generation
 - Phase 6: Policy & Deployment

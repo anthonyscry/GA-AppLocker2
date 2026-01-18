@@ -1,0 +1,167 @@
+# GA-AppLocker Continuous Integration Pipeline
+# Runs on every push and PR to main branches
+
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop, 'feature/*', 'claude/*']
+  pull_request:
+    branches: [main, master, develop]
+
+jobs:
+  lint:
+    name: Static Analysis
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Install-Module -Name PSScriptAnalyzer -Force -SkipPublisherCheck -Scope CurrentUser
+
+      - name: Run PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Import-Module PSScriptAnalyzer
+          $results = Invoke-ScriptAnalyzer -Path ./GA-AppLocker -Settings ./PSScriptAnalyzerSettings.psd1 -Recurse -Severity Error
+          if ($results.Count -gt 0) {
+            $results | Format-Table -AutoSize
+            throw "PSScriptAnalyzer found $($results.Count) error(s)"
+          }
+          Write-Host "No PSScriptAnalyzer errors found" -ForegroundColor Green
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: windows-latest
+    needs: lint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          Install-Module -Name Pester -Force -SkipPublisherCheck -Scope CurrentUser -MinimumVersion 5.0.0
+
+      - name: Run Unit Tests
+        shell: pwsh
+        run: |
+          Import-Module Pester
+          $config = New-PesterConfiguration
+          $config.Run.Path = './Tests/Unit'
+          $config.Run.Exit = $true
+          $config.Output.Verbosity = 'Detailed'
+          $config.TestResult.Enabled = $true
+          $config.TestResult.OutputPath = 'unit-test-results.xml'
+          $config.TestResult.OutputFormat = 'NUnitXml'
+          Invoke-Pester -Configuration $config
+
+      - name: Upload Unit Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-test-results
+          path: unit-test-results.xml
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: windows-latest
+    needs: unit-tests
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          Install-Module -Name Pester -Force -SkipPublisherCheck -Scope CurrentUser -MinimumVersion 5.0.0
+
+      - name: Run Integration Tests
+        shell: pwsh
+        run: |
+          Import-Module Pester
+          $config = New-PesterConfiguration
+          $config.Run.Path = './Tests/Integration'
+          $config.Run.Exit = $true
+          $config.Output.Verbosity = 'Detailed'
+          $config.TestResult.Enabled = $true
+          $config.TestResult.OutputPath = 'integration-test-results.xml'
+          $config.TestResult.OutputFormat = 'NUnitXml'
+          Invoke-Pester -Configuration $config
+
+      - name: Upload Integration Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-test-results
+          path: integration-test-results.xml
+
+  regression-tests:
+    name: Regression Tests (Legacy Suite)
+    runs-on: windows-latest
+    needs: integration-tests
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Legacy Test Suite
+        shell: pwsh
+        run: |
+          ./Test-AllModules.ps1
+
+  code-coverage:
+    name: Code Coverage
+    runs-on: windows-latest
+    needs: [unit-tests, integration-tests]
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          Install-Module -Name Pester -Force -SkipPublisherCheck -Scope CurrentUser -MinimumVersion 5.0.0
+
+      - name: Run Tests with Coverage
+        shell: pwsh
+        run: |
+          Import-Module Pester
+          $config = New-PesterConfiguration
+          $config.Run.Path = './Tests'
+          $config.Run.Exit = $false
+          $config.Output.Verbosity = 'Normal'
+          $config.CodeCoverage.Enabled = $true
+          $config.CodeCoverage.Path = @(
+            './GA-AppLocker/Modules/GA-AppLocker.Policy/Functions/*.ps1',
+            './GA-AppLocker/Modules/GA-AppLocker.Rules/Functions/*.ps1'
+          )
+          $config.CodeCoverage.OutputPath = 'coverage.xml'
+          $config.CodeCoverage.OutputFormat = 'JaCoCo'
+          $result = Invoke-Pester -Configuration $config
+          
+          # Report coverage percentage
+          $coverage = $result.CodeCoverage.CoveragePercent
+          Write-Host "Code Coverage: $([math]::Round($coverage, 2))%"
+          
+          if ($coverage -lt 50) {
+            Write-Warning "Code coverage is below 50%"
+          }
+
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+
+  # Gate: All tests must pass before merge
+  ci-complete:
+    name: CI Complete
+    runs-on: windows-latest
+    needs: [lint, unit-tests, integration-tests, regression-tests]
+    steps:
+      - name: All checks passed
+        run: echo "All CI checks passed successfully!"
