@@ -58,7 +58,10 @@ function Get-RemoteArtifacts {
         [switch]$Recurse,
 
         [Parameter()]
-        [int]$ThrottleLimit = 5
+        [int]$ThrottleLimit = 5,
+
+        [Parameter()]
+        [int]$BatchSize = 50
     )
 
     $result = [PSCustomObject]@{
@@ -177,12 +180,11 @@ function Get-RemoteArtifacts {
         }
         #endregion
 
-        #region --- Execute on machines in parallel ---
-        Write-ScanLog -Message "Scanning $($ComputerName.Count) machines in parallel (ThrottleLimit: $ThrottleLimit)"
+        #region --- Execute on machines in parallel with batching ---
+        Write-ScanLog -Message "Scanning $($ComputerName.Count) machines in parallel (ThrottleLimit: $ThrottleLimit, BatchSize: $BatchSize)"
 
         # Build Invoke-Command parameters for parallel execution
         $invokeParams = @{
-            ComputerName  = $ComputerName
             ScriptBlock   = $remoteScriptBlock
             ArgumentList  = @($Paths, $Extensions, $Recurse.IsPresent)
             ThrottleLimit = $ThrottleLimit
@@ -194,116 +196,37 @@ function Get-RemoteArtifacts {
             $invokeParams.Credential = $Credential
         }
 
-        # Execute in parallel - Invoke-Command handles multiple computers natively
-        $remoteResults = Invoke-Command @invokeParams
+        # Process machines in batches to handle large-scale scans
+        $batchedResults = @()
+        $batchNumber = 0
+        $batches = [System.Collections.ArrayList]::new()
 
-        # Process results - group by PSComputerName
-        if ($remoteResults) {
-            $allArtifacts = @($remoteResults)
-            
-            # Build per-machine results from successful returns
-            $remoteResults | Group-Object PSComputerName | ForEach-Object {
-                $computerName = $_.Name
-                $machineArtifacts = $_.Group
-                $machineResults[$computerName] = @{
-                    Success       = $true
-                    ArtifactCount = $machineArtifacts.Count
-                    Error         = $null
-                }
-                Write-ScanLog -Message "Collected $($machineArtifacts.Count) artifacts from $computerName"
+        if ($ComputerName.Count -le $BatchSize) {
+            # Small enough for single batch
+            $null = $batches.Add($ComputerName)
+        } else {
+            # Split into batches
+            for ($i = 0; $i -lt $ComputerName.Count; $i += $BatchSize) {
+                $batch = $ComputerName[$i..[Math]::Min($i + $BatchSize - 1, $ComputerName.Count - 1)]
+                $null = $batches.Add($batch)
             }
         }
 
-        # Process errors - machines that failed with better classification
-        if ($remoteErrors) {
-            # Error classification patterns
-            $transientPatterns = @(
-                'The WinRM client cannot process the request',
-                'The client cannot connect to the destination',
-                'WinRM cannot complete the operation',
-                'The operation has timed out',
-                'The semaphore timeout period has expired',
-                'A connection attempt failed'
-            )
-            $accessPatterns = @(
-                'Access is denied',
-                'The user name or password is incorrect',
-                'Logon failure'
-            )
-            $networkPatterns = @(
-                'The network path was not found',
-                'The network name cannot be found',
-                'The RPC server is unavailable',
-                'The remote computer is not available',
-                'The server is not operational'
-            )
-            
-            foreach ($err in $remoteErrors) {
-                # Extract computer name from error
-                $failedComputer = if ($err.TargetObject) { 
-                    $err.TargetObject.ToString() 
-                } elseif ($err.Exception.Message -match '(\S+)') {
-                    # Try to extract from message
-                    $ComputerName | Where-Object { $err.Exception.Message -match [regex]::Escape($_) } | Select-Object -First 1
-                } else {
-                    'Unknown'
-                }
-                
-                if ($failedComputer -and -not $machineResults.ContainsKey($failedComputer)) {
-                    # Classify error for better user feedback
-                    $errorMsg = $err.Exception.Message
-                    $errorCategory = 'Unknown'
-                    $userFriendlyMsg = $errorMsg
-                    
-                    foreach ($pattern in $transientPatterns) {
-                        if ($errorMsg -match $pattern) {
-                            $errorCategory = 'Transient'
-                            $userFriendlyMsg = "Connection timed out or temporarily unavailable. Try again later."
-                            break
-                        }
-                    }
-                    if ($errorCategory -eq 'Unknown') {
-                        foreach ($pattern in $accessPatterns) {
-                            if ($errorMsg -match $pattern) {
-                                $errorCategory = 'AccessDenied'
-                                $userFriendlyMsg = "Access denied. Check credentials and permissions."
-                                break
-                            }
-                        }
-                    }
-                    if ($errorCategory -eq 'Unknown') {
-                        foreach ($pattern in $networkPatterns) {
-                            if ($errorMsg -match $pattern) {
-                                $errorCategory = 'NetworkError'
-                                $userFriendlyMsg = "Network error - machine may be offline or unreachable."
-                                break
-                            }
-                        }
-                    }
-                    
-                    $machineResults[$failedComputer] = @{
-                        Success       = $false
-                        ArtifactCount = 0
-                        Error         = $errorMsg
-                        ErrorCategory = $errorCategory
-                        UserMessage   = $userFriendlyMsg
-                        IsRetryable   = ($errorCategory -eq 'Transient')
-                    }
-                    Write-ScanLog -Level Warning -Message "Failed to scan $failedComputer [$errorCategory]: $userFriendlyMsg"
-                }
+        foreach ($batch in $batches) {
+            $batchNumber++
+            if ($batches.Count -gt 1) {
+                Write-ScanLog -Message "Processing batch $batchNumber of $($batches.Count) ($($batch.Count) machines)..."
             }
+
+            $invokeParams.ComputerName = $batch
+            $batchResults = Invoke-Command @invokeParams
+            if ($batchResults) {
+                $batchedResults += $batchResults
+            }
+            Start-Sleep -Milliseconds 100  # Brief pause between batches
         }
 
-        # Mark machines with no results and no errors as having 0 artifacts
-        foreach ($computer in $ComputerName) {
-            if (-not $machineResults.ContainsKey($computer)) {
-                $machineResults[$computer] = @{
-                    Success       = $true
-                    ArtifactCount = 0
-                    Error         = $null
-                }
-            }
-        }
+        $remoteResults = $batchedResults
         #endregion
 
         #region --- Build summary ---
