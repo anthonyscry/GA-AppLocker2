@@ -47,7 +47,15 @@ function Get-RuleTemplates {
     try {
         # $PSScriptRoot is the Functions folder, go up one level to module root
         $modulePath = Split-Path -Parent $PSScriptRoot
-        $templatePath = Join-Path $modulePath 'Data\RuleTemplates.json'
+        $dataPath = Join-Path $modulePath 'Data'
+        $templatePath = Join-Path $dataPath 'RuleTemplates.json'
+
+        # Validate path stays within expected module boundaries
+        $normalizedPath = [System.IO.Path]::GetFullPath($templatePath)
+        $normalizedDataPath = [System.IO.Path]::GetFullPath($dataPath)
+        if (-not $normalizedPath.StartsWith($normalizedDataPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw "Invalid template path: path traversal detected"
+        }
 
         if (-not (Test-Path $templatePath)) {
             throw "Rule templates file not found: $templatePath"
