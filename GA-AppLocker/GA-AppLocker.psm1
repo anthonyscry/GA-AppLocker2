@@ -216,6 +216,14 @@ Export-ModuleMember -Function @(
     'Get-OUTree',
     'Get-ComputersByOU',
     'Test-MachineConnectivity',
+    # LDAP fallback functions
+    'Get-LdapConnection',
+    'Get-LdapSearchResult',
+    'Get-DomainInfoViaLdap',
+    'Get-OUTreeViaLdap',
+    'Get-ComputersByOUViaLdap',
+    'Set-LdapConfiguration',
+    'Test-LdapConnection',
     # Credentials module
     'New-CredentialProfile',
     'Get-CredentialProfile',
@@ -243,6 +251,9 @@ Export-ModuleMember -Function @(
     'Set-RuleStatus',
     'Get-SuggestedGroup',
     'Get-KnownVendors',
+    'Get-RuleTemplates',
+    'New-RulesFromTemplate',
+    'Get-RuleTemplateCategories',
     # Policy module
     'New-Policy',
     'Get-Policy',
