@@ -24,6 +24,10 @@ function Get-LdapConnection {
         $connection.SessionOptions.ReferralChasing = [System.DirectoryServices.Protocols.ReferralChasingOptions]::None
         if ($UseSSL) { $connection.SessionOptions.SecureSocketLayer = $true }
         if ($Credential) {
+            # Warn about Basic auth without SSL
+            if (-not $UseSSL) {
+                Write-AppLockerLog -Level Warning -Message "LDAP: Using Basic authentication without SSL. Credentials transmitted base64-encoded. Consider enabling SSL (-UseSSL) for production deployments."
+            }
             $connection.Credential = $Credential.GetNetworkCredential()
             $connection.AuthType = [System.DirectoryServices.Protocols.AuthType]::Basic
         } else {
