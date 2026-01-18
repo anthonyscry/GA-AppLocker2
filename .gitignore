@@ -1,0 +1,42 @@
+# API Test Artifacts
+Test-GeminiAPI.ps1
+Test-GroqAPI.ps1
+Test-ZhipuAPI.ps1
+test_*.py
+setup_api_keys.py
+zhipu_api_demo.py
+*_api_test_results*.json
+*_connectivity_test_results*.json
+*_demo_results*.json
+.env
+.env.local
+API-SETUP.md
+*-API-*.md
+ZHIPU-GLM-CODING-PLAN.md
+
+# Windows artifacts
+nul
+Thumbs.db
+desktop.ini
+
+# PowerShell
+*.ps1xml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.egg-info/
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.user
+
+# Build output
+bin/
+obj/
