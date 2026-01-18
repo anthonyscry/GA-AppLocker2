@@ -163,11 +163,14 @@ function ConvertFrom-Artifact {
                         }
                         else {
                             # Individual publisher rule per artifact
+                            $productName = if ($art.ProductName) { $art.ProductName } else { '*' }
+                            $minVer = if ($IncludeProductVersion -and $art.ProductVersion) { $art.ProductVersion } else { '*' }
+                            
                             $pubResult = New-PublisherRule `
                                 -PublisherName $art.SignerCertificate `
-                                -ProductName (if ($art.ProductName) { $art.ProductName } else { '*' }) `
+                                -ProductName $productName `
                                 -BinaryName $art.FileName `
-                                -MinVersion (if ($IncludeProductVersion -and $art.ProductVersion) { $art.ProductVersion } else { '*' }) `
+                                -MinVersion $minVer `
                                 -MaxVersion '*' `
                                 -Action $Action `
                                 -CollectionType $collectionType `

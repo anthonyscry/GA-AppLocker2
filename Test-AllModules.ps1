@@ -1020,7 +1020,7 @@ catch {
 # Test 26: Window initialization
 try {
     Initialize-MainWindow -Window $window
-    $initialized = ($script:MainWindow -ne $null) -or ($global:GA_MainWindow -ne $null)
+    $initialized = ($script:MainWindow -ne $null)
     Write-TestResult -TestName "Window initialization" -Passed $initialized -Message "Initialize-MainWindow completes"
 }
 catch {
@@ -1044,6 +1044,207 @@ try {
 }
 catch {
     Write-TestResult -TestName "Navigation (all panels)" -Passed $false -Message "Exception" -Details $_.Exception.Message
+}
+
+# ============================================================
+# EDGE CASE TESTS
+# ============================================================
+Write-Section "EDGE CASE TESTS"
+
+# Test: Get-Policy with invalid GUID
+try {
+    $result = Get-Policy -PolicyId "not-a-valid-guid-12345"
+    # Should return Success=$false with an error, not crash
+    $handledGracefully = ($result -ne $null) -and ($result.Success -eq $false -or $result.Data -eq $null)
+    Write-TestResult -TestName "Get-Policy (invalid GUID)" -Passed $handledGracefully -Message "Handles invalid GUID gracefully"
+}
+catch {
+    Write-TestResult -TestName "Get-Policy (invalid GUID)" -Passed $false -Message "Exception" -Details $_.Exception.Message
+}
+
+# Test: Get-DeploymentJob with invalid GUID
+try {
+    $result = Get-DeploymentJob -JobId "invalid-job-id-xyz"
+    $handledGracefully = ($result -ne $null) -and ($result.Success -eq $false -or $result.Data -eq $null)
+    Write-TestResult -TestName "Get-DeploymentJob (invalid GUID)" -Passed $handledGracefully -Message "Handles invalid GUID gracefully"
+}
+catch {
+    Write-TestResult -TestName "Get-DeploymentJob (invalid GUID)" -Passed $false -Message "Exception" -Details $_.Exception.Message
+}
+
+# Test: Get-Rule with invalid ID
+try {
+    $result = Get-Rule -Id "nonexistent-rule-id"
+    $handledGracefully = ($result -ne $null) -and ($result.Success -eq $false -or $result.Data -eq $null)
+    Write-TestResult -TestName "Get-Rule (invalid ID)" -Passed $handledGracefully -Message "Handles invalid ID gracefully"
+}
+catch {
+    Write-TestResult -TestName "Get-Rule (invalid ID)" -Passed $false -Message "Exception" -Details $_.Exception.Message
+}
+
+# Test: New-PathRule with empty path
+try {
+    $result = New-PathRule -Path '' -Action Allow
+    # Should fail validation or return error
+    $handledGracefully = ($result -ne $null)
+    Write-TestResult -TestName "New-PathRule (empty path)" -Passed $handledGracefully -Message "Handles empty path"
+}
+catch {
+    # Exception is acceptable for invalid input
+    Write-TestResult -TestName "New-PathRule (empty path)" -Passed $true -Message "Throws on empty path (expected)"
+}
+
+# Test: New-HashRule with invalid hash
+try {
+    $result = New-HashRule -Hash 'invalid' -SourceFileName 'test.exe'
+    # Should fail - invalid hash format
+    $handledGracefully = ($result -ne $null) -and ($result.Success -eq $false)
+    Write-TestResult -TestName "New-HashRule (invalid hash)" -Passed $handledGracefully -Message "Rejects invalid hash format"
+}
+catch {
+    Write-TestResult -TestName "New-HashRule (invalid hash)" -Passed $true -Message "Throws on invalid hash (expected)"
+}
+
+# Test: Remove-Policy with nonexistent ID
+try {
+    $result = Remove-Policy -PolicyId "nonexistent-policy-id" -Force
+    $handledGracefully = ($result -ne $null) -and ($result.Success -eq $false)
+    Write-TestResult -TestName "Remove-Policy (nonexistent)" -Passed $handledGracefully -Message "Handles nonexistent policy"
+}
+catch {
+    Write-TestResult -TestName "Remove-Policy (nonexistent)" -Passed $false -Message "Exception" -Details $_.Exception.Message
+}
+
+# Test: Set-RuleStatus with nonexistent rule
+try {
+    $result = Set-RuleStatus -Id "nonexistent-rule-id" -Status Approved
+    $handledGracefully = ($result -ne $null) -and ($result.Success -eq $false)
+    Write-TestResult -TestName "Set-RuleStatus (nonexistent)" -Passed $handledGracefully -Message "Handles nonexistent rule"
+}
+catch {
+    Write-TestResult -TestName "Set-RuleStatus (nonexistent)" -Passed $false -Message "Exception" -Details $_.Exception.Message
+}
+
+# ============================================================
+# END-TO-END WORKFLOW TESTS
+# ============================================================
+Write-Section "END-TO-END WORKFLOW TESTS"
+
+# Test: Full workflow - Scan -> Rules -> Policy -> XML Export
+try {
+    # Step 1: Create a local scan
+    # Use a small folder for fast E2E test
+    $scanResult = Get-LocalArtifacts -Paths @('C:\Windows') -Extensions @('.exe') -Recurse:$false
+    # Wrap in scan result structure
+    $scanResult = @{ Success = $scanResult.Success; Data = @{ Artifacts = $scanResult.Data }; ScanId = [guid]::NewGuid().ToString() }
+    $step1Pass = $scanResult.Success
+    
+    if ($step1Pass -and $scanResult.Data.Artifacts.Count -gt 0) {
+        # Step 2: Convert first artifact to a rule
+        $artifact = $scanResult.Data.Artifacts[0]
+        $ruleResult = ConvertFrom-Artifact -Artifact $artifact
+        $step2Pass = $ruleResult.Success -and $ruleResult.Data.Count -gt 0
+        
+        if ($step2Pass) {
+            # Save the first rule
+            $rule = $ruleResult.Data[0]
+            $rule.Status = 'Approved'
+            $dataPath = Get-AppLockerDataPath
+            $rulesPath = Join-Path $dataPath 'Rules'
+            if (-not (Test-Path $rulesPath)) { New-Item -Path $rulesPath -ItemType Directory -Force | Out-Null }
+            $rule | ConvertTo-Json -Depth 10 | Set-Content -Path (Join-Path $rulesPath "$($rule.Id).json") -Encoding UTF8
+            
+            # Step 3: Create a policy and add the rule
+            $policyResult = New-Policy -Name "E2E_Policy_$(Get-Random)" -EnforcementMode "AuditOnly"
+            $step3Pass = $policyResult.Success
+            
+            if ($step3Pass) {
+                $addResult = Add-RuleToPolicy -PolicyId $policyResult.Data.PolicyId -RuleId $rule.Id
+                $step4Pass = $addResult.Success
+                
+                if ($step4Pass) {
+                    # Step 4: Export to XML
+                    $xmlPath = Join-Path $env:TEMP "e2e_test_$(Get-Random).xml"
+                    $exportResult = Export-PolicyToXml -PolicyId $policyResult.Data.PolicyId -OutputPath $xmlPath
+                    $step5Pass = $exportResult.Success -and (Test-Path $xmlPath)
+                    
+                    # Verify XML content
+                    $xmlValid = $false
+                    if ($step5Pass) {
+                        $xmlContent = Get-Content -Path $xmlPath -Raw
+                        $xmlValid = $xmlContent -match 'AppLockerPolicy' -and $xmlContent -match 'RuleCollection'
+                    }
+                    
+                    Write-TestResult -TestName "E2E: Scan->Rules->Policy->XML" -Passed ($step5Pass -and $xmlValid) -Message "Full workflow completed" -Details "Scan:$step1Pass, Rule:$step2Pass, Policy:$step3Pass, Add:$step4Pass, Export:$step5Pass"
+                    
+                    # Cleanup
+                    if (Test-Path $xmlPath) { Remove-Item $xmlPath -Force }
+                }
+                else {
+                    Write-TestResult -TestName "E2E: Scan->Rules->Policy->XML" -Passed $false -Message "Failed at Add-RuleToPolicy"
+                }
+                
+                # Cleanup policy
+                Remove-Policy -PolicyId $policyResult.Data.PolicyId -Force | Out-Null
+            }
+            else {
+                Write-TestResult -TestName "E2E: Scan->Rules->Policy->XML" -Passed $false -Message "Failed at New-Policy"
+            }
+            
+            # Cleanup rule
+            Remove-Rule -Id $rule.Id | Out-Null
+        }
+        else {
+            Write-TestResult -TestName "E2E: Scan->Rules->Policy->XML" -Passed $false -Message "Failed at ConvertFrom-Artifact"
+        }
+    }
+    else {
+        Write-TestResult -TestName "E2E: Scan->Rules->Policy->XML" -Passed $false -Message "Failed at Start-ArtifactScan or no artifacts"
+    }
+}
+catch {
+    Write-TestResult -TestName "E2E: Scan->Rules->Policy->XML" -Passed $false -Message "Exception" -Details $_.Exception.Message
+}
+
+# Test: Full workflow - Policy -> Deployment Job -> Start
+try {
+    # Step 1: Create policy with rule
+    $testPolicy = New-Policy -Name "E2E_Deploy_$(Get-Random)" -EnforcementMode "AuditOnly"
+    $testRule = New-PathRule -Path '%PROGRAMFILES%\E2ETest\*' -Action Allow -Status Approved -Save
+    
+    if ($testPolicy.Success -and $testRule.Success) {
+        Add-RuleToPolicy -PolicyId $testPolicy.Data.PolicyId -RuleId $testRule.Data.Id | Out-Null
+        
+        # Step 2: Create deployment job
+        $jobResult = New-DeploymentJob -PolicyId $testPolicy.Data.PolicyId -GPOName "E2E_GPO_Test" -Schedule "Manual"
+        $step2Pass = $jobResult.Success
+        
+        if ($step2Pass) {
+            # Step 3: Start deployment (will fail/require manual but should not crash)
+            $deployResult = Start-Deployment -JobId $jobResult.Data.JobId
+            # Success or ManualRequired are both valid outcomes
+            $step3Pass = $deployResult.Success -or ($deployResult.ManualRequired -eq $true) -or ($deployResult.Error -ne $null)
+            
+            # Step 4: Check deployment status
+            $statusResult = Get-DeploymentStatus -JobId $jobResult.Data.JobId
+            $step4Pass = $statusResult.Success
+            
+            Write-TestResult -TestName "E2E: Policy->Job->Deploy" -Passed ($step2Pass -and $step3Pass -and $step4Pass) -Message "Deployment workflow completed" -Details "Job:$step2Pass, Deploy:$step3Pass, Status:$step4Pass"
+        }
+        else {
+            Write-TestResult -TestName "E2E: Policy->Job->Deploy" -Passed $false -Message "Failed at New-DeploymentJob"
+        }
+        
+        # Cleanup
+        Remove-Policy -PolicyId $testPolicy.Data.PolicyId -Force | Out-Null
+        Remove-Rule -Id $testRule.Data.Id | Out-Null
+    }
+    else {
+        Write-TestResult -TestName "E2E: Policy->Job->Deploy" -Passed $false -Message "Failed to create policy or rule"
+    }
+}
+catch {
+    Write-TestResult -TestName "E2E: Policy->Job->Deploy" -Passed $false -Message "Exception" -Details $_.Exception.Message
 }
 
 # ============================================================

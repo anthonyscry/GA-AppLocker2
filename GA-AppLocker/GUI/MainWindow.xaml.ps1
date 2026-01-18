@@ -24,10 +24,10 @@ function script:Write-Log {
 #region ===== BUTTON ACTION DISPATCHER =====
 # Central dispatcher for button clicks - avoids closure scope issues
 # Using global scope so scriptblocks can access it
-function global:Invoke-ButtonAction {
+function script:Invoke-ButtonAction {
     param([string]$Action)
 
-    $win = $global:GA_MainWindow
+    $win = $script:MainWindow
     if (-not $win) { return }
 
     switch ($Action) {
@@ -91,8 +91,7 @@ function global:Invoke-ButtonAction {
 #endregion
 
 #region ===== SCRIPT-LEVEL VARIABLES =====
-# Store window reference for event handlers (global for scriptblock access)
-$global:GA_MainWindow = $null
+# Store window reference for event handlers
 $script:MainWindow = $null
 $script:DiscoveredOUs = @()
 $script:DiscoveredMachines = @()
@@ -114,7 +113,7 @@ function Set-ActivePanel {
 
     # Try script scope first, fall back to global
     $Window = $script:MainWindow
-    if (-not $Window) { $Window = $global:GA_MainWindow }
+    if (-not $Window) { $Window = $script:MainWindow }
     if (-not $Window) { return }
 
     # All panel names
@@ -176,7 +175,7 @@ function Initialize-Navigation {
 
     # Store window reference
     $script:MainWindow = $Window
-    $global:GA_MainWindow = $Window
+    $script:MainWindow = $Window
 
     # Register each nav button directly - no closures needed
     $btn = $Window.FindName('NavDashboard')
@@ -683,11 +682,11 @@ function Initialize-ScannerPanel {
     if ($btnSelectMachines) { $btnSelectMachines.Add_Click({ Invoke-ButtonAction -Action 'SelectMachines' }) }
 
     $btnBrowsePath = $Window.FindName('BtnBrowsePath')
-    if ($btnBrowsePath) { $btnBrowsePath.Add_Click({ Invoke-BrowseScanPath -Window $global:GA_MainWindow }) }
+    if ($btnBrowsePath) { $btnBrowsePath.Add_Click({ Invoke-BrowseScanPath -Window $script:MainWindow }) }
 
     $btnResetPaths = $Window.FindName('BtnResetPaths')
     if ($btnResetPaths) { $btnResetPaths.Add_Click({ 
-        $txtPaths = $global:GA_MainWindow.FindName('TxtScanPaths')
+        $txtPaths = $script:MainWindow.FindName('TxtScanPaths')
         if ($txtPaths) { $txtPaths.Text = "C:\Program Files`nC:\Program Files (x86)" }
     }) }
 
@@ -719,7 +718,7 @@ function Initialize-ScannerPanel {
             $btn.Add_Click({ 
                 param($sender, $e)
                 $filter = $sender.Content -replace '[^a-zA-Z]', ''
-                Update-ArtifactFilter -Window $global:GA_MainWindow -Filter $filter
+                Update-ArtifactFilter -Window $script:MainWindow -Filter $filter
             }.GetNewClosure())
         }
     }
@@ -728,7 +727,7 @@ function Initialize-ScannerPanel {
     $filterBox = $Window.FindName('ArtifactFilterBox')
     if ($filterBox) {
         $filterBox.Add_TextChanged({
-            Update-ArtifactDataGrid -Window $global:GA_MainWindow
+            Update-ArtifactDataGrid -Window $script:MainWindow
         })
     }
 
@@ -893,7 +892,7 @@ function Update-ScanProgress {
     # TODO: Implement proper async pattern with runspaces for long operations
 }
 
-function global:Update-ArtifactDataGrid {
+function script:Update-ArtifactDataGrid {
     param([System.Windows.Window]$Window)
 
     $dataGrid = $Window.FindName('ArtifactDataGrid')
@@ -926,7 +925,7 @@ function global:Update-ArtifactDataGrid {
     $dataGrid.ItemsSource = $displayData
 }
 
-function global:Update-ArtifactFilter {
+function script:Update-ArtifactFilter {
     param(
         [System.Windows.Window]$Window,
         [string]$Filter
@@ -1232,7 +1231,7 @@ function Initialize-RulesPanel {
                 $tag = $sender.Tag
                 if ($tag -match 'FilterRules(.+)') {
                     $filter = $Matches[1]
-                    Update-RulesFilter -Window $global:GA_MainWindow -Filter $filter
+                    Update-RulesFilter -Window $script:MainWindow -Filter $filter
                 }
             }.GetNewClosure())
         }
@@ -1259,7 +1258,7 @@ function Initialize-RulesPanel {
     $filterBox = $Window.FindName('TxtRuleFilter')
     if ($filterBox) {
         $filterBox.Add_TextChanged({
-            Update-RulesDataGrid -Window $global:GA_MainWindow
+            Update-RulesDataGrid -Window $script:MainWindow
         })
     }
 
@@ -1267,7 +1266,7 @@ function Initialize-RulesPanel {
     Update-RulesDataGrid -Window $Window
 }
 
-function global:Update-RulesDataGrid {
+function script:Update-RulesDataGrid {
     param([System.Windows.Window]$Window)
 
     $dataGrid = $Window.FindName('RulesDataGrid')
@@ -1347,7 +1346,7 @@ function Update-RuleCounters {
     $Window.FindName('TxtRuleRejectedCount').Text = "$rejected"
 }
 
-function global:Update-RulesFilter {
+function script:Update-RulesFilter {
     param(
         [System.Windows.Window]$Window,
         [string]$Filter
@@ -1668,7 +1667,7 @@ function Initialize-PolicyPanel {
                 $tag = $sender.Tag
                 if ($tag -match 'FilterPolicies(.+)') {
                     $filter = $Matches[1]
-                    Update-PoliciesFilter -Window $global:GA_MainWindow -Filter $filter
+                    Update-PoliciesFilter -Window $script:MainWindow -Filter $filter
                 }
             }.GetNewClosure())
         }
@@ -1696,7 +1695,7 @@ function Initialize-PolicyPanel {
     if ($dataGrid) {
         $dataGrid.Add_SelectionChanged({
             param($sender, $e)
-            Update-SelectedPolicyInfo -Window $global:GA_MainWindow
+            Update-SelectedPolicyInfo -Window $script:MainWindow
         })
     }
 
@@ -1704,7 +1703,7 @@ function Initialize-PolicyPanel {
     Update-PoliciesDataGrid -Window $Window
 }
 
-function global:Update-PoliciesDataGrid {
+function script:Update-PoliciesDataGrid {
     param([System.Windows.Window]$Window)
 
     $dataGrid = $Window.FindName('PoliciesDataGrid')
@@ -1777,7 +1776,7 @@ function Update-PolicyCounters {
     $Window.FindName('TxtPolicyDeployedCount').Text = "$deployed"
 }
 
-function global:Update-PoliciesFilter {
+function script:Update-PoliciesFilter {
     param(
         [System.Windows.Window]$Window,
         [string]$Filter
@@ -2161,7 +2160,7 @@ function Initialize-DeploymentPanel {
                 $tag = $sender.Tag
                 if ($tag -match 'FilterJobs(.+)') {
                     $filter = $Matches[1]
-                    Update-DeploymentFilter -Window $global:GA_MainWindow -Filter $filter
+                    Update-DeploymentFilter -Window $script:MainWindow -Filter $filter
                 }
             }.GetNewClosure())
         }
@@ -2188,7 +2187,7 @@ function Initialize-DeploymentPanel {
     if ($dataGrid) {
         $dataGrid.Add_SelectionChanged({
             param($sender, $e)
-            Update-SelectedJobInfo -Window $global:GA_MainWindow
+            Update-SelectedJobInfo -Window $script:MainWindow
         })
     }
 
@@ -2235,7 +2234,7 @@ function Update-ModuleStatus {
     }
 }
 
-function global:Update-DeploymentJobsDataGrid {
+function script:Update-DeploymentJobsDataGrid {
     param([System.Windows.Window]$Window)
 
     $dataGrid = $Window.FindName('DeploymentJobsDataGrid')
@@ -2299,7 +2298,7 @@ function Update-JobCounters {
     $Window.FindName('TxtJobCompletedCount').Text = "$completed"
 }
 
-function global:Update-DeploymentFilter {
+function script:Update-DeploymentFilter {
     param(
         [System.Windows.Window]$Window,
         [string]$Filter
@@ -2483,9 +2482,8 @@ function Initialize-MainWindow {
         [System.Windows.Window]$Window
     )
 
-    # Store window reference for script-level and global access
+    # Store window reference for script-level access
     $script:MainWindow = $Window
-    $global:GA_MainWindow = $Window
 
     # Initialize navigation buttons
     try {
