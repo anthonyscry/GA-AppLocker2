@@ -3,8 +3,17 @@
     Retrieves Active Directory domain information.
 
 .DESCRIPTION
-    Auto-detects the current domain and returns domain details
-    including name, DNS root, domain controllers, and forest info.
+    Auto-detects the current domain and returns domain details.
+    Falls back to LDAP when ActiveDirectory module is not available.
+
+.PARAMETER UseLdap
+    Force using LDAP instead of AD module.
+
+.PARAMETER Server
+    LDAP server to connect to (for LDAP fallback).
+
+.PARAMETER Port
+    LDAP port (default: 389).
 
 .EXAMPLE
     $domain = Get-DomainInfo
@@ -12,17 +21,23 @@
 
 .OUTPUTS
     [PSCustomObject] Result object with Success, Data, and Error properties.
-    Data contains: Name, DnsRoot, NetBIOSName, DomainControllers, Forest, FunctionalLevel
-
-.NOTES
-    Author: GA-AppLocker Team
-    Version: 1.0.0
-    Requires: ActiveDirectory module (RSAT)
 #>
 function Get-DomainInfo {
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
-    param()
+    param(
+        [Parameter()]
+        [switch]$UseLdap,
+        
+        [Parameter()]
+        [string]$Server,
+        
+        [Parameter()]
+        [int]$Port = 389,
+        
+        [Parameter()]
+        [pscredential]$Credential
+    )
 
     $result = [PSCustomObject]@{
         Success = $false
@@ -30,48 +45,49 @@ function Get-DomainInfo {
         Error   = $null
     }
 
-    #region --- Validate AD Module ---
-    if (-not (Get-Module -ListAvailable -Name ActiveDirectory)) {
-        $result.Error = 'ActiveDirectory module not installed. Install RSAT features.'
-        Write-AppLockerLog -Level Error -Message $result.Error
-        return $result
-    }
-    #endregion
+    # Check if we should use LDAP
+    $useAdModule = -not $UseLdap -and (Get-Module -ListAvailable -Name ActiveDirectory)
+    
+    if ($useAdModule) {
+        try {
+            Import-Module ActiveDirectory -ErrorAction Stop
 
-    try {
-        Import-Module ActiveDirectory -ErrorAction Stop
+            $domain = Get-ADDomain -ErrorAction Stop
+            $forest = Get-ADForest -ErrorAction Stop
 
-        #region --- Get Domain Info ---
-        $domain = Get-ADDomain -ErrorAction Stop
-        $forest = Get-ADForest -ErrorAction Stop
+            $dcs = Get-ADDomainController -Filter * -ErrorAction SilentlyContinue |
+                Select-Object -Property Name, HostName, IPv4Address, Site, IsGlobalCatalog
 
-        # Get domain controllers
-        $dcs = Get-ADDomainController -Filter * -ErrorAction SilentlyContinue |
-            Select-Object -Property Name, HostName, IPv4Address, Site, IsGlobalCatalog
-        #endregion
+            $result.Data = [PSCustomObject]@{
+                Name              = $domain.Name
+                DnsRoot           = $domain.DNSRoot
+                NetBIOSName       = $domain.NetBIOSName
+                DistinguishedName = $domain.DistinguishedName
+                DomainControllers = $dcs
+                Forest            = $forest.Name
+                ForestMode        = $forest.ForestMode
+                DomainMode        = $domain.DomainMode
+                PDCEmulator       = $domain.PDCEmulator
+                InfrastructureMaster = $domain.InfrastructureMaster
+                Source            = 'ActiveDirectory'
+            }
 
-        #region --- Build Result ---
-        $result.Data = [PSCustomObject]@{
-            Name              = $domain.Name
-            DnsRoot           = $domain.DNSRoot
-            NetBIOSName       = $domain.NetBIOSName
-            DistinguishedName = $domain.DistinguishedName
-            DomainControllers = $dcs
-            Forest            = $forest.Name
-            ForestMode        = $forest.ForestMode
-            DomainMode        = $domain.DomainMode
-            PDCEmulator       = $domain.PDCEmulator
-            InfrastructureMaster = $domain.InfrastructureMaster
+            $result.Success = $true
+            Write-AppLockerLog -Message "Domain detected: $($domain.DNSRoot)" -NoConsole
+            return $result
         }
-
-        $result.Success = $true
-        Write-AppLockerLog -Message "Domain detected: $($domain.DNSRoot)" -NoConsole
-        #endregion
+        catch {
+            Write-AppLockerLog -Level Warning -Message "AD module failed, falling back to LDAP: $($_.Exception.Message)"
+        }
     }
-    catch {
-        $result.Error = "Failed to get domain info: $($_.Exception.Message)"
-        Write-AppLockerLog -Level Error -Message $result.Error
+    
+    # LDAP fallback
+    Write-AppLockerLog -Message "Using LDAP fallback for domain info" -NoConsole
+    $ldapResult = Get-DomainInfoViaLdap -Server $Server -Port $Port -Credential $Credential
+    
+    if ($ldapResult.Success) {
+        $ldapResult.Data | Add-Member -NotePropertyName 'Source' -NotePropertyValue 'LDAP' -Force
     }
-
-    return $result
+    
+    return $ldapResult
 }

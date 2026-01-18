@@ -22,19 +22,19 @@ BeforeAll {
 
 Describe 'Get-DomainInfo (Mocked)' -Tag 'Unit', 'AD', 'Mock' {
 
-    Context 'When ActiveDirectory module is NOT available' {
+    Context 'When ActiveDirectory module is NOT available and LDAP fails' {
         BeforeAll {
             Mock Get-Module { $null } -ParameterFilter { $ListAvailable -and $Name -eq 'ActiveDirectory' } -ModuleName 'GA-AppLocker.Discovery'
         }
 
-        It 'Returns Success = $false' {
+        It 'Returns Success = $false when AD and LDAP unavailable' {
             $result = Get-DomainInfo
             $result.Success | Should -BeFalse
         }
 
-        It 'Returns appropriate error message' {
+        It 'Returns error message about connection failure' {
             $result = Get-DomainInfo
-            $result.Error | Should -Match 'ActiveDirectory module not installed'
+            $result.Error | Should -Match 'LDAP|connect|unavailable'
         }
     }
 }
@@ -46,7 +46,7 @@ Describe 'Get-OUTree (Mocked)' -Tag 'Unit', 'AD', 'Mock' {
             Mock Get-Module { $null } -ParameterFilter { $ListAvailable -and $Name -eq 'ActiveDirectory' } -ModuleName 'GA-AppLocker.Discovery'
         }
 
-        It 'Returns Success = $false for missing AD module' {
+        It 'Returns Success = $false when AD and LDAP unavailable' {
             $result = Get-OUTree
             $result.Success | Should -BeFalse
         }
@@ -60,9 +60,17 @@ Describe 'Get-ComputersByOU (Mocked)' -Tag 'Unit', 'AD', 'Mock' {
             Mock Get-Module { $null } -ParameterFilter { $ListAvailable -and $Name -eq 'ActiveDirectory' } -ModuleName 'GA-AppLocker.Discovery'
         }
 
-        It 'Returns Success = $false for missing AD module' {
+        It 'Returns Success = $false when AD and LDAP unavailable' {
             $result = Get-ComputersByOU -OUDistinguishedNames 'OU=Test,DC=test,DC=local'
             $result.Success | Should -BeFalse
+        }
+    }
+    
+    Context 'When called with empty OUs' {
+        It 'Returns Success with empty data for empty input' {
+            $result = Get-ComputersByOU -OUDistinguishedNames @()
+            $result.Success | Should -BeTrue
+            $result.Data.Count | Should -Be 0
         }
     }
 }
@@ -80,7 +88,6 @@ Describe 'Test-MachineConnectivity (Mocked)' -Tag 'Unit', 'AD', 'Mock' {
 
     Context 'When machine is reachable with WinRM' {
         BeforeAll {
-            # Test-Connection with -Quiet returns boolean
             Mock Test-Connection { $true } -ModuleName 'GA-AppLocker.Discovery'
             Mock Test-WSMan { [PSCustomObject]@{ ProductVersion = 'OS: 10.0.19041' } } -ModuleName 'GA-AppLocker.Discovery'
             Mock Write-AppLockerLog { } -ModuleName 'GA-AppLocker.Discovery'
@@ -110,7 +117,6 @@ Describe 'Test-MachineConnectivity (Mocked)' -Tag 'Unit', 'AD', 'Mock' {
 
     Context 'When machine is unreachable' {
         BeforeAll {
-            # Test-Connection with -Quiet returns $false when unreachable
             Mock Test-Connection { $false } -ModuleName 'GA-AppLocker.Discovery'
             Mock Write-AppLockerLog { } -ModuleName 'GA-AppLocker.Discovery'
         }
@@ -163,7 +169,6 @@ Describe 'Test-MachineConnectivity (Mocked)' -Tag 'Unit', 'AD', 'Mock' {
         BeforeAll {
             Mock Test-Connection { 
                 param($ComputerName)
-                # First machine online, second offline
                 $ComputerName -eq 'ONLINE-PC'
             } -ModuleName 'GA-AppLocker.Discovery'
             Mock Test-WSMan { [PSCustomObject]@{ ProductVersion = 'OS: 10.0.19041' } } -ModuleName 'GA-AppLocker.Discovery'
