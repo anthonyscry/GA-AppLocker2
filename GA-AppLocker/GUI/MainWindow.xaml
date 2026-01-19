@@ -1223,9 +1223,9 @@
                                             <DataGridTextColumn Header="File Name" Width="150" Binding="{Binding FileName}"/>
                                             <DataGridTextColumn Header="Type" Width="55" Binding="{Binding ArtifactType}"/>
                                             <DataGridTextColumn Header="Publisher" Width="140" Binding="{Binding Publisher}"/>
-                                            <DataGridTextColumn Header="Version" Width="80" Binding="{Binding Version}"/>
-                                            <DataGridTextColumn Header="Machine" Width="100" Binding="{Binding SourceMachine}"/>
-                                            <DataGridTextColumn Header="Path" Width="*" Binding="{Binding Path}"/>
+<DataGridTextColumn Header="Version" Width="80" Binding="{Binding FileVersion}"/>
+                                            <DataGridTextColumn Header="Machine" Width="100" Binding="{Binding ComputerName}"/>
+                                            <DataGridTextColumn Header="Path" Width="*" Binding="{Binding FilePath}"/>
                                         </DataGrid.Columns>
                                     </DataGrid>
                                 </Border>
@@ -1577,22 +1577,22 @@
                                     
                                     <!-- Center: Bulk Action Buttons -->
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <Button x:Name="BtnApproveRule" Content="✓ Approve" 
-                                                Style="{StaticResource ButtonStyle}" MinWidth="85" Margin="0,0,5,0"
+<Button x:Name="BtnApproveRule" Content="Approve" 
+                                                Style="{StaticResource ButtonStyle}" MinWidth="65" Padding="6,4" Margin="0,0,3,0"
                                                 Background="{StaticResource ApprovedBrush}" Tag="ApproveRule"/>
-                                        <Button x:Name="BtnRejectRule" Content="✗ Reject" 
-                                                Style="{StaticResource ButtonStyle}" MinWidth="80" Margin="0,0,5,0"
+                                        <Button x:Name="BtnRejectRule" Content="Reject" 
+                                                Style="{StaticResource ButtonStyle}" MinWidth="55" Padding="6,4" Margin="0,0,3,0"
                                                 Background="#8B0000" Tag="RejectRule"/>
-                                        <Button x:Name="BtnReviewRule" Content="⟳ Review" 
-                                                Style="{StaticResource ButtonStyle}" MinWidth="80" Margin="0,0,5,0"
+                                        <Button x:Name="BtnReviewRule" Content="Review" 
+                                                Style="{StaticResource ButtonStyle}" MinWidth="55" Padding="6,4" Margin="0,0,3,0"
                                                 Background="{StaticResource ActiveBrush}" Tag="ReviewRule"/>
-                                        <Border Width="1" Background="{StaticResource BorderBrush}" Margin="5,0,10,0"/>
-                                        <Button x:Name="BtnAddRuleToPolicy" Content="+ Add to Policy" 
-                                                Style="{StaticResource ButtonStyle}" MinWidth="100" Margin="0,0,5,0"
+                                        <Border Width="1" Background="{StaticResource BorderBrush}" Margin="3,0,6,0"/>
+                                        <Button x:Name="BtnAddRuleToPolicy" Content="+ Policy" 
+                                                Style="{StaticResource ButtonStyle}" MinWidth="60" Padding="6,4" Margin="0,0,3,0"
                                                 Background="{StaticResource PrimaryBrush}" Tag="AddRuleToPolicy"/>
-                                        <Border Width="1" Background="{StaticResource BorderBrush}" Margin="5,0,10,0"/>
-                                        <Button x:Name="BtnDeleteRule" Content="🗑 Delete" 
-                                                Style="{StaticResource ButtonStyle}" MinWidth="80" Margin="0,0,5,0"
+                                        <Border Width="1" Background="{StaticResource BorderBrush}" Margin="3,0,6,0"/>
+                                        <Button x:Name="BtnDeleteRule" Content="Delete" 
+                                                Style="{StaticResource ButtonStyle}" MinWidth="50" Padding="6,4" Margin="0,0,3,0"
                                                 Tag="DeleteRule"/>
                                     </StackPanel>
                                     
@@ -1756,6 +1756,38 @@
                                                 Tag="ExportPolicyCsv"/>
                                     </StackPanel>
                                 </TabItem>
+                                
+                                <!-- Tab 4: Edit Policy -->
+                                <TabItem Header="Edit">
+                                    <StackPanel Margin="15">
+                                        <TextBlock Text="EDIT POLICY" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
+
+                                        <TextBlock Text="Selected Policy:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                        <TextBlock x:Name="TxtEditPolicyName" 
+                                                   Text="(Select a policy)" 
+                                                   Foreground="{StaticResource MutedBrush}" 
+                                                   FontStyle="Italic" Margin="0,0,0,15"/>
+
+                                        <TextBlock Text="Enforcement Mode:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                        <ComboBox x:Name="CboEditEnforcement" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,15">
+                                            <ComboBoxItem Content="Audit Only" Tag="AuditOnly"/>
+                                            <ComboBoxItem Content="Enabled (Enforce)" Tag="Enabled"/>
+                                            <ComboBoxItem Content="Not Configured" Tag="NotConfigured"/>
+                                        </ComboBox>
+
+                                        <TextBlock Text="Deployment Phase:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                        <ComboBox x:Name="CboEditPhase" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,15">
+                                            <ComboBoxItem Content="Phase 1: EXE Only" Tag="1"/>
+                                            <ComboBoxItem Content="Phase 2: EXE + Script" Tag="2"/>
+                                            <ComboBoxItem Content="Phase 3: EXE + Script + MSI" Tag="3"/>
+                                            <ComboBoxItem Content="Phase 4: All (Full)" Tag="4"/>
+                                        </ComboBox>
+
+                                        <Button x:Name="BtnSavePolicyChanges" Content="Save Changes" 
+                                                Style="{StaticResource PrimaryButtonStyle}"
+                                                Tag="SavePolicyChanges"/>
+                                    </StackPanel>
+                                </TabItem>
                             </TabControl>
                         </Border>
 
@@ -1811,8 +1843,21 @@
                                               IsReadOnly="True">
                                         <DataGrid.Columns>
                                             <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
-                                            <DataGridTextColumn Header="Rules" Binding="{Binding RuleCount}" Width="50"/>
-                                            <DataGridTextColumn Header="Mode" Binding="{Binding EnforcementMode}" Width="90"/>
+                                            <DataGridTextColumn Header="Rules" Binding="{Binding RuleCount}" Width="50">
+                                                <DataGridTextColumn.ElementStyle>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                    </Style>
+                                                </DataGridTextColumn.ElementStyle>
+                                            </DataGridTextColumn>
+                                            <DataGridTextColumn Header="Mode" Binding="{Binding EnforcementMode}" Width="70"/>
+                                            <DataGridTextColumn Header="Phase" Binding="{Binding Phase}" Width="50">
+                                                <DataGridTextColumn.ElementStyle>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                    </Style>
+                                                </DataGridTextColumn.ElementStyle>
+                                            </DataGridTextColumn>
                                             <DataGridTemplateColumn Header="Status" Width="75">
                                                 <DataGridTemplateColumn.CellTemplate>
                                                     <DataTemplate>
@@ -1972,13 +2017,13 @@
                                     <StackPanel Margin="15">
                                         <TextBlock Text="QUICK ACTIONS" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
 
-                                        <Button x:Name="BtnDeployJob" Content="▶ Deploy Selected Job" 
+                                        <Button x:Name="BtnDeployJob" Content="[>] Deploy Selected Job" 
                                                 Style="{StaticResource PrimaryButtonStyle}" Margin="0,0,0,5"
                                                 Tag="DeploySelectedJob"/>
-                                        <Button x:Name="BtnStopDeployment" Content="■ Stop Deployment" 
+                                        <Button x:Name="BtnStopDeployment" Content="[=] Stop Deployment" 
                                                 Style="{StaticResource ButtonStyle}" Margin="0,0,0,5"
                                                 Tag="StopDeployment" IsEnabled="False"/>
-                                        <Button x:Name="BtnCancelSelected" Content="✕ Cancel Selected Job" 
+                                        <Button x:Name="BtnCancelSelected" Content="[x] Cancel Selected Job" 
                                                 Style="{StaticResource ButtonStyle}" Margin="0,0,0,5"
                                                 Tag="CancelDeploymentJob"/>
                                         <Button x:Name="BtnViewDeployLog" Content="View Deployment Log" 
@@ -2501,12 +2546,12 @@
 
                                 <TextBlock Text="Storage Locations:" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,0,0,8"/>
                                 <StackPanel Margin="10,0,0,0">
-                                    <TextBlock Text="• Config: config.json" Foreground="{StaticResource ForegroundBrush}" FontSize="12"/>
-                                    <TextBlock Text="• Credentials: Credentials\" Foreground="{StaticResource ForegroundBrush}" FontSize="12"/>
-                                    <TextBlock Text="• Scans: Scans\" Foreground="{StaticResource ForegroundBrush}" FontSize="12"/>
-                                    <TextBlock Text="• Rules: Rules\" Foreground="{StaticResource ForegroundBrush}" FontSize="12"/>
-                                    <TextBlock Text="• Policies: Policies\" Foreground="{StaticResource ForegroundBrush}" FontSize="12"/>
-                                    <TextBlock Text="• Deployments: Deployments\" Foreground="{StaticResource ForegroundBrush}" FontSize="12"/>
+                                    <TextBlock Text="- Config: config.json" Foreground="{StaticResource ForegroundBrush}" FontSize="12"/>
+                                    <TextBlock Text="- Credentials: Credentials\" Foreground="{StaticResource ForegroundBrush}" FontSize="12"/>
+                                    <TextBlock Text="- Scans: Scans\" Foreground="{StaticResource ForegroundBrush}" FontSize="12"/>
+                                    <TextBlock Text="- Rules: Rules\" Foreground="{StaticResource ForegroundBrush}" FontSize="12"/>
+                                    <TextBlock Text="- Policies: Policies\" Foreground="{StaticResource ForegroundBrush}" FontSize="12"/>
+                                    <TextBlock Text="- Deployments: Deployments\" Foreground="{StaticResource ForegroundBrush}" FontSize="12"/>
                                 </StackPanel>
                             </StackPanel>
                         </Border>
@@ -2554,29 +2599,29 @@
                                 <TextBlock Text="MODULES" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,15"/>
 
                                 <WrapPanel>
-                                    <Border Background="{StaticResource PrimaryBrush}" CornerRadius="4" Padding="12,8" Margin="0,0,8,8">
-                                        <TextBlock Text="Core" Foreground="White" FontWeight="SemiBold"/>
+                                    <Border Background="{StaticResource PrimaryBrush}" CornerRadius="4" Padding="12,8" Margin="0,0,8,8" Width="100">
+                                        <TextBlock Text="Core" Foreground="White" FontWeight="SemiBold" HorizontalAlignment="Center"/>
                                     </Border>
-                                    <Border Background="{StaticResource SecondaryBrush}" CornerRadius="4" Padding="12,8" Margin="0,0,8,8">
-                                        <TextBlock Text="Discovery" Foreground="White" FontWeight="SemiBold"/>
+                                    <Border Background="{StaticResource SecondaryBrush}" CornerRadius="4" Padding="12,8" Margin="0,0,8,8" Width="100">
+                                        <TextBlock Text="Discovery" Foreground="White" FontWeight="SemiBold" HorizontalAlignment="Center"/>
                                     </Border>
-                                    <Border Background="#9C27B0" CornerRadius="4" Padding="12,8" Margin="0,0,8,8">
-                                        <TextBlock Text="Credentials" Foreground="White" FontWeight="SemiBold"/>
+                                    <Border Background="#9C27B0" CornerRadius="4" Padding="12,8" Margin="0,0,8,8" Width="100">
+                                        <TextBlock Text="Credentials" Foreground="White" FontWeight="SemiBold" HorizontalAlignment="Center"/>
                                     </Border>
-                                    <Border Background="{StaticResource WarningBrush}" CornerRadius="4" Padding="12,8" Margin="0,0,8,8">
-                                        <TextBlock Text="Scanning" Foreground="White" FontWeight="SemiBold"/>
+                                    <Border Background="{StaticResource WarningBrush}" CornerRadius="4" Padding="12,8" Margin="0,0,8,8" Width="100">
+                                        <TextBlock Text="Scanning" Foreground="White" FontWeight="SemiBold" HorizontalAlignment="Center"/>
                                     </Border>
-                                    <Border Background="{StaticResource SuccessBrush}" CornerRadius="4" Padding="12,8" Margin="0,0,8,8">
-                                        <TextBlock Text="Rules" Foreground="White" FontWeight="SemiBold"/>
+                                    <Border Background="{StaticResource SuccessBrush}" CornerRadius="4" Padding="12,8" Margin="0,0,8,8" Width="100">
+                                        <TextBlock Text="Rules" Foreground="White" FontWeight="SemiBold" HorizontalAlignment="Center"/>
                                     </Border>
-                                    <Border Background="{StaticResource PurpleBrush}" CornerRadius="4" Padding="12,8" Margin="0,0,8,8">
-                                        <TextBlock Text="Policy" Foreground="White" FontWeight="SemiBold"/>
+                                    <Border Background="{StaticResource PurpleBrush}" CornerRadius="4" Padding="12,8" Margin="0,0,8,8" Width="100">
+                                        <TextBlock Text="Policy" Foreground="White" FontWeight="SemiBold" HorizontalAlignment="Center"/>
                                     </Border>
-                                    <Border Background="{StaticResource ErrorBrush}" CornerRadius="4" Padding="12,8" Margin="0,0,8,8">
-                                        <TextBlock Text="Deployment" Foreground="White" FontWeight="SemiBold"/>
+                                    <Border Background="{StaticResource ErrorBrush}" CornerRadius="4" Padding="12,8" Margin="0,0,8,8" Width="100">
+                                        <TextBlock Text="Deployment" Foreground="White" FontWeight="SemiBold" HorizontalAlignment="Center"/>
                                     </Border>
-                                    <Border Background="#607D8B" CornerRadius="4" Padding="12,8" Margin="0,0,8,8">
-                                        <TextBlock Text="Setup" Foreground="White" FontWeight="SemiBold"/>
+                                    <Border Background="#607D8B" CornerRadius="4" Padding="12,8" Margin="0,0,8,8" Width="100">
+                                        <TextBlock Text="Setup" Foreground="White" FontWeight="SemiBold" HorizontalAlignment="Center"/>
                                     </Border>
                                 </WrapPanel>
                             </StackPanel>

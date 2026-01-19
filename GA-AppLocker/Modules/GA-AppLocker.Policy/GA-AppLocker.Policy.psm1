@@ -65,6 +65,7 @@ Export-ModuleMember -Function @(
     'New-Policy',
     'Get-Policy',
     'Get-AllPolicies',
+    'Update-Policy',
     'Remove-Policy',
     'Set-PolicyStatus',
     'Add-RuleToPolicy',

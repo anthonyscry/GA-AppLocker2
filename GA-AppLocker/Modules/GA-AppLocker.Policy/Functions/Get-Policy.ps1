@@ -120,12 +120,19 @@ function Get-AllPolicies {
             }
         }
 
-        # Sort by modified date descending
-        $policies = $policies | Sort-Object -Property ModifiedAt -Descending
+        # Sort by modified date descending (with fallback if ModifiedAt is invalid)
+        try {
+            $policies = $policies | Sort-Object -Property { 
+                if ($_.ModifiedAt) { [datetime]$_.ModifiedAt } else { [datetime]::MinValue }
+            } -Descending
+        }
+        catch {
+            # If sorting fails, return unsorted
+        }
 
         return @{
             Success = $true
-            Data    = $policies
+            Data    = @($policies)
         }
     }
     catch {

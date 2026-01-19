@@ -21,6 +21,44 @@ function script:Write-Log {
 }
 #endregion
 
+#region ===== LOADING OVERLAY HELPERS =====
+function script:Show-LoadingOverlay {
+    param([string]$Message = 'Processing...', [string]$SubMessage = '')
+    
+    $win = $script:MainWindow
+    if (-not $win) { return }
+    
+    $overlay = $win.FindName('LoadingOverlay')
+    $txtMain = $win.FindName('LoadingText')
+    $txtSub = $win.FindName('LoadingSubText')
+    
+    if ($overlay) { $overlay.Visibility = 'Visible' }
+    if ($txtMain) { $txtMain.Text = $Message }
+    if ($txtSub) { $txtSub.Text = $SubMessage }
+}
+
+function script:Hide-LoadingOverlay {
+    $win = $script:MainWindow
+    if (-not $win) { return }
+    
+    $overlay = $win.FindName('LoadingOverlay')
+    if ($overlay) { $overlay.Visibility = 'Collapsed' }
+}
+
+function script:Update-LoadingText {
+    param([string]$Message, [string]$SubMessage)
+    
+    $win = $script:MainWindow
+    if (-not $win) { return }
+    
+    $txtMain = $win.FindName('LoadingText')
+    $txtSub = $win.FindName('LoadingSubText')
+    
+    if ($txtMain -and $Message) { $txtMain.Text = $Message }
+    if ($txtSub -and $SubMessage) { $txtSub.Text = $SubMessage }
+}
+#endregion
+
 #region ===== BUTTON ACTION DISPATCHER =====
 # Central dispatcher for button clicks - avoids closure scope issues
 # Using global scope so WPF event scriptblocks can access it
@@ -85,6 +123,7 @@ function global:Invoke-ButtonAction {
         'RemoveRulesFromPolicy' { Invoke-RemoveRulesFromPolicy -Window $win }
         'SelectTargetOUs' { Invoke-SelectTargetOUs -Window $win }
         'SavePolicyTargets' { Invoke-SavePolicyTargets -Window $win }
+        'SavePolicyChanges' { Invoke-SavePolicyChanges -Window $win }
         # Deployment panel
         'CreateDeploymentJob' { Invoke-CreateDeploymentJob -Window $win }
         'RefreshDeployments' { Update-DeploymentJobsDataGrid -Window $win }
@@ -109,6 +148,7 @@ $script:DiscoveredOUs = @()
 $script:DiscoveredMachines = @()
 $script:SelectedScanMachines = @()
 $script:CurrentScanArtifacts = @()
+$script:CurrentArtifactFilter = 'All'
 $script:ScanInProgress = $false
 $script:CurrentRulesFilter = 'All'
 $script:CurrentRulesTypeFilter = 'All'
@@ -425,10 +465,25 @@ function Update-DashboardStats {
             $statMachines.Text = $script:DiscoveredMachines.Count.ToString()
         }
 
-        # Artifacts count
+        # Artifacts count - sum from all saved scans + current session
         $statArtifacts = $Window.FindName('StatArtifacts')
-        if ($statArtifacts -and $script:CurrentScanArtifacts) { 
-            $statArtifacts.Text = $script:CurrentScanArtifacts.Count.ToString()
+        if ($statArtifacts) { 
+            $totalArtifacts = 0
+            # Count current session artifacts
+            if ($script:CurrentScanArtifacts) {
+                $totalArtifacts += $script:CurrentScanArtifacts.Count
+            }
+            # Also count from saved scans
+            $scansResult = Get-ScanResults
+            if ($scansResult.Success -and $scansResult.Data) {
+                $scanData = @($scansResult.Data)
+                foreach ($scan in $scanData) {
+                    if ($scan.Artifacts) {
+                        $totalArtifacts += [int]$scan.Artifacts
+                    }
+                }
+            }
+            $statArtifacts.Text = $totalArtifacts.ToString()
         }
 
         # Rules count
@@ -436,8 +491,12 @@ function Update-DashboardStats {
         $statPending = $Window.FindName('StatPending')
         $rulesResult = Get-AllRules
         if ($rulesResult.Success) {
-            $allRules = $rulesResult.Data
-            if ($statRules) { $statRules.Text = $allRules.Count.ToString() }
+            $allRules = @($rulesResult.Data)
+            # Rules = Total rules count
+            if ($statRules) { 
+                $statRules.Text = $allRules.Count.ToString() 
+            }
+            # Pending = Rules awaiting approval
             if ($statPending) {
                 $pendingCount = ($allRules | Where-Object { $_.Status -eq 'Pending' }).Count
                 $statPending.Text = $pendingCount.ToString()
@@ -1065,18 +1124,32 @@ function Invoke-SetDefaultCredential {
 function Initialize-ScannerPanel {
     param([System.Windows.Window]$Window)
 
-    # Initialize scan paths from config
+    # Initialize scan paths from config or defaults
     $txtPaths = $Window.FindName('TxtScanPaths')
     if ($txtPaths) {
+        $paths = $null
         try {
             $config = Get-AppLockerConfig
             if ($config.DefaultScanPaths) {
-                $txtPaths.Text = $config.DefaultScanPaths -join "`n"
+                $paths = $config.DefaultScanPaths
             }
         }
-        catch {
-            # Keep XAML default if config unavailable
+        catch { }
+        
+        # Fallback to comprehensive defaults
+        if (-not $paths) {
+            $paths = @(
+                'C:\Program Files',
+                'C:\Program Files (x86)',
+                'C:\Windows\System32',
+                'C:\Windows\SysWOW64',
+                'C:\ProgramData',
+                'C:\Windows\Microsoft.NET',
+                "$env:LOCALAPPDATA\Programs",
+                "$env:LOCALAPPDATA\Microsoft\WindowsApps"
+            )
         }
+        $txtPaths.Text = $paths -join "`n"
     }
 
     # Wire up main action buttons
@@ -1104,8 +1177,16 @@ function Initialize-ScannerPanel {
         $btnResetPaths.Add_Click({ 
                 $txtPaths = $script:MainWindow.FindName('TxtScanPaths')
                 if ($txtPaths) { 
-                    $config = Get-AppLockerConfig
-                    $defaultPaths = if ($config.DefaultScanPaths) { $config.DefaultScanPaths -join "`n" } else { "C:\Program Files`nC:\Program Files (x86)" }
+                    $defaultPaths = @(
+                        'C:\Program Files',
+                        'C:\Program Files (x86)',
+                        'C:\Windows\System32',
+                        'C:\Windows\SysWOW64',
+                        'C:\ProgramData',
+                        'C:\Windows\Microsoft.NET',
+                        "$env:LOCALAPPDATA\Programs",
+                        "$env:LOCALAPPDATA\Microsoft\WindowsApps"
+                    ) -join "`n"
                     $txtPaths.Text = $defaultPaths
                 }
             }) 
@@ -1135,21 +1216,37 @@ function Initialize-ScannerPanel {
     foreach ($btnName in $filterButtons.Keys) {
         $btn = $Window.FindName($btnName)
         if ($btn) {
-            $filterType = $filterButtons[$btnName]
+            $filterValue = $filterButtons[$btnName]
+            # Store filter value in button's Tag for reliable retrieval
+            $btn.Tag = $filterValue
             $btn.Add_Click({ 
                     param($sender, $e)
-                    $filter = $sender.Content -replace '[^a-zA-Z]', ''
-                    Update-ArtifactFilter -Window $script:MainWindow -Filter $filter
-                }.GetNewClosure())
+                    $filter = $sender.Tag
+                    if ($script:MainWindow) {
+                        Update-ArtifactFilter -Window $script:MainWindow -Filter $filter
+                    }
+                })
         }
     }
 
-    # Wire up text filter
+    # Wire up text filter with debounce for better performance
     $filterBox = $Window.FindName('ArtifactFilterBox')
     if ($filterBox) {
-        $filterBox.Add_TextChanged({
+        # Create debounce timer (300ms delay)
+        $script:ArtifactFilterTimer = New-Object System.Windows.Threading.DispatcherTimer
+        $script:ArtifactFilterTimer.Interval = [TimeSpan]::FromMilliseconds(300)
+        $script:ArtifactFilterTimer.Add_Tick({
+            $script:ArtifactFilterTimer.Stop()
+            if ($script:MainWindow) {
                 Update-ArtifactDataGrid -Window $script:MainWindow
-            })
+            }
+        })
+        
+        $filterBox.Add_TextChanged({
+            # Reset and restart timer on each keystroke
+            $script:ArtifactFilterTimer.Stop()
+            $script:ArtifactFilterTimer.Start()
+        })
     }
 
     # Load saved scans list
@@ -1430,23 +1527,37 @@ function script:Update-ArtifactDataGrid {
         return
     }
 
+    # Apply type filter first
+    $typeFilter = $script:CurrentArtifactFilter
+    if ($typeFilter -and $typeFilter -ne 'All') {
+        $artifacts = switch ($typeFilter) {
+            'EXE' { @($artifacts | Where-Object { $_.ArtifactType -eq 'EXE' }) }
+            'DLL' { @($artifacts | Where-Object { $_.ArtifactType -eq 'DLL' }) }
+            'MSI' { @($artifacts | Where-Object { $_.ArtifactType -eq 'MSI' }) }
+            'Script' { @($artifacts | Where-Object { $_.ArtifactType -in @('PS1', 'BAT', 'CMD', 'VBS', 'JS') }) }
+            'Signed' { @($artifacts | Where-Object { $_.IsSigned }) }
+            'Unsigned' { @($artifacts | Where-Object { -not $_.IsSigned }) }
+            default { $artifacts }
+        }
+    }
+
     # Apply text filter
     $filterBox = $Window.FindName('ArtifactFilterBox')
     $filterText = if ($filterBox) { $filterBox.Text } else { '' }
 
     if (-not [string]::IsNullOrWhiteSpace($filterText)) {
-        $artifacts = $artifacts | Where-Object {
+        $artifacts = @($artifacts | Where-Object {
             $_.FileName -like "*$filterText*" -or
             $_.Publisher -like "*$filterText*" -or
-            $_.Path -like "*$filterText*"
-        }
+            $_.FilePath -like "*$filterText*"
+        })
     }
 
     # Add display properties
-    $displayData = $artifacts | ForEach-Object {
+    $displayData = @($artifacts | ForEach-Object {
         $signedIcon = if ($_.IsSigned) { [char]0x2714 } else { [char]0x2718 }
         $_ | Add-Member -NotePropertyName 'SignedIcon' -NotePropertyValue $signedIcon -PassThru -Force
-    }
+    })
 
     $dataGrid.ItemsSource = $displayData
 }
@@ -1482,26 +1593,9 @@ function global:Update-ArtifactFilter {
         $btn.Background = [System.Windows.Media.SolidColorBrush]::new([System.Windows.Media.Color]::FromRgb(62, 62, 66))
     }
 
-    # Filter artifacts
-    $baseArtifacts = $script:CurrentScanArtifacts
-    if (-not $baseArtifacts) { return }
-
-    $filtered = switch ($Filter) {
-        'All' { $baseArtifacts }
-        'EXE' { $baseArtifacts | Where-Object { $_.ArtifactType -eq 'EXE' } }
-        'DLL' { $baseArtifacts | Where-Object { $_.ArtifactType -eq 'DLL' } }
-        'MSI' { $baseArtifacts | Where-Object { $_.ArtifactType -eq 'MSI' } }
-        'Script' { $baseArtifacts | Where-Object { $_.ArtifactType -in @('PS1', 'BAT', 'CMD', 'VBS', 'JS') } }
-        'Signed' { $baseArtifacts | Where-Object { $_.IsSigned } }
-        'Unsigned' { $baseArtifacts | Where-Object { -not $_.IsSigned } }
-        default { $baseArtifacts }
-    }
-
-    # Temporarily replace current artifacts for display
-    $original = $script:CurrentScanArtifacts
-    $script:CurrentScanArtifacts = $filtered
+    # Store filter state and refresh grid
+    $script:CurrentArtifactFilter = $Filter
     Update-ArtifactDataGrid -Window $Window
-    $script:CurrentScanArtifacts = $original
 }
 
 function Update-SavedScansList {
@@ -1516,7 +1610,8 @@ function Update-SavedScansList {
 
     $result = Get-ScanResults
     if ($result.Success -and $result.Data) {
-        $listBox.ItemsSource = $result.Data
+        # Wrap in array to ensure WPF binding works with single item
+        $listBox.ItemsSource = @($result.Data)
     }
     else {
         $listBox.ItemsSource = $null
@@ -1532,23 +1627,47 @@ function Invoke-LoadSelectedScan {
         return
     }
 
+    # Check if we should merge with existing artifacts
+    $mergeMode = $false
+    if ($script:CurrentScanArtifacts -and $script:CurrentScanArtifacts.Count -gt 0) {
+        $response = [System.Windows.MessageBox]::Show(
+            "You have $($script:CurrentScanArtifacts.Count) artifacts loaded.`n`nYes = Merge (add to existing)`nNo = Replace (clear existing)",
+            'Merge or Replace?',
+            'YesNoCancel',
+            'Question'
+        )
+        if ($response -eq 'Cancel') { return }
+        $mergeMode = ($response -eq 'Yes')
+    }
+
     $selectedScan = $listBox.SelectedItem
     $result = Get-ScanResults -ScanId $selectedScan.ScanId
 
     if ($result.Success) {
-        $script:CurrentScanArtifacts = $result.Data.Artifacts
+        if ($mergeMode) {
+            # Merge: add new artifacts, avoiding duplicates by hash
+            $existingHashes = @($script:CurrentScanArtifacts | ForEach-Object { $_.SHA256Hash })
+            $newArtifacts = @($result.Data.Artifacts | Where-Object { $_.SHA256Hash -notin $existingHashes })
+            $script:CurrentScanArtifacts = @($script:CurrentScanArtifacts) + $newArtifacts
+            $statusText = "Merged (+$($newArtifacts.Count) new)"
+        }
+        else {
+            $script:CurrentScanArtifacts = $result.Data.Artifacts
+            $statusText = "Loaded"
+        }
+        
         Update-ArtifactDataGrid -Window $Window
 
         # Update counters
-        $signed = ($result.Data.Artifacts | Where-Object { $_.IsSigned }).Count
-        $unsigned = $result.Data.Artifacts.Count - $signed
-        $Window.FindName('ScanArtifactCount').Text = "$($result.Data.Artifacts.Count) artifacts"
+        $signed = ($script:CurrentScanArtifacts | Where-Object { $_.IsSigned }).Count
+        $unsigned = $script:CurrentScanArtifacts.Count - $signed
+        $Window.FindName('ScanArtifactCount').Text = "$($script:CurrentScanArtifacts.Count) artifacts"
         $Window.FindName('ScanSignedCount').Text = "$signed"
         $Window.FindName('ScanUnsignedCount').Text = "$unsigned"
-        $Window.FindName('ScanStatusLabel').Text = "Loaded"
+        $Window.FindName('ScanStatusLabel').Text = $statusText
         $Window.FindName('ScanStatusLabel').Foreground = [System.Windows.Media.Brushes]::LightBlue
 
-        Update-ScanProgress -Window $Window -Text "Loaded: $($selectedScan.ScanName)" -Percent 100
+        Update-ScanProgress -Window $Window -Text "$statusText`: $($selectedScan.ScanName)" -Percent 100
     }
     else {
         [System.Windows.MessageBox]::Show("Failed to load scan: $($result.Error)", 'Error', 'OK', 'Error')
@@ -1591,38 +1710,68 @@ function Invoke-ImportArtifacts {
     Add-Type -AssemblyName System.Windows.Forms
 
     $dialog = [System.Windows.Forms.OpenFileDialog]::new()
-    $dialog.Title = 'Import Artifacts'
+    $dialog.Title = 'Import Artifacts (select multiple files with Ctrl+Click)'
     $dialog.Filter = 'CSV Files (*.csv)|*.csv|JSON Files (*.json)|*.json|All Files (*.*)|*.*'
     $dialog.FilterIndex = 1
+    $dialog.Multiselect = $true
 
     if ($dialog.ShowDialog() -eq 'OK') {
         try {
-            $extension = [System.IO.Path]::GetExtension($dialog.FileName).ToLower()
-            
-            $artifacts = switch ($extension) {
-                '.csv' { Import-Csv -Path $dialog.FileName }
-                '.json' { Get-Content -Path $dialog.FileName -Raw | ConvertFrom-Json }
-                default { throw "Unsupported file format: $extension" }
+            # Check if we should merge with existing artifacts
+            $mergeMode = $false
+            if ($script:CurrentScanArtifacts -and $script:CurrentScanArtifacts.Count -gt 0) {
+                $response = [System.Windows.MessageBox]::Show(
+                    "You have $($script:CurrentScanArtifacts.Count) artifacts loaded.`n`nYes = Merge (add to existing)`nNo = Replace (clear existing)",
+                    'Merge or Replace?',
+                    'YesNoCancel',
+                    'Question'
+                )
+                if ($response -eq 'Cancel') { return }
+                $mergeMode = ($response -eq 'Yes')
             }
 
-            $script:CurrentScanArtifacts = $artifacts
+            $allArtifacts = @()
+            $fileCount = 0
+            
+            foreach ($filePath in $dialog.FileNames) {
+                $extension = [System.IO.Path]::GetExtension($filePath).ToLower()
+                
+                $artifacts = switch ($extension) {
+                    '.csv' { @(Import-Csv -Path $filePath) }
+                    '.json' { @(Get-Content -Path $filePath -Raw | ConvertFrom-Json) }
+                    default { throw "Unsupported file format: $extension" }
+                }
+                
+                $allArtifacts += $artifacts
+                $fileCount++
+            }
+
+            if ($mergeMode) {
+                # Merge: add new artifacts, avoiding duplicates by hash
+                $existingHashes = @($script:CurrentScanArtifacts | ForEach-Object { $_.SHA256Hash })
+                $newArtifacts = @($allArtifacts | Where-Object { $_.SHA256Hash -notin $existingHashes })
+                $script:CurrentScanArtifacts = @($script:CurrentScanArtifacts) + $newArtifacts
+                $statusText = "Merged (+$($newArtifacts.Count) new)"
+                $messageText = "Merged $($newArtifacts.Count) new artifacts from $fileCount file(s).`nTotal: $($script:CurrentScanArtifacts.Count) artifacts"
+            }
+            else {
+                $script:CurrentScanArtifacts = $allArtifacts
+                $statusText = "Imported"
+                $messageText = "Imported $($allArtifacts.Count) artifacts from $fileCount file(s)."
+            }
+            
             Update-ArtifactDataGrid -Window $Window
 
             # Update counters
-            $signed = ($artifacts | Where-Object { $_.IsSigned }).Count
-            $unsigned = $artifacts.Count - $signed
-            $Window.FindName('ScanArtifactCount').Text = "$($artifacts.Count) artifacts"
+            $signed = ($script:CurrentScanArtifacts | Where-Object { $_.IsSigned }).Count
+            $unsigned = $script:CurrentScanArtifacts.Count - $signed
+            $Window.FindName('ScanArtifactCount').Text = "$($script:CurrentScanArtifacts.Count) artifacts"
             $Window.FindName('ScanSignedCount').Text = "$signed"
             $Window.FindName('ScanUnsignedCount').Text = "$unsigned"
-            $Window.FindName('ScanStatusLabel').Text = "Imported"
+            $Window.FindName('ScanStatusLabel').Text = $statusText
             $Window.FindName('ScanStatusLabel').Foreground = [System.Windows.Media.Brushes]::LightGreen
 
-            [System.Windows.MessageBox]::Show(
-                "Imported $($artifacts.Count) artifacts from file.",
-                'Import Complete',
-                'OK',
-                'Information'
-            )
+            [System.Windows.MessageBox]::Show($messageText, 'Import Complete', 'OK', 'Information')
         }
         catch {
             [System.Windows.MessageBox]::Show("Import failed: $($_.Exception.Message)", 'Error', 'OK', 'Error')
@@ -2231,12 +2380,12 @@ function Invoke-GenerateRulesFromArtifacts {
         return
     }
 
-    # Get options
+    # Get options from UI before async
     $collection = $Window.FindName('TxtRuleCollectionName').Text
     if ([string]::IsNullOrWhiteSpace($collection)) { $collection = 'Default' }
 
     $modeCombo = $Window.FindName('CboRuleGenMode')
-    $modeIndex = $modeCombo.SelectedIndex
+    $modeIndex = if ($modeCombo) { $modeCombo.SelectedIndex } else { 0 }
 
     $mode = switch ($modeIndex) {
         0 { 'Smart' }
@@ -2246,7 +2395,8 @@ function Invoke-GenerateRulesFromArtifacts {
         default { 'Smart' }
     }
 
-    $action = if ($Window.FindName('RbRuleAllow').IsChecked) { 'Allow' } else { 'Deny' }
+    $rbAllow = $Window.FindName('RbRuleAllow')
+    $action = if ($rbAllow -and $rbAllow.IsChecked) { 'Allow' } else { 'Deny' }
 
     # Get target group SID
     $targetGroupCombo = $Window.FindName('CboRuleTargetGroup')
@@ -2257,38 +2407,152 @@ function Invoke-GenerateRulesFromArtifacts {
         'S-1-1-0'  # Everyone
     }
 
-    # Generate rules
-    $generated = 0
-    $failed = 0
+    # Disable generate button during processing
+    $btnGenerate = $Window.FindName('BtnGenerateFromArtifacts')
+    if ($btnGenerate) { $btnGenerate.IsEnabled = $false }
 
-    foreach ($artifact in $script:CurrentScanArtifacts) {
+    # Show loading overlay
+    Show-LoadingOverlay -Message "Generating Rules..." -SubMessage "Processing $($script:CurrentScanArtifacts.Count) artifacts..."
+    
+    Show-Toast -Message "Generating rules from $($script:CurrentScanArtifacts.Count) artifacts..." -Type 'Info'
+
+    # Create sync hashtable for async communication
+    $script:RuleGenSyncHash = [hashtable]::Synchronized(@{
+        Window = $Window
+        Artifacts = @($script:CurrentScanArtifacts)
+        Mode = $mode
+        Action = $action
+        TargetGroupSid = $targetGroupSid
+        Generated = 0
+        Failed = 0
+        IsComplete = $false
+        Error = $null
+    })
+
+    # Create runspace for background processing
+    $script:RuleGenRunspace = [runspacefactory]::CreateRunspace()
+    $script:RuleGenRunspace.ApartmentState = 'STA'
+    $script:RuleGenRunspace.ThreadOptions = 'ReuseThread'
+    $script:RuleGenRunspace.Open()
+    $script:RuleGenRunspace.SessionStateProxy.SetVariable('SyncHash', $script:RuleGenSyncHash)
+
+    # Get module path - try multiple methods
+    $modulePath = $null
+    $gaModule = Get-Module GA-AppLocker -ErrorAction SilentlyContinue
+    if ($gaModule) {
+        $modulePath = $gaModule.ModuleBase
+    }
+    if (-not $modulePath) {
+        # Fallback: look relative to GUI folder
+        $modulePath = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+        if (-not (Test-Path (Join-Path $modulePath "GA-AppLocker.psd1"))) {
+            $modulePath = Join-Path $PSScriptRoot "..\..\"
+        }
+    }
+    $script:RuleGenRunspace.SessionStateProxy.SetVariable('ModulePath', $modulePath)
+
+    $script:RuleGenPowerShell = [powershell]::Create()
+    $script:RuleGenPowerShell.Runspace = $script:RuleGenRunspace
+
+    [void]$script:RuleGenPowerShell.AddScript({
+        param($SyncHash, $ModulePath)
+        
         try {
-            $ruleType = switch ($mode) {
-                'Smart' { if ($artifact.IsSigned) { 'Publisher' } else { 'Hash' } }
-                'Publisher' { if ($artifact.IsSigned) { 'Publisher' } else { $null } }
-                'Hash' { 'Hash' }
-                'Path' { 'Path' }
+            # Import module in runspace
+            $manifestPath = Join-Path $ModulePath "GA-AppLocker.psd1"
+            if (-not (Test-Path $manifestPath)) {
+                throw "Module not found at: $manifestPath"
+            }
+            Import-Module $manifestPath -Force -ErrorAction Stop
+
+            $generated = 0
+            $failed = 0
+
+            foreach ($artifact in $SyncHash.Artifacts) {
+                try {
+                    $ruleType = switch ($SyncHash.Mode) {
+                        'Smart' { if ($artifact.IsSigned) { 'Publisher' } else { 'Hash' } }
+                        'Publisher' { if ($artifact.IsSigned) { 'Publisher' } else { $null } }
+                        'Hash' { 'Hash' }
+                        'Path' { 'Path' }
+                    }
+
+                    if (-not $ruleType) { continue }
+
+                    $result = ConvertFrom-Artifact -Artifact $artifact -PreferredRuleType $ruleType -Action $SyncHash.Action -UserOrGroupSid $SyncHash.TargetGroupSid -Save
+                    if ($result.Success) { $generated++ } else { $failed++ }
+                }
+                catch {
+                    $failed++
+                }
             }
 
-            if (-not $ruleType) { continue }
-
-            $result = ConvertFrom-Artifact -Artifact $artifact -PreferredRuleType $ruleType -Action $action -UserOrGroupSid $targetGroupSid -Save
-            if ($result.Success) { $generated++ } else { $failed++ }
+            $SyncHash.Generated = $generated
+            $SyncHash.Failed = $failed
         }
         catch {
-            $failed++
+            $SyncHash.Error = $_.Exception.Message
         }
-    }
+        finally {
+            $SyncHash.IsComplete = $true
+        }
+    })
 
-    Update-RulesDataGrid -Window $Window
-    Update-WorkflowBreadcrumb -Window $Window
+    [void]$script:RuleGenPowerShell.AddArgument($script:RuleGenSyncHash)
+    [void]$script:RuleGenPowerShell.AddArgument($modulePath)
 
-    if ($generated -gt 0) {
-        Show-Toast -Message "Generated $generated rule(s) from $($script:CurrentScanArtifacts.Count) artifacts." -Type 'Success'
-    }
-    if ($failed -gt 0) {
-        Show-Toast -Message "$failed artifact(s) failed to generate rules." -Type 'Warning'
-    }
+    # Start async
+    $script:RuleGenAsyncResult = $script:RuleGenPowerShell.BeginInvoke()
+
+    # Timer to check completion
+    $script:RuleGenTimer = New-Object System.Windows.Threading.DispatcherTimer
+    $script:RuleGenTimer.Interval = [TimeSpan]::FromMilliseconds(200)
+    $script:RuleGenTimer.Add_Tick({
+        $syncHash = $script:RuleGenSyncHash
+        
+        # Update progress display
+        $total = $syncHash.Artifacts.Count
+        $processed = $syncHash.Generated + $syncHash.Failed
+        if ($processed -gt 0 -and -not $syncHash.IsComplete) {
+            Update-LoadingText -Message "Generating Rules..." -SubMessage "Processed $processed of $total artifacts..."
+        }
+        
+        if ($syncHash.IsComplete) {
+            $script:RuleGenTimer.Stop()
+            
+            # Hide loading overlay
+            Hide-LoadingOverlay
+            
+            # Cleanup
+            try { $script:RuleGenPowerShell.EndInvoke($script:RuleGenAsyncResult) } catch {}
+            if ($script:RuleGenPowerShell) { $script:RuleGenPowerShell.Dispose() }
+            if ($script:RuleGenRunspace) { 
+                $script:RuleGenRunspace.Close()
+                $script:RuleGenRunspace.Dispose()
+            }
+
+            # Re-enable button
+            $win = $syncHash.Window
+            $btnGenerate = $win.FindName('BtnGenerateFromArtifacts')
+            if ($btnGenerate) { $btnGenerate.IsEnabled = $true }
+
+            # Update UI
+            Update-RulesDataGrid -Window $win
+            Update-WorkflowBreadcrumb -Window $win
+
+            if ($syncHash.Error) {
+                Show-Toast -Message "Error: $($syncHash.Error)" -Type 'Error'
+            }
+            elseif ($syncHash.Generated -gt 0) {
+                Show-Toast -Message "Generated $($syncHash.Generated) rule(s) from $($syncHash.Artifacts.Count) artifacts." -Type 'Success'
+            }
+            if ($syncHash.Failed -gt 0) {
+                Show-Toast -Message "$($syncHash.Failed) artifact(s) failed to generate rules." -Type 'Warning'
+            }
+        }
+    })
+
+    $script:RuleGenTimer.Start()
 }
 
 function Invoke-CreateManualRule {
@@ -2602,7 +2866,8 @@ function Initialize-PolicyPanel {
     $actionButtons = @(
         'BtnCreatePolicy', 'BtnRefreshPolicies', 'BtnActivatePolicy', 
         'BtnArchivePolicy', 'BtnExportPolicy', 'BtnDeletePolicy', 'BtnDeployPolicy',
-        'BtnAddRulesToPolicy', 'BtnRemoveRulesFromPolicy', 'BtnSelectTargetOUs', 'BtnSaveTargets'
+        'BtnAddRulesToPolicy', 'BtnRemoveRulesFromPolicy', 'BtnSelectTargetOUs', 'BtnSaveTargets',
+        'BtnSavePolicyChanges'
     )
 
     foreach ($btnName in $actionButtons) {
@@ -2664,23 +2929,36 @@ function script:Update-PoliciesDataGrid {
         }
 
         # Add display properties
-        $displayData = $policies | ForEach-Object {
-            $policy = $_
-            $props = @{}
-            $_.PSObject.Properties | ForEach-Object { $props[$_.Name] = $_.Value }
-            $props['RuleCount'] = if ($_.RuleIds) { $_.RuleIds.Count } else { 0 }
-            [PSCustomObject]$props
+        $displayData = @()
+        if ($policies) {
+            foreach ($policy in $policies) {
+                $props = @{
+                    PolicyId        = $policy.PolicyId
+                    Name            = $policy.Name
+                    Description     = $policy.Description
+                    EnforcementMode = $policy.EnforcementMode
+                    Phase           = if ($policy.Phase) { $policy.Phase } else { 1 }
+                    Status          = $policy.Status
+                    RuleIds         = $policy.RuleIds
+                    TargetOUs       = $policy.TargetOUs
+                    TargetGPO       = $policy.TargetGPO
+                    CreatedAt       = $policy.CreatedAt
+                    ModifiedAt      = $policy.ModifiedAt
+                    Version         = $policy.Version
+                    RuleCount       = if ($policy.RuleIds) { @($policy.RuleIds).Count } else { 0 }
+                }
+                $displayData += [PSCustomObject]$props
+            }
         }
 
-        $dataGrid.ItemsSource = @($displayData)
+        $dataGrid.ItemsSource = $displayData
 
-        # Update counters
-        $allPolicies = (Get-AllPolicies).Data
-        Update-PolicyCounters -Window $Window -Policies $allPolicies
+        # Update counters using already-fetched data
+        Update-PolicyCounters -Window $Window -Policies $result.Data
     }
     catch {
         Write-Log -Level Error -Message "Failed to update policies grid: $($_.Exception.Message)"
-        $dataGrid.ItemsSource = $null
+        # Don't set to null - leave existing data
     }
 }
 
@@ -2728,6 +3006,43 @@ function Update-SelectedPolicyInfo {
         # Update target fields
         $Window.FindName('TxtTargetGPO').Text = if ($selectedItem.TargetGPO) { $selectedItem.TargetGPO } else { '' }
         $Window.FindName('PolicyTargetOUsList').ItemsSource = if ($selectedItem.TargetOUs) { $selectedItem.TargetOUs } else { @() }
+        
+        # Update Export tab
+        $txtExportName = $Window.FindName('TxtExportPolicyName')
+        if ($txtExportName) {
+            $txtExportName.Text = $selectedItem.Name
+            $txtExportName.FontStyle = 'Normal'
+            $txtExportName.Foreground = [System.Windows.Media.Brushes]::White
+        }
+        
+        # Update Edit tab
+        $txtEditName = $Window.FindName('TxtEditPolicyName')
+        if ($txtEditName) {
+            $txtEditName.Text = $selectedItem.Name
+            $txtEditName.FontStyle = 'Normal'
+            $txtEditName.Foreground = [System.Windows.Media.Brushes]::White
+        }
+        
+        # Set enforcement mode dropdown
+        $cboEnforcement = $Window.FindName('CboEditEnforcement')
+        if ($cboEnforcement) {
+            $enfIndex = switch ($selectedItem.EnforcementMode) {
+                'AuditOnly' { 0 }
+                'Enabled' { 1 }
+                'NotConfigured' { 2 }
+                default { 0 }
+            }
+            $cboEnforcement.SelectedIndex = $enfIndex
+        }
+        
+        # Set phase dropdown
+        $cboPhase = $Window.FindName('CboEditPhase')
+        if ($cboPhase) {
+            $phaseIndex = if ($selectedItem.Phase) { [int]$selectedItem.Phase - 1 } else { 0 }
+            if ($phaseIndex -lt 0) { $phaseIndex = 0 }
+            if ($phaseIndex -gt 3) { $phaseIndex = 3 }
+            $cboPhase.SelectedIndex = $phaseIndex
+        }
     }
     else {
         $script:SelectedPolicyId = $null
@@ -2737,6 +3052,64 @@ function Update-SelectedPolicyInfo {
         $Window.FindName('TxtPolicyRuleCount').Text = '0 rules'
         $Window.FindName('TxtTargetGPO').Text = ''
         $Window.FindName('PolicyTargetOUsList').ItemsSource = $null
+        
+        # Reset Export tab
+        $txtExportName = $Window.FindName('TxtExportPolicyName')
+        if ($txtExportName) {
+            $txtExportName.Text = '(Select a policy)'
+            $txtExportName.FontStyle = 'Italic'
+            $txtExportName.Foreground = [System.Windows.Media.SolidColorBrush]::new([System.Windows.Media.Color]::FromRgb(158, 158, 158))
+        }
+        
+        # Reset Edit tab
+        $txtEditName = $Window.FindName('TxtEditPolicyName')
+        if ($txtEditName) {
+            $txtEditName.Text = '(Select a policy)'
+            $txtEditName.FontStyle = 'Italic'
+            $txtEditName.Foreground = [System.Windows.Media.SolidColorBrush]::new([System.Windows.Media.Color]::FromRgb(158, 158, 158))
+        }
+    }
+}
+
+function Invoke-SavePolicyChanges {
+    param([System.Windows.Window]$Window)
+    
+    if (-not $script:SelectedPolicyId) {
+        Show-Toast -Message 'Please select a policy to edit.' -Type 'Warning'
+        return
+    }
+    
+    # Get enforcement mode from dropdown
+    $cboEnforcement = $Window.FindName('CboEditEnforcement')
+    $enforcement = switch ($cboEnforcement.SelectedIndex) {
+        0 { 'AuditOnly' }
+        1 { 'Enabled' }
+        2 { 'NotConfigured' }
+        default { 'AuditOnly' }
+    }
+    
+    # Get phase from dropdown
+    $cboPhase = $Window.FindName('CboEditPhase')
+    $selectedPhaseItem = $cboPhase.SelectedItem
+    $phase = if ($selectedPhaseItem -and $selectedPhaseItem.Tag) {
+        [int]$selectedPhaseItem.Tag
+    } else {
+        1
+    }
+    
+    try {
+        $result = Update-Policy -Id $script:SelectedPolicyId -EnforcementMode $enforcement -Phase $phase
+        
+        if ($result.Success) {
+            Update-PoliciesDataGrid -Window $Window
+            Show-Toast -Message "Policy updated: Mode=$enforcement, Phase=$phase" -Type 'Success'
+        }
+        else {
+            Show-Toast -Message "Failed to update policy: $($result.Error)" -Type 'Error'
+        }
+    }
+    catch {
+        Show-Toast -Message "Error: $($_.Exception.Message)" -Type 'Error'
     }
 }
 
@@ -3255,7 +3628,7 @@ function Update-JobCounters {
     $Window.FindName('TxtJobCompletedCount').Text = "$completed"
 }
 
-function script:Update-DeploymentFilter {
+function global:Update-DeploymentFilter {
     param(
         [System.Windows.Window]$Window,
         [string]$Filter

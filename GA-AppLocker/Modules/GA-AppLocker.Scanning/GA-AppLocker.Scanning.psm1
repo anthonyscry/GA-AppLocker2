@@ -50,7 +50,11 @@ function script:Get-DefaultScanPaths {
                 'C:\Program Files',
                 'C:\Program Files (x86)',
                 'C:\Windows\System32',
-                'C:\Windows\SysWOW64'
+                'C:\Windows\SysWOW64',
+                'C:\ProgramData',
+                'C:\Windows\Microsoft.NET',
+                "$env:LOCALAPPDATA\Programs",
+                "$env:LOCALAPPDATA\Microsoft\WindowsApps"
             )
         }
     }
