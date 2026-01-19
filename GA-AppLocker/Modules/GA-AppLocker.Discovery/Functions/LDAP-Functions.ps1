@@ -120,7 +120,7 @@ function Get-OUTreeViaLdap {
     [CmdletBinding()]
     param([string]$Server, [int]$Port = 389, [pscredential]$Credential, [string]$SearchBase, [bool]$IncludeComputerCount = $true)
     
-    $result = [PSCustomObject]@{ Success = $false; Data = @(); Error = $null }
+    $result = [PSCustomObject]@{ Success = $false; Data = $null; Error = $null }
     
     try {
         if (-not $Server) {
@@ -189,7 +189,7 @@ function Get-ComputersByOUViaLdap {
         [string]$Server, [int]$Port = 389, [pscredential]$Credential, [bool]$IncludeNestedOUs = $true
     )
     
-    $result = [PSCustomObject]@{ Success = $false; Data = @(); Error = $null }
+    $result = [PSCustomObject]@{ Success = $false; Data = $null; Error = $null }
     
     try {
         if (-not $Server) {

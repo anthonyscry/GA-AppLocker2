@@ -215,6 +215,7 @@ function Import-PolicyToGPO {
     catch {
         return @{
             Success = $false
+            Data    = $null
             Error   = $_.Exception.Message
         }
     }
