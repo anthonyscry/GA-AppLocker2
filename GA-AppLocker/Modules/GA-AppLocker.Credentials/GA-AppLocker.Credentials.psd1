@@ -1,3 +1,11 @@
+#
+# Module manifest for module 'GA-AppLocker.Credentials'
+# Generated: 2026-01-17
+#
+# Credential management module with tiered access model.
+# Uses DPAPI encryption for secure credential storage.
+#
+
 @{
     RootModule        = 'GA-AppLocker.Credentials.psm1'
     ModuleVersion     = '1.0.0'

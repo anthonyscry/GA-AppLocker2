@@ -1,3 +1,11 @@
+#
+# Module manifest for module 'GA-AppLocker.Policy'
+# Generated: 2026-01-17
+#
+# Policy management module for combining rules into AppLocker policies.
+# Supports policy XML generation and GPO targeting.
+#
+
 @{
     RootModule        = 'GA-AppLocker.Policy.psm1'
     ModuleVersion     = '1.0.0'

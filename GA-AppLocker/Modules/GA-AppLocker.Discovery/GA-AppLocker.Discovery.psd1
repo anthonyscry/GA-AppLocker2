@@ -1,3 +1,11 @@
+#
+# Module manifest for module 'GA-AppLocker.Discovery'
+# Generated: 2026-01-17
+#
+# Active Directory discovery module with LDAP fallback for air-gapped environments.
+# Provides domain, OU, and computer discovery without requiring RSAT.
+#
+
 @{
     RootModule        = 'GA-AppLocker.Discovery.psm1'
     ModuleVersion     = '1.1.0'
