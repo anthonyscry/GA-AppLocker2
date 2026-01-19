@@ -165,14 +165,24 @@ function Import-PolicyToGPO {
         # Read XML content
         $xmlContent = Get-Content -Path $XmlPath -Raw
 
+        # Get domain DN for LDAP path
+        $domain = Get-ADDomain -ErrorAction SilentlyContinue
+        if (-not $domain) {
+            return @{
+                Success = $false
+                Error   = 'Unable to retrieve Active Directory domain information. Ensure the machine is domain-joined and the ActiveDirectory module is available.'
+            }
+        }
+        $ldapPath = "LDAP://CN={$($gpo.Id)},CN=Policies,CN=System,$($domain.DistinguishedName)"
+
         # Set AppLocker policy using PowerShell
         # Note: Set-AppLockerPolicy requires AppLocker module
         if (Get-Command -Name 'Set-AppLockerPolicy' -ErrorAction SilentlyContinue) {
             if ($Merge) {
-                Set-AppLockerPolicy -XmlPolicy $xmlContent -Ldap "LDAP://CN={$($gpo.Id)},CN=Policies,CN=System,$((Get-ADDomain).DistinguishedName)" -Merge
+                Set-AppLockerPolicy -XmlPolicy $xmlContent -Ldap $ldapPath -Merge
             }
             else {
-                Set-AppLockerPolicy -XmlPolicy $xmlContent -Ldap "LDAP://CN={$($gpo.Id)},CN=Policies,CN=System,$((Get-ADDomain).DistinguishedName)"
+                Set-AppLockerPolicy -XmlPolicy $xmlContent -Ldap $ldapPath
             }
         }
         else {
@@ -205,6 +215,7 @@ function Import-PolicyToGPO {
     catch {
         return @{
             Success = $false
+            Data    = $null
             Error   = $_.Exception.Message
         }
     }

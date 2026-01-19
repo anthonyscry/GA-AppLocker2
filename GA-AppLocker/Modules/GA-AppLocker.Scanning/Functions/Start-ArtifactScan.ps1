@@ -24,12 +24,21 @@
 .PARAMETER ScanName
     Name for this scan (used for saved results).
 
+.PARAMETER ThrottleLimit
+    Maximum concurrent remote sessions (default: 5).
+
+.PARAMETER BatchSize
+    Number of machines to process per batch (default: 50).
+
 .EXAMPLE
     $machines = (Get-ComputersByOU -OUDistinguishedNames 'OU=Servers,DC=domain,DC=com').Data
     Start-ArtifactScan -Machines $machines -IncludeEventLogs
 
 .EXAMPLE
     Start-ArtifactScan -ScanLocal -SaveResults -ScanName 'LocalBaseline'
+
+.EXAMPLE
+    Start-ArtifactScan -Machines $machines -ThrottleLimit 10 -BatchSize 25
 
 .OUTPUTS
     [PSCustomObject] Result with Success, Data (all artifacts), and Summary.
@@ -58,7 +67,13 @@ function Start-ArtifactScan {
         [switch]$SaveResults,
 
         [Parameter()]
-        [string]$ScanName = "Scan_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+        [string]$ScanName = "Scan_$(Get-Date -Format 'yyyyMMdd_HHmmss')",
+
+        [Parameter()]
+        [int]$ThrottleLimit = 5,
+
+        [Parameter()]
+        [int]$BatchSize = 50
     )
 
     $result = [PSCustomObject]@{
@@ -156,6 +171,8 @@ function Start-ArtifactScan {
                     ComputerName = $computerNames
                     Credential   = $credential
                     Recurse      = $true
+                    ThrottleLimit = $ThrottleLimit
+                    BatchSize    = $BatchSize
                 }
                 if ($Paths) { $remoteParams.Paths = $Paths }
 

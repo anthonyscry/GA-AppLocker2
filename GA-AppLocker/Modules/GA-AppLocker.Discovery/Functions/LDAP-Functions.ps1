@@ -24,6 +24,10 @@ function Get-LdapConnection {
         $connection.SessionOptions.ReferralChasing = [System.DirectoryServices.Protocols.ReferralChasingOptions]::None
         if ($UseSSL) { $connection.SessionOptions.SecureSocketLayer = $true }
         if ($Credential) {
+            # Warn about Basic auth without SSL
+            if (-not $UseSSL) {
+                Write-AppLockerLog -Level Warning -Message "LDAP: Using Basic authentication without SSL. Credentials transmitted base64-encoded. Consider enabling SSL (-UseSSL) for production deployments."
+            }
             $connection.Credential = $Credential.GetNetworkCredential()
             $connection.AuthType = [System.DirectoryServices.Protocols.AuthType]::Basic
         } else {
@@ -43,7 +47,9 @@ function Get-LdapSearchResult {
     param(
         [Parameter(Mandatory)]
         [System.DirectoryServices.Protocols.LdapConnection]$Connection,
-        [Parameter(Mandatory)][string]$SearchBase,
+        [Parameter(Mandatory)]
+        [AllowEmptyString()]
+        [string]$SearchBase,
         [string]$Filter = "(objectClass=*)",
         [string[]]$Properties = @("*"),
         [System.DirectoryServices.Protocols.SearchScope]$Scope = "Subtree"
@@ -114,7 +120,7 @@ function Get-OUTreeViaLdap {
     [CmdletBinding()]
     param([string]$Server, [int]$Port = 389, [pscredential]$Credential, [string]$SearchBase, [bool]$IncludeComputerCount = $true)
     
-    $result = [PSCustomObject]@{ Success = $false; Data = @(); Error = $null }
+    $result = [PSCustomObject]@{ Success = $false; Data = $null; Error = $null }
     
     try {
         if (-not $Server) {
@@ -183,7 +189,7 @@ function Get-ComputersByOUViaLdap {
         [string]$Server, [int]$Port = 389, [pscredential]$Credential, [bool]$IncludeNestedOUs = $true
     )
     
-    $result = [PSCustomObject]@{ Success = $false; Data = @(); Error = $null }
+    $result = [PSCustomObject]@{ Success = $false; Data = $null; Error = $null }
     
     try {
         if (-not $Server) {

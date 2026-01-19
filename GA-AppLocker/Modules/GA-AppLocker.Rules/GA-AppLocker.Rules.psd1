@@ -1,3 +1,11 @@
+#
+# Module manifest for module 'GA-AppLocker.Rules'
+# Generated: 2026-01-17
+#
+# Rule generation module for creating AppLocker policies from artifacts.
+# Supports Publisher, Hash, and Path rules with template support.
+#
+
 @{
     RootModule        = 'GA-AppLocker.Rules.psm1'
     ModuleVersion     = '1.0.0'
@@ -20,7 +28,11 @@
         'Export-RulesToXml',
         'Set-RuleStatus',
         'Get-SuggestedGroup',
-        'Get-KnownVendors'
+        'Get-KnownVendors',
+        # Rule Templates
+        'Get-RuleTemplates',
+        'New-RulesFromTemplate',
+        'Get-RuleTemplateCategories'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()

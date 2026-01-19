@@ -1,3 +1,11 @@
+#
+# Module manifest for module 'GA-AppLocker.Scanning'
+# Generated: 2026-01-17
+#
+# Artifact scanning module for discovering executables and collect metadata.
+# Supports local and remote scanning via WinRM with parallel execution.
+#
+
 @{
     RootModule        = 'GA-AppLocker.Scanning.psm1'
     ModuleVersion     = '1.0.0'

@@ -229,6 +229,10 @@ Export-ModuleMember -Function @(
     'Export-RulesToXml',
     'Set-RuleStatus',
     'Get-SuggestedGroup',
-    'Get-KnownVendors'
+    'Get-KnownVendors',
+    # Rule Templates
+    'Get-RuleTemplates',
+    'New-RulesFromTemplate',
+    'Get-RuleTemplateCategories'
 )
 #endregion

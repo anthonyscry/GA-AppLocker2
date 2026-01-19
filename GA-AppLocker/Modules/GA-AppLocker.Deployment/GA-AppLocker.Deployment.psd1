@@ -1,3 +1,11 @@
+#
+# Module manifest for module 'GA-AppLocker.Deployment'
+# Generated: 2026-01-17
+#
+# Deployment module for applying AppLocker policies to GPOs.
+# Supports async deployment with progress tracking.
+#
+
 @{
     RootModule        = 'GA-AppLocker.Deployment.psm1'
     ModuleVersion     = '1.0.0'
