@@ -32,7 +32,8 @@ GA-AppLocker2/
 │   │   ├── MainWindow.xaml.ps1     # Core UI (navigation, session state) - 716 lines
 │   │   ├── ToastHelpers.ps1        # Toast notifications + loading overlay
 │   │   ├── Helpers/
-│   │   │   └── UIHelpers.ps1       # Shared UI utilities
+│   │   │   ├── UIHelpers.ps1       # Shared UI utilities
+│   │   │   └── AsyncHelpers.ps1    # Async operations (runspaces, progress)
 │   │   └── Panels/                 # Panel-specific handlers (extracted)
 │   │       ├── Dashboard.ps1       # Dashboard stats, quick actions
 │   │       ├── ADDiscovery.ps1     # AD/OU discovery, machine filters
@@ -50,7 +51,8 @@ GA-AppLocker2/
 │       ├── GA-AppLocker.Rules/     # Rule generation (Publisher/Hash/Path)
 │       ├── GA-AppLocker.Policy/    # Policy management + XML export
 │       ├── GA-AppLocker.Deployment/ # GPO deployment
-│       └── GA-AppLocker.Setup/     # Environment initialization
+│       ├── GA-AppLocker.Setup/     # Environment initialization
+│       └── GA-AppLocker.Storage/   # Indexed rule storage (O(1) lookups)
 ├── Tests/
 │   ├── Unit/                       # Unit tests
 │   └── Integration/                # AD integration tests
@@ -59,7 +61,7 @@ GA-AppLocker2/
 └── Run-Dashboard.ps1               # Quick launcher
 ```
 
-### 8 Sub-Modules
+### 9 Sub-Modules
 
 | Module | Purpose | Key Functions |
 |--------|---------|---------------|
@@ -71,6 +73,7 @@ GA-AppLocker2/
 | **Policy** | Policy building | `New-Policy`, `Add-RuleToPolicy`, `Export-PolicyToXml` |
 | **Deployment** | GPO deployment | `Start-Deployment`, `Import-PolicyToGPO`, `New-AppLockerGPO` |
 | **Setup** | Environment init | `Initialize-AppLockerEnvironment`, `Initialize-WinRMGPO` |
+| **Storage** | Indexed rule storage | `Initialize-RuleDatabase`, `Find-RuleByHash`, `Get-RulesFromDatabase` |
 
 ## Code Conventions
 
@@ -526,13 +529,14 @@ Remove-DuplicateRules -RuleType All -Strategy KeepOldest
 
 ## Current Issues / Known Bugs
 
-### Slow Rule Loading (35k rules)
-- Loading all rules takes 2-5 minutes due to 35k JSON files
-- Bulk operations show progress with Write-Progress
-- Future optimization: Consider SQLite or indexed storage
+No critical issues. All major performance issues have been resolved:
+
+- ~~Slow Rule Loading (35k rules)~~ - **FIXED** with Storage module (O(1) lookups)
+- ~~Scanner Progress Stuck at 36%~~ - **FIXED** with unified progress tracking
+- ~~UI Freezes During Loads~~ - **FIXED** with async operations
 
 ## Version History
 
 See [TODO.md](TODO.md) for completed work and [README.md](README.md) for feature list.
 
-**Current Status:** All 21 TODO items completed. 67 tests passing. Bulk operations and deduplication added Jan 2026.
+**Current Status:** All 21 TODO items completed. 67 tests passing. Performance optimization complete (async UI, O(1) lookups, scanner progress fix) - Jan 2026.
