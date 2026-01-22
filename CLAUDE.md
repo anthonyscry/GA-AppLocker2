@@ -149,8 +149,10 @@ Audit → Enforce
 
 ## Testing
 
+### Unit Tests
+
 ```powershell
-# Run all tests (67 tests)
+# Run all unit tests (67 tests)
 .\Test-AllModules.ps1
 
 # Run with verbose output
@@ -159,6 +161,65 @@ Audit → Enforce
 # Run Pester unit tests
 .\Tests\Run-AllTests.ps1
 ```
+
+### Automated Testing
+
+```powershell
+# Run all automated tests (Workflows + UI)
+.\Tests\Automation\Run-AutomatedTests.ps1 -All
+
+# Workflow tests with mock data (no AD required)
+.\Tests\Automation\Run-AutomatedTests.ps1 -Workflows -UseMockData
+
+# UI automation tests
+.\Tests\Automation\Run-AutomatedTests.ps1 -UI -KeepUIOpen
+
+# Docker AD integration tests
+.\Tests\Automation\Run-AutomatedTests.ps1 -DockerAD
+
+# Full test with all options
+.\Tests\Automation\Run-AutomatedTests.ps1 -All -UseMockData -UITestMode Full
+```
+
+### Test Components
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| Unit Tests | `Test-AllModules.ps1` | Module function tests (67 tests) |
+| Mock Data | `Tests/Automation/MockData/` | Generate fake AD data for testing |
+| Workflows | `Tests/Automation/Workflows/` | Headless integration tests (5-stage pipeline) |
+| UI Bot | `Tests/Automation/UI/` | Windows UIAutomation GUI tests |
+| Docker AD | `docker/` | Samba AD DC for realistic AD testing |
+
+### Mock Data Functions
+
+| Function | Purpose |
+|----------|---------|
+| `New-MockDomainInfo` | Fake domain info (TESTLAB.LOCAL) |
+| `New-MockOUTree` | Fake OU structure (8 OUs across T0/T1/T2) |
+| `New-MockComputers` | Fake computer objects (DCs, servers, workstations) |
+| `New-MockArtifacts` | Fake scan artifacts (EXE, DLL, MSI, PS1) |
+| `New-MockCredentialProfile` | Fake tiered credentials |
+| `New-MockRules` | Fake AppLocker rules (Hash/Publisher/Path) |
+| `New-MockPolicy` | Fake policy objects |
+| `New-MockScanResult` | Fake scan results with artifacts |
+| `New-MockTestEnvironment` | Complete test environment with all data |
+
+### Workflow Test Stages
+
+1. **Discovery**: Get-DomainInfo, Get-OUTree, Get-ComputersByOU
+2. **Scanning**: Get-LocalArtifacts, artifact validation
+3. **Rules**: New-HashRule, New-PublisherRule
+4. **Policy**: New-Policy, Add-RuleToPolicy, Get-Policy
+5. **Export**: Export-PolicyToXml, Test-PolicyCompliance
+
+### UI Test Modes
+
+| Mode | Description |
+|------|-------------|
+| Quick | Navigation only (9 panels) |
+| Standard | Navigation + panel interactions |
+| Full | All panels + workflow simulation |
 
 ### Test Categories
 - Core module tests
@@ -170,6 +231,7 @@ Audit → Enforce
 - Deployment module tests
 - Edge case tests (invalid GUIDs, empty params)
 - E2E workflow tests
+- UI automation tests
 
 ## Configuration
 
