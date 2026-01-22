@@ -48,6 +48,7 @@ Features:
     # Nested modules to load
     NestedModules = @(
         'Modules\GA-AppLocker.Core\GA-AppLocker.Core.psd1',
+        'Modules\GA-AppLocker.Storage\GA-AppLocker.Storage.psd1',
         'Modules\GA-AppLocker.Discovery\GA-AppLocker.Discovery.psd1',
         'Modules\GA-AppLocker.Credentials\GA-AppLocker.Credentials.psd1',
         'Modules\GA-AppLocker.Scanning\GA-AppLocker.Scanning.psd1',
@@ -121,6 +122,20 @@ Features:
         'Find-ExistingHashRule',
         'Find-ExistingPublisherRule',
         'Get-ExistingRuleIndex',
+        # Storage module (SQLite)
+        'Initialize-RuleDatabase',
+        'Get-RuleDatabasePath',
+        'Test-RuleDatabaseExists',
+        'Add-RuleToDatabase',
+        'Get-RuleFromDatabase',
+        'Get-RulesFromDatabase',
+        'Update-RuleInDatabase',
+        'Remove-RuleFromDatabase',
+        'Import-RulesToDatabase',
+        'Get-RuleCounts',
+        'Find-RuleByHash',
+        'Find-RuleByPublisher',
+        'Get-DuplicateRules',
         # Policy module
         'New-Policy',
         'Get-Policy',

@@ -54,6 +54,12 @@ try {
         Import-Module $coreModulePath -ErrorAction Stop
     }
     
+    # Storage module - SQLite backend (depends on Core)
+    $storageModulePath = Join-Path $modulePath 'Modules\GA-AppLocker.Storage\GA-AppLocker.Storage.psd1'
+    if (Test-Path $storageModulePath) {
+        Import-Module $storageModulePath -ErrorAction Stop
+    }
+    
     # Discovery module - depends on Core
     $discoveryModulePath = Join-Path $modulePath 'Modules\GA-AppLocker.Discovery\GA-AppLocker.Discovery.psd1'
     if (Test-Path $discoveryModulePath) {
@@ -325,6 +331,20 @@ Export-ModuleMember -Function @(
     'Find-ExistingHashRule',
     'Find-ExistingPublisherRule',
     'Get-ExistingRuleIndex',
+    # Storage module (SQLite)
+    'Initialize-RuleDatabase',
+    'Get-RuleDatabasePath',
+    'Test-RuleDatabaseExists',
+    'Add-RuleToDatabase',
+    'Get-RuleFromDatabase',
+    'Get-RulesFromDatabase',
+    'Update-RuleInDatabase',
+    'Remove-RuleFromDatabase',
+    'Import-RulesToDatabase',
+    'Get-RuleCounts',
+    'Find-RuleByHash',
+    'Find-RuleByPublisher',
+    'Get-DuplicateRules',
     # Policy module
     'New-Policy',
     'Get-Policy',
