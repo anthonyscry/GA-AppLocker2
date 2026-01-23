@@ -1237,7 +1237,6 @@
                                             </Style>
                                         </DataGrid.CellStyle>
                                         <DataGrid.Columns>
-                                            <DataGridCheckBoxColumn Width="30"/>
                                             <DataGridTextColumn Header="S" Width="30" Binding="{Binding SignedIcon}"/>
                                             <DataGridTextColumn Header="File Name" Width="150" Binding="{Binding FileName}"/>
                                             <DataGridTextColumn Header="Type" Width="55" Binding="{Binding ArtifactType}"/>
