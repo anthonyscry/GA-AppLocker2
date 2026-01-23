@@ -15,19 +15,14 @@ function Initialize-ScannerPanel {
         }
         catch { }
         
-        # Fallback to comprehensive defaults
-        if (-not $paths) {
-            $paths = @(
-                'C:\Program Files',
-                'C:\Program Files (x86)',
-                'C:\Windows\System32',
-                'C:\Windows\SysWOW64',
-                'C:\ProgramData',
-                'C:\Windows\Microsoft.NET',
-                "$env:LOCALAPPDATA\Programs",
-                "$env:LOCALAPPDATA\Microsoft\WindowsApps"
-            )
-        }
+        # Use clean default paths (ProgramData included)
+        $paths = @(
+            'C:\Program Files',
+            'C:\Program Files (x86)',
+            'C:\ProgramData',
+            'C:\Windows\System32',
+            'C:\Windows\SysWOW64'
+        )
         $txtPaths.Text = $paths -join "`n"
     }
 
@@ -51,20 +46,50 @@ function Initialize-ScannerPanel {
     $btnBrowsePath = $Window.FindName('BtnBrowsePath')
     if ($btnBrowsePath) { $btnBrowsePath.Add_Click({ Invoke-BrowseScanPath -Window $script:MainWindow }) }
 
+    # High risk paths checkbox handler - add/remove paths from textbox
+    $chkHighRisk = $Window.FindName('ChkIncludeHighRisk')
+    if ($chkHighRisk) {
+        $chkHighRisk.Add_Checked({
+            $txtPaths = $script:MainWindow.FindName('TxtScanPaths')
+            if ($txtPaths) {
+                $highRiskPaths = @(
+                    "# --- HIGH RISK PATHS ---",
+                    [Environment]::GetFolderPath('UserProfile') + '\Downloads',
+                    [Environment]::GetFolderPath('Desktop'),
+                    $env:TEMP
+                ) -join "`n"
+                $txtPaths.Text = $txtPaths.Text.TrimEnd() + "`n" + $highRiskPaths
+            }
+        })
+        $chkHighRisk.Add_Unchecked({
+            $txtPaths = $script:MainWindow.FindName('TxtScanPaths')
+            if ($txtPaths) {
+                # Remove high risk section
+                $lines = $txtPaths.Text -split "`n" | Where-Object { 
+                    $_ -notmatch "HIGH RISK PATHS" -and 
+                    $_ -notmatch "\\Downloads$" -and 
+                    $_ -notmatch "\\Desktop$" -and
+                    $_ -notmatch "\\Temp$" -and
+                    $_ -notmatch "\\Local\\Temp$"
+                }
+                $txtPaths.Text = ($lines -join "`n").TrimEnd()
+            }
+        })
+    }
+
     $btnResetPaths = $Window.FindName('BtnResetPaths')
     if ($btnResetPaths) {
         $btnResetPaths.Add_Click({ 
                 $txtPaths = $script:MainWindow.FindName('TxtScanPaths')
+                $chkHighRisk = $script:MainWindow.FindName('ChkIncludeHighRisk')
+                if ($chkHighRisk) { $chkHighRisk.IsChecked = $false }
                 if ($txtPaths) { 
                     $defaultPaths = @(
                         'C:\Program Files',
                         'C:\Program Files (x86)',
-                        'C:\Windows\System32',
-                        'C:\Windows\SysWOW64',
                         'C:\ProgramData',
-                        'C:\Windows\Microsoft.NET',
-                        "$env:LOCALAPPDATA\Programs",
-                        "$env:LOCALAPPDATA\Microsoft\WindowsApps"
+                        'C:\Windows\System32',
+                        'C:\Windows\SysWOW64'
                     ) -join "`n"
                     $txtPaths.Text = $defaultPaths
                 }
