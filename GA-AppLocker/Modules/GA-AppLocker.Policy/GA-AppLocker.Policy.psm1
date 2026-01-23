@@ -62,16 +62,31 @@ if (Test-Path $functionPath) {
 
 #region ===== EXPORTS =====
 Export-ModuleMember -Function @(
+    # Core Policy CRUD
     'New-Policy',
     'Get-Policy',
     'Get-AllPolicies',
     'Update-Policy',
     'Remove-Policy',
     'Set-PolicyStatus',
+    # Rule Management
     'Add-RuleToPolicy',
     'Remove-RuleFromPolicy',
+    # Targeting
     'Set-PolicyTarget',
+    # Export
     'Export-PolicyToXml',
-    'Test-PolicyCompliance'
+    'Test-PolicyCompliance',
+    # Policy Comparison
+    'Compare-Policies',
+    'Compare-RuleProperties',
+    'Get-PolicyDiffReport',
+    # Policy Snapshots
+    'New-PolicySnapshot',
+    'Get-PolicySnapshots',
+    'Get-PolicySnapshot',
+    'Restore-PolicySnapshot',
+    'Remove-PolicySnapshot',
+    'Invoke-PolicySnapshotCleanup'
 )
 #endregion

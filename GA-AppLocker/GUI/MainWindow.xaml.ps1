@@ -17,6 +17,13 @@ $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
 # Load helpers first
 . "$scriptPath\Helpers\UIHelpers.ps1"
 . "$scriptPath\Helpers\AsyncHelpers.ps1"
+. "$scriptPath\Helpers\KeyboardShortcuts.ps1"
+. "$scriptPath\Helpers\DragDropHelpers.ps1"
+
+# Load wizards
+if (Test-Path "$scriptPath\Wizards\SetupWizard.ps1") {
+    . "$scriptPath\Wizards\SetupWizard.ps1"
+}
 
 # Load panel handlers
 . "$scriptPath\Panels\Dashboard.ps1"

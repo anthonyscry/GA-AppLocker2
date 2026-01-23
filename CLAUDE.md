@@ -65,15 +65,15 @@ GA-AppLocker2/
 
 | Module | Purpose | Key Functions |
 |--------|---------|---------------|
-| **Core** | Logging, config, session | `Write-AppLockerLog`, `Get-AppLockerConfig`, `Save-SessionState` |
+| **Core** | Logging, config, session, cache, events, validation | `Write-AppLockerLog`, `Get-AppLockerConfig`, `Save-SessionState`, `Get-CachedValue`, `Publish-AppLockerEvent`, `Test-ValidHash` |
 | **Discovery** | AD enumeration | `Get-DomainInfo`, `Get-OUTree`, `Get-ComputersByOU` |
 | **Credentials** | DPAPI credential storage | `New-CredentialProfile`, `Get-CredentialForTier` |
 | **Scanning** | Artifact collection | `Get-LocalArtifacts`, `Get-RemoteArtifacts`, `Start-ArtifactScan` |
-| **Rules** | Rule generation | `New-PublisherRule`, `New-HashRule`, `ConvertFrom-Artifact` |
-| **Policy** | Policy building | `New-Policy`, `Add-RuleToPolicy`, `Export-PolicyToXml` |
+| **Rules** | Rule generation + templates | `New-PublisherRule`, `New-HashRule`, `ConvertFrom-Artifact`, `Get-RuleTemplates`, `New-RulesFromTemplate` |
+| **Policy** | Policy building + comparison + snapshots | `New-Policy`, `Add-RuleToPolicy`, `Export-PolicyToXml`, `Compare-Policies`, `New-PolicySnapshot`, `Restore-PolicySnapshot` |
 | **Deployment** | GPO deployment | `Start-Deployment`, `Import-PolicyToGPO`, `New-AppLockerGPO` |
 | **Setup** | Environment init | `Initialize-AppLockerEnvironment`, `Initialize-WinRMGPO` |
-| **Storage** | Indexed rule storage | `Initialize-RuleDatabase`, `Find-RuleByHash`, `Get-RulesFromDatabase` |
+| **Storage** | Indexed rule storage + repository | `Initialize-RuleDatabase`, `Find-RuleByHash`, `Get-RulesFromDatabase`, `Get-RuleFromRepository`, `Save-RuleToRepository` |
 
 ## Code Conventions
 
@@ -540,3 +540,197 @@ No critical issues. All major performance issues have been resolved:
 See [TODO.md](TODO.md) for completed work and [README.md](README.md) for feature list.
 
 **Current Status:** All 21 TODO items completed. 67 tests passing. Performance optimization complete (async UI, O(1) lookups, scanner progress fix) - Jan 2026.
+
+### Architecture Enhancements (Jan 22, 2026)
+
+New infrastructure components in `GA-AppLocker.Core`:
+
+#### Cache Manager (`Cache-Manager.ps1`)
+
+Thread-safe in-memory caching with TTL support:
+
+```powershell
+# Get with auto-refresh factory
+$data = Get-CachedValue -Key 'RuleCounts' -MaxAgeSeconds 60 -Factory { Get-RuleCounts }
+
+# Manual set/clear
+Set-CachedValue -Key 'MyKey' -Value $data -TimeToLive 300
+Clear-AppLockerCache -Pattern 'Rule:*'
+
+# Statistics
+Get-CacheStatistics
+```
+
+#### Event System (`Event-System.ps1`)
+
+Publish/subscribe pattern for loose coupling:
+
+```powershell
+# Subscribe to events
+Register-AppLockerEvent -EventName 'RuleCreated' -Handler {
+    param($EventData)
+    Write-Host "New rule: $($EventData.RuleId)"
+}
+
+# Publish events
+Publish-AppLockerEvent -EventName 'RuleCreated' -EventData @{ RuleId = 'abc123' }
+
+# Standard events: RuleCreated, RuleUpdated, PolicyCreated, ScanCompleted, SnapshotCreated, PolicyRestored
+```
+
+#### Validation Helpers (`Validation-Helpers.ps1`)
+
+Centralized input validation:
+
+```powershell
+# Type validators
+Test-ValidHash -Hash 'ABC123...'
+Test-ValidSid -Sid 'S-1-5-21-...'
+Test-ValidGuid -Guid '12345678-...'
+Test-ValidPath -Path 'C:\Windows'
+
+# Domain validators
+Test-ValidCollectionType -CollectionType 'Exe'
+Test-ValidRuleAction -Action 'Allow'
+Test-ValidRuleStatus -Status 'Approved'
+
+# Assertions (throw on failure)
+Assert-NotNullOrEmpty -Value $name -ParameterName 'Name'
+Assert-InRange -Value $count -Min 1 -Max 100
+
+# Sanitizers
+ConvertTo-SafeFileName -FileName 'My<Invalid>File.txt'
+ConvertTo-SafeXmlString -Text '<script>alert(1)</script>'
+```
+
+#### Repository Pattern (`GA-AppLocker.Storage/RuleRepository.ps1`)
+
+Abstraction over storage with caching and events:
+
+```powershell
+# Uses cache automatically
+$rule = Get-RuleFromRepository -RuleId 'abc123'
+
+# Invalidates cache and publishes event
+Save-RuleToRepository -Rule $rule
+
+# Batch operations
+Invoke-RuleBatchOperation -Operation 'UpdateStatus' -RuleIds @('id1','id2') -Parameters @{ Status = 'Approved' }
+```
+
+### New Features (Jan 22, 2026)
+
+#### Rule Templates (`GA-AppLocker.Rules`)
+
+Pre-built rule templates for common applications:
+
+```powershell
+# List available templates
+Get-RuleTemplates
+
+# Get specific template
+Get-RuleTemplates -TemplateName 'Microsoft Office'
+
+# Create rules from template
+New-RulesFromTemplate -TemplateName 'Google Chrome' -Status Pending -Save
+
+# Available templates:
+# - Microsoft Office, Google Chrome, Mozilla Firefox, Adobe Acrobat Reader
+# - 7-Zip, Notepad++, Zoom, Microsoft Teams, Slack, Visual Studio Code
+# - Java Runtime, Cisco AnyConnect, Python, Git
+# - Windows Default Allow, Block High Risk Locations, Block Script Locations
+```
+
+#### Policy Comparison (`GA-AppLocker.Policy/Compare-Policies.ps1`)
+
+Compare two policies and identify differences:
+
+```powershell
+# Compare by ID
+$diff = Compare-Policies -SourcePolicyId 'abc123' -TargetPolicyId 'def456'
+
+# Compare objects directly
+$diff = Compare-Policies -SourcePolicy $oldPolicy -TargetPolicy $newPolicy -IncludeUnchanged
+
+# $diff.Summary: AddedCount, RemovedCount, ModifiedCount, UnchangedCount
+# $diff.Added, $diff.Removed, $diff.Modified arrays with details
+
+# Generate formatted report
+Get-PolicyDiffReport -SourcePolicyId 'abc123' -TargetPolicyId 'def456' -Format Markdown
+# Formats: Text, Html, Markdown
+```
+
+#### Policy Snapshots (`GA-AppLocker.Policy/Policy-Snapshots.ps1`)
+
+Versioned backups with rollback capability:
+
+```powershell
+# Create snapshot before changes
+New-PolicySnapshot -PolicyId 'abc123' -Description 'Before adding Chrome rules'
+
+# List snapshots
+Get-PolicySnapshots -PolicyId 'abc123' -Limit 10
+
+# Restore to previous state (auto-creates backup first)
+Restore-PolicySnapshot -SnapshotId 'abc123_20260122_143000'
+
+# Cleanup old snapshots
+Invoke-PolicySnapshotCleanup -PolicyId 'abc123' -KeepCount 5 -KeepDays 30
+```
+
+### UX Enhancements (Jan 22, 2026)
+
+#### Keyboard Shortcuts (`GUI/Helpers/KeyboardShortcuts.ps1`)
+
+| Shortcut | Action |
+|----------|--------|
+| Ctrl+1-9 | Navigate to panels (Dashboard, Discovery, Scanner, Rules, Policy, Deploy, Settings, Setup, About) |
+| F5 / Ctrl+R | Refresh current panel |
+| Ctrl+F | Focus search box |
+| Ctrl+S | Save (context-dependent) |
+| Ctrl+E | Export (context-dependent) |
+| Ctrl+N | New item (context-dependent) |
+| Ctrl+A | Select all in data grid |
+| Escape | Cancel/Clear |
+| Delete | Delete selected items |
+| F1 | Help/About |
+
+#### Drag-and-Drop (`GUI/Helpers/DragDropHelpers.ps1`)
+
+- **Scanner Panel**: Drop executable files to scan them
+- **Rules Panel**: Drop files to create rules, drop XML to import rules
+- **Policy Panel**: Drop AppLocker XML files to import policies
+- Drop on wrong panel → prompted to redirect
+
+#### Setup Wizard (`GUI/Wizards/SetupWizard.ps1`)
+
+7-step guided first-run wizard:
+
+1. Welcome & Prerequisites Check
+2. Domain Configuration (auto-detect)
+3. Credential Setup
+4. WinRM Configuration
+5. AppLocker GPO Setup
+6. Initial Scan Target Selection
+7. Summary & Launch
+
+```powershell
+# Check if wizard should show
+Test-ShouldShowWizard
+
+# Show wizard manually
+Show-SetupWizard -ParentWindow $mainWindow
+```
+
+### New Test Files
+
+```
+Tests/Unit/
+├── Cache.Tests.ps1           # 25+ cache operation tests
+├── Events.Tests.ps1          # 20+ event system tests
+├── Validation.Tests.ps1      # 30+ validator tests
+└── Repository.Tests.ps1      # 15+ repository pattern tests
+
+Tests/Performance/
+└── Benchmark-Storage.ps1     # Performance benchmarks with targets
+```

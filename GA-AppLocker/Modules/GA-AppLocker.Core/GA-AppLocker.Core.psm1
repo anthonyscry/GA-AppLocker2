@@ -66,14 +66,51 @@ if (-not (Test-Path $logsPath)) {
 #region ===== EXPORTS =====
 # Export public functions
 Export-ModuleMember -Function @(
+    # Logging & Config
     'Write-AppLockerLog',
     'Get-AppLockerConfig',
     'Set-AppLockerConfig',
     'Test-Prerequisites',
     'Get-AppLockerDataPath',
     'Invoke-WithRetry',
+    # Session State
     'Save-SessionState',
     'Restore-SessionState',
-    'Clear-SessionState'
+    'Clear-SessionState',
+    # Cache Manager
+    'Get-CachedValue',
+    'Set-CachedValue',
+    'Clear-AppLockerCache',
+    'Get-CacheStatistics',
+    'Test-CacheKey',
+    'Invoke-CacheCleanup',
+    # Event System
+    'Register-AppLockerEvent',
+    'Publish-AppLockerEvent',
+    'Unregister-AppLockerEvent',
+    'Get-AppLockerEventHandlers',
+    'Get-AppLockerEventHistory',
+    'Clear-AppLockerEventHistory',
+    'Get-AppLockerStandardEvents',
+    # Validation Helpers
+    'Test-ValidHash',
+    'Test-ValidSid',
+    'Test-ValidGuid',
+    'Test-ValidPath',
+    'Test-ValidDistinguishedName',
+    'Test-ValidHostname',
+    'Test-ValidCollectionType',
+    'Test-ValidRuleAction',
+    'Test-ValidRuleStatus',
+    'Test-ValidPolicyStatus',
+    'Test-ValidEnforcementMode',
+    'Test-ValidTier',
+    'Assert-NotNullOrEmpty',
+    'Assert-InRange',
+    'Assert-MatchesPattern',
+    'Assert-InSet',
+    'ConvertTo-SafeFileName',
+    'ConvertTo-SafeXmlString',
+    'Get-ValidValues'
 )
 #endregion

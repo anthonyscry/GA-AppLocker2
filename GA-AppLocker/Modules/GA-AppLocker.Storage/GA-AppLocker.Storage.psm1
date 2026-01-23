@@ -102,6 +102,7 @@ if (Test-Path $jsonFallbackPath) {
 }
 
 Export-ModuleMember -Function @(
+    # Core database functions
     'Initialize-RuleDatabase',
     'Get-RuleDatabasePath', 
     'Test-RuleDatabaseExists',
@@ -120,5 +121,13 @@ Export-ModuleMember -Function @(
     'Stop-RuleIndexWatcher',
     'Get-RuleIndexWatcherStatus',
     'Set-RuleIndexWatcherDebounce',
-    'Invoke-RuleIndexRebuild'
+    'Invoke-RuleIndexRebuild',
+    # Repository pattern functions
+    'Get-RuleFromRepository',
+    'Save-RuleToRepository',
+    'Remove-RuleFromRepository',
+    'Find-RulesInRepository',
+    'Get-RuleCountsFromRepository',
+    'Invoke-RuleBatchOperation',
+    'Test-RuleExistsInRepository'
 )
