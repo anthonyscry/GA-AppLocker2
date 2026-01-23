@@ -361,25 +361,6 @@
             </Setter>
         </Style>
 
-        <!-- Spinner Style -->
-        <Style x:Key="SpinnerStyle" TargetType="Border">
-            <Setter Property="Width" Value="40"/>
-            <Setter Property="Height" Value="40"/>
-            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
-            <Setter Property="RenderTransform">
-                <Setter.Value>
-                    <RotateTransform x:Name="SpinnerRotate" Angle="0"/>
-                </Setter.Value>
-            </Setter>
-        </Style>
-        
-        <!-- Spinner Rotation Animation (applied in code or via EventTrigger on element) -->
-        <Storyboard x:Key="SpinnerAnimation" RepeatBehavior="Forever">
-            <DoubleAnimation 
-                Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
-                From="0" To="360" 
-                Duration="0:0:1"/>
-        </Storyboard>
     </Window.Resources>
 
     <Grid>
@@ -2724,37 +2705,33 @@
                     VerticalAlignment="Center"
                     MinWidth="200">
                 <StackPanel HorizontalAlignment="Center">
-                    <!-- Animated Spinner -->
+                    <!-- Spinner with pulsing animation -->
                     <Border x:Name="LoadingSpinner"
-                            Width="40" Height="40"
-                            RenderTransformOrigin="0.5,0.5"
+                            Width="50" Height="50"
+                            CornerRadius="25"
+                            BorderBrush="{StaticResource PrimaryBrush}"
+                            BorderThickness="4"
                             Margin="0,0,0,15"
                             HorizontalAlignment="Center">
-                        <Border.RenderTransform>
-                            <RotateTransform x:Name="SpinnerRotateTransform" Angle="0"/>
-                        </Border.RenderTransform>
                         <Border.Triggers>
                             <EventTrigger RoutedEvent="Border.Loaded">
                                 <BeginStoryboard>
                                     <Storyboard RepeatBehavior="Forever">
                                         <DoubleAnimation 
-                                            Storyboard.TargetName="SpinnerRotateTransform"
-                                            Storyboard.TargetProperty="Angle"
-                                            From="0" To="360" 
-                                            Duration="0:0:1"/>
+                                            Storyboard.TargetProperty="Opacity"
+                                            From="1" To="0.3" 
+                                            Duration="0:0:0.5"
+                                            AutoReverse="True"/>
                                     </Storyboard>
                                 </BeginStoryboard>
                             </EventTrigger>
                         </Border.Triggers>
-                        <Viewbox>
-                            <Canvas Width="24" Height="24">
-                                <Ellipse Width="24" Height="24" 
-                                         Stroke="{StaticResource PrimaryBrush}" 
-                                         StrokeThickness="3"
-                                         StrokeDashArray="3,2"
-                                         StrokeDashCap="Round"/>
-                            </Canvas>
-                        </Viewbox>
+                        <TextBlock Text="..." 
+                                   FontSize="20" 
+                                   FontWeight="Bold"
+                                   Foreground="{StaticResource PrimaryBrush}"
+                                   HorizontalAlignment="Center" 
+                                   VerticalAlignment="Center"/>
                     </Border>
                     <TextBlock x:Name="LoadingText"
                                Text="Loading..."
