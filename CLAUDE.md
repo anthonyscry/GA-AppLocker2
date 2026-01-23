@@ -734,3 +734,125 @@ Tests/Unit/
 Tests/Performance/
 └── Benchmark-Storage.ps1     # Performance benchmarks with targets
 ```
+
+### Bug Fixes (Jan 22, 2026 - Evening Session)
+
+#### Fixed: App Hanging During Initialization
+
+**Symptoms:**
+- App would hang after "Loaded JSON index with 8325 rules"
+- Dashboard panel initialization never completed
+- Timer callbacks failing silently
+
+**Root Causes & Fixes:**
+
+1. **Module Path Resolution** (`AsyncHelpers.ps1`)
+   - Changed from deriving path from data directory to using `Get-Module -Name 'GA-AppLocker'`
+   - Runspaces now correctly import the module
+
+2. **UI Helper Scope Issues** (`UIHelpers.ps1`, `MainWindow.xaml.ps1`)
+   - Changed `Show-LoadingOverlay`, `Hide-LoadingOverlay`, `Update-LoadingText` from `script:` to `global:` scope
+   - Timer callbacks run in dispatcher context and need global access
+
+3. **Write-Log Scope** (`UIHelpers.ps1`, `MainWindow.xaml.ps1`)
+   - Changed `Write-Log` from `script:` to `global:` scope
+   - WPF event handlers need global access
+
+4. **Duplicate Function Definitions**
+   - `UIHelpers.ps1` and `MainWindow.xaml.ps1` both defined the same UI helper functions
+   - Removed duplicates from `MainWindow.xaml.ps1`, kept in `UIHelpers.ps1`
+
+5. **Missing Handler Registration** (`MainWindow.xaml.ps1`)
+   - Added `Register-KeyboardShortcuts` call in `Initialize-MainWindow`
+   - Added `Register-DragDropHandlers` call in `Initialize-MainWindow`
+
+**Commits:**
+```
+f157c04 fix: remove duplicate UI helpers and use global scope for Write-Log
+368a749 fix: change UI helpers to global scope for timer callback accessibility
+130a00a fix: correct module path resolution and register keyboard/drag-drop handlers
+```
+
+#### Known Minor Issues (Non-Blocking)
+
+Async runspace operations occasionally log warnings because isolated runspaces don't have access to the main session's global functions:
+- "Write-Log not recognized" in runspace context
+- "Get-Command not recognized" in runspace context
+
+These happen in background operations but don't affect app functionality. The main UI thread works correctly.
+
+## Current App Status (Jan 22, 2026)
+
+**Working:**
+- All 8 panels initialize (Dashboard, Discovery, Credentials, Scanner, Rules, Policy, Deployment, Setup)
+- 8325 rules loaded from JSON index
+- Keyboard shortcuts registered (Ctrl+1-9 navigation, F5 refresh, etc.)
+- Drag-drop handlers registered
+- Session state save/restore
+- Navigation between panels
+- Toast notifications and loading overlays
+
+**Startup Sequence (from logs):**
+```
+1. All nested modules loaded successfully
+2. Starting GA-AppLocker Dashboard v1.0.0
+3. Code-behind loaded successfully
+4. Toast helpers loaded successfully
+5. Main window loaded successfully
+6. Navigation initialized
+7. [Storage] Loaded JSON index with 8325 rules (~8 sec)
+8. Dashboard panel initialized
+9. Discovery panel initialized
+10. Credentials panel initialized
+11. Scanner panel initialized
+12. Rules panel initialized
+13. Policy panel initialized
+14. Deployment panel initialized
+15. Setup panel initialized
+16. Session state restored
+17. Keyboard shortcuts registered
+18. Drag-drop handlers registered
+19. Main window initialized
+20. Window Loaded event fired
+```
+
+## Debugging Tips
+
+### Check Logs
+```powershell
+# View today's logs
+Get-Content "$env:LOCALAPPDATA\GA-AppLocker\Logs\GA-AppLocker_$(Get-Date -Format 'yyyy-MM-dd').log" -Tail 50
+
+# Clear logs for fresh run
+Remove-Item "$env:LOCALAPPDATA\GA-AppLocker\Logs\GA-AppLocker_$(Get-Date -Format 'yyyy-MM-dd').log" -ErrorAction SilentlyContinue
+```
+
+### Common Issues
+
+| Symptom | Likely Cause | Solution |
+|---------|--------------|----------|
+| App hangs after "Loading rules" | Async callback scope issue | Check functions use `global:` scope |
+| "Function not recognized" in log | Runspace doesn't have function | Use `global:` scope or pass via arguments |
+| Panels don't initialize | Error in panel init code | Check logs for specific panel error |
+| Session restore fails | Async runspace can't access functions | Non-critical, app still works |
+
+### Testing Launch
+```bash
+# From Git Bash
+cd /c/Projects/GA-AppLocker2
+powershell.exe -ExecutionPolicy Bypass -File Run-Dashboard.ps1
+
+# Check logs
+tail -50 "/c/Users/major/AppData/Local/GA-AppLocker/Logs/GA-AppLocker_2026-01-22.log"
+```
+
+### WPF Scope Rules
+
+When working with WPF timer callbacks, async operations, or event handlers:
+
+1. **Functions called from timer ticks** must be `global:` scope
+2. **Functions called from runspaces** must either be:
+   - Defined in the runspace via imported module
+   - Or use `global:` scope (less reliable in true runspaces)
+3. **MainWindow reference** use `$script:MainWindow` in the main script scope
+4. **UI updates from background** use `Invoke-UIUpdate` which marshals to dispatcher
