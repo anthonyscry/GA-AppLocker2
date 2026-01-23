@@ -542,6 +542,49 @@ function Invoke-GenerateRulesFromArtifacts {
         Write-Log -Level Warning -Message "Could not filter existing rules: $($_.Exception.Message)"
     }
 
+    # Deduplicate artifacts by hash (same file in multiple locations = one rule needed)
+    $beforeDedupeCount = $artifactsToProcess.Count
+    $seenHashes = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    $seenPublishers = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    $dedupedArtifacts = [System.Collections.Generic.List[PSCustomObject]]::new()
+    
+    foreach ($artifact in $artifactsToProcess) {
+        $dominated = $false
+        
+        # For Publisher mode or Smart mode with signed files, dedupe by publisher+product
+        if ($mode -in @('Publisher', 'Smart') -and $artifact.IsSigned -and $artifact.Publisher) {
+            $pubKey = "$($artifact.Publisher)|$($artifact.ProductName)".ToLower()
+            if ($seenPublishers.Contains($pubKey)) {
+                $dominated = $true
+            }
+            else {
+                [void]$seenPublishers.Add($pubKey)
+            }
+        }
+        
+        # For Hash mode or unsigned files in Smart mode, dedupe by hash
+        if (-not $dominated -and $artifact.SHA256Hash) {
+            if ($mode -eq 'Hash' -or ($mode -eq 'Smart' -and -not $artifact.IsSigned)) {
+                if ($seenHashes.Contains($artifact.SHA256Hash)) {
+                    $dominated = $true
+                }
+                else {
+                    [void]$seenHashes.Add($artifact.SHA256Hash)
+                }
+            }
+        }
+        
+        if (-not $dominated) {
+            $dedupedArtifacts.Add($artifact)
+        }
+    }
+    
+    $artifactsToProcess = $dedupedArtifacts.ToArray()
+    $dedupedCount = $beforeDedupeCount - $artifactsToProcess.Count
+    if ($dedupedCount -gt 0) {
+        Write-Log -Message "Deduplicated $dedupedCount artifacts (same hash/publisher) - processing $($artifactsToProcess.Count) unique"
+    }
+
     if ($artifactsToProcess.Count -eq 0) {
         Hide-LoadingOverlay
         if ($btnGenerate) { $btnGenerate.IsEnabled = $true }
@@ -549,11 +592,16 @@ function Invoke-GenerateRulesFromArtifacts {
         return
     }
 
-    # Show loading overlay
-    $filterMsg = if ($originalCount -ne $artifactsToProcess.Count) { " ($($originalCount - $artifactsToProcess.Count) already have rules)" } else { "" }
-    Show-LoadingOverlay -Message "Generating Rules..." -SubMessage "Processing $($artifactsToProcess.Count) artifacts...$filterMsg"
+    # Show loading overlay with deduplication info
+    $skippedCount = $originalCount - $beforeDedupeCount  # Already have rules
+    $filterParts = @()
+    if ($skippedCount -gt 0) { $filterParts += "$skippedCount already have rules" }
+    if ($dedupedCount -gt 0) { $filterParts += "$dedupedCount duplicates" }
+    $filterMsg = if ($filterParts.Count -gt 0) { " (skipped: $($filterParts -join ', '))" } else { "" }
     
-    Show-Toast -Message "Generating rules from $($artifactsToProcess.Count) of $originalCount artifacts$filterMsg..." -Type 'Info'
+    Show-LoadingOverlay -Message "Generating Rules..." -SubMessage "Processing $($artifactsToProcess.Count) unique artifacts...$filterMsg"
+    
+    Show-Toast -Message "Generating rules from $($artifactsToProcess.Count) unique artifacts (of $originalCount total)$filterMsg..." -Type 'Info'
 
     # Create sync hashtable for async communication
     $script:RuleGenSyncHash = [hashtable]::Synchronized(@{
