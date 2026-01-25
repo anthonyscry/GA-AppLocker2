@@ -942,66 +942,56 @@ function Invoke-DeleteSelectedRules {
 
     if ($confirm -ne 'Yes') { return }
 
-    # Collect IDs for bulk delete (copy now, before async)
+    # Collect IDs for bulk delete
     $ids = @($selectedItems | ForEach-Object { $_.Id })
     $count = $ids.Count
     
-    # Run delete operation asynchronously to prevent UI freeze
-    Invoke-AsyncOperation -ScriptBlock {
-        param($RuleIds)
-        
-        # Try bulk delete first
+    # Show loading overlay
+    Show-LoadingOverlay -Message "Deleting $count rules..." -SubMessage 'Please wait'
+    
+    # Force UI to update before blocking operation
+    [System.Windows.Forms.Application]::DoEvents()
+    
+    try {
+        # Use bulk delete (updates index automatically)
         if (Get-Command -Name 'Remove-RulesBulk' -ErrorAction SilentlyContinue) {
-            $result = Remove-RulesBulk -RuleIds $RuleIds -UpdateIndex
+            $result = Remove-RulesBulk -RuleIds $ids -UpdateIndex
             
-            # Invalidate GlobalSearch cache so refreshed data is fetched
+            # Invalidate GlobalSearch cache
             if (Get-Command -Name 'Clear-CachedValue' -ErrorAction SilentlyContinue) {
                 Clear-CachedValue -Key 'GlobalSearch_AllRules'
             }
             
-            return $result
-        }
-        
-        # Fallback to one-by-one
-        $deleted = 0
-        $errors = 0
-        foreach ($id in $RuleIds) {
-            try {
-                $result = Remove-Rule -Id $id
-                if ($result.Success) { $deleted++ } else { $errors++ }
+            if ($result.Success) {
+                Show-Toast -Message "Deleted $($result.RemovedCount) rule(s)." -Type 'Success'
+                if ($result.FailedCount -gt 0) {
+                    Show-Toast -Message "$($result.FailedCount) rule(s) failed to delete." -Type 'Warning'
+                }
             }
-            catch { $errors++ }
-        }
-        return @{ Success = $true; RemovedCount = $deleted; FailedCount = $errors }
-    } -Arguments @{ RuleIds = $ids } -LoadingMessage "Deleting $count rules..." -LoadingSubMessage 'Please wait' -OnComplete {
-        param($Result)
-        
-        if ($Result -and $Result.Success) {
-            $removed = if ($Result.RemovedCount) { $Result.RemovedCount } else { 0 }
-            $failed = if ($Result.FailedCount) { $Result.FailedCount } else { 0 }
-            Show-Toast -Message "Deleted $removed rule(s)." -Type 'Success'
-            if ($failed -gt 0) {
-                Show-Toast -Message "$failed rule(s) failed to delete." -Type 'Warning'
+            else {
+                Show-Toast -Message "Delete failed: $($result.Error)" -Type 'Error'
             }
-        }
-        elseif ($Result) {
-            Show-Toast -Message "Delete failed: $($Result.Error)" -Type 'Error'
         }
         else {
-            Show-Toast -Message "Delete operation failed." -Type 'Error'
+            # Fallback to one-by-one
+            $deleted = 0
+            foreach ($id in $ids) {
+                $itemResult = Remove-Rule -Id $id
+                if ($itemResult.Success) { $deleted++ }
+            }
+            Show-Toast -Message "Deleted $deleted rule(s)." -Type 'Success'
         }
-        
-        # Reset the in-memory cache so it reloads from disk
-        if (Get-Command -Name 'Reset-RulesIndexCache' -ErrorAction SilentlyContinue) {
-            Reset-RulesIndexCache
-        }
-        
-        # Refresh the grid after delete using global action dispatcher
-        Invoke-ButtonAction -Action 'RefreshRules'
-    } -OnError {
-        param($ErrorMessage)
-        Show-Toast -Message "Error: $ErrorMessage" -Type 'Error'
     }
+    catch {
+        Show-Toast -Message "Error: $($_.Exception.Message)" -Type 'Error'
+    }
+    finally {
+        Hide-LoadingOverlay
+    }
+    
+    # Refresh the grid
+    Update-RulesDataGrid -Window $Window
+    Update-RulesSelectionCount -Window $Window
 }
 
 function Invoke-ApproveTrustedVendors {
