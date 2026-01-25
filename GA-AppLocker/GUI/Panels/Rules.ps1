@@ -952,7 +952,7 @@ function Invoke-DeleteSelectedRules {
         
         # Try bulk delete first
         if (Get-Command -Name 'Remove-RulesBulk' -ErrorAction SilentlyContinue) {
-            return Remove-RulesBulk -Ids $RuleIds
+            return Remove-RulesBulk -RuleIds $RuleIds
         }
         
         # Fallback to one-by-one

@@ -1,0 +1,117 @@
+Loading GA-AppLocker module...
+Module loaded successfully
+
+
+= * 60
+ CORE MODULE TESTS
+= * 60
+[PASS] Write-AppLockerLog - Log file created
+[PASS] Get-AppLockerDataPath - Returns valid path
+[PASS] Get-AppLockerConfig - Returns config object
+
+[PASS] Set-AppLockerConfig - Can set and retrieve config
+[PASS] Test-Prerequisites - Returns prereq results
+
+= * 60
+ DISCOVERY MODULE TESTS
+= * 60
+[2026-01-24 20:46:14] [Error] LDAP connection failed: Exception calling "Bind" with "0" argument(s): "The LDAP server is unavailable."
+[PASS] Get-DomainInfo - Returns valid result
+[2026-01-24 20:46:16] [Error] LDAP connection failed: Exception calling "Bind" with "0" argument(s): "The LDAP server is unavailable."
+[FAIL] Get-OUTree - Exception
+        You cannot call a method on a null-valued expression.
+[PASS] Get-ComputersByOU (empty) - Handles empty input
+[PASS] Test-MachineConnectivity (empty) - Handles empty input
+
+= * 60
+ CREDENTIALS MODULE TESTS
+= * 60
+[PASS] Get-CredentialStoragePath - Returns valid path
+[PASS] New-CredentialProfile - Creates profile
+[PASS] Get-CredentialProfile - Retrieves profile by name
+[PASS] Get-AllCredentialProfiles - Returns profiles list
+[PASS] Get-CredentialForTier - Returns valid result
+[PASS] Remove-CredentialProfile - Removes profile
+
+= * 60
+ SCANNING MODULE TESTS
+= * 60
+[PASS] Get-LocalArtifacts (non-recursive) - Scans local files
+[PASS] Get-LocalArtifacts (recursive) - Recursive scan works
+[PASS] Artifact data structure - Has required properties
+[PASS] Get-AppLockerEventLogs - Returns valid result
+[PASS] Start-ArtifactScan (local) - Orchestrates local scan
+[PASS] Get-ScanResults (list) - Lists saved scans
+[PASS] Get-RemoteArtifacts (structure) - Returns valid result structure
+
+= * 60
+ RULES MODULE TESTS
+= * 60
+[PASS] New-PublisherRule - Creates publisher rule
+[PASS] New-HashRule - Creates hash rule
+[PASS] New-PathRule - Creates path rule
+[PASS] ConvertFrom-Artifact - Converts artifact to rule
+[2026-01-24 20:46:48] [INFO] [Storage] Loaded JSON index with 8178 rules
+[PASS] Get-AllRules - Lists all rules
+
+= * 60
+ POLICY MODULE TESTS
+= * 60
+[PASS] New-Policy - Creates policy
+[PASS] Get-Policy - Retrieves policy by ID
+[PASS] Get-AllPolicies - Lists all policies
+[PASS] Set-PolicyStatus - Updates policy status
+[PASS] Set-PolicyTarget - Sets policy targets
+[FAIL] Remove-Policy - Exception
+        Cannot process argument transformation on parameter 'Passed'. Cannot convert value "System.Object[]" to type "System.Boolean". Boolean parameters accept only Boolean values and numbers, such as $True, $False, 1 or 0.
+
+= * 60
+ PHASE-BASED ENFORCEMENT TESTS
+= * 60
+[PASS] New-Policy (Phase 1) - Phase 1 creates AuditOnly policy
+[PASS] New-Policy (Phase 4) - Phase 4 creates Enabled policy
+[PASS] New-Policy (Phase 2) - Phase 2 creates AuditOnly policy
+
+= * 60
+ DEPLOYMENT MODULE TESTS
+= * 60
+[PASS] New-DeploymentJob - Creates deployment job
+[PASS] Get-DeploymentJob - Retrieves job by ID
+[PASS] Get-AllDeploymentJobs - Lists all jobs
+[PASS] Get-DeploymentStatus - Gets job status
+[PASS] Test-GPOExists - Checks GPO existence or reports missing modules
+[PASS] Stop-Deployment - Cancels deployment job
+
+= * 60
+ ADDITIONAL COVERAGE TESTS
+= * 60
+[PASS] Test-CredentialProfile - Returns result object
+[PASS] Export-ScanResults - Handles missing scan
+[PASS] Get-Rule - Retrieves rule by ID
+[2026-01-24 20:48:17] [INFO] [Storage] Added 1 rules to index
+[2026-01-24 20:48:17] [INFO] [Storage] Updated 1 rule(s) status to 'Approved' in index
+[2026-01-24 20:48:17] [INFO] Saved rule version v1 for Path: %PROGRAMFILES%\StatusTest\* (bdc71e15-b933-40f3-8460-bc381ab49418)
+[PASS] Set-RuleStatus - Updates rule status
+[2026-01-24 20:48:17] [INFO] [Storage] Added 1 rules to index
+[PASS] Remove-Rule - Deletes rule
+[2026-01-24 20:48:17] [INFO] [Storage] Added 1 rules to index
+[PASS] Export-RulesToXml - Exports rules to XML
+[2026-01-24 20:48:40] [INFO] [Storage] Added 1 rules to index
+[PASS] Add-RuleToPolicy - Adds rule to policy
+[2026-01-24 20:48:41] [INFO] [Storage] Added 1 rules to index
+[PASS] Remove-RuleFromPolicy - Removes rule from policy
+[2026-01-24 20:48:41] [INFO] [Storage] Added 1 rules to index
+[PASS] Export-PolicyToXml - Exports policy to XML
+[PASS] Test-PolicyCompliance - Tests policy compliance
+[PASS] Get-DeploymentHistory - Gets deployment history
+[PASS] New-AppLockerGPO - Creates GPO or reports error
+[PASS] Import-PolicyToGPO - Imports policy or reports error
+[2026-01-24 20:48:42] [INFO] [Storage] Added 1 rules to index
+[PASS] Start-Deployment - Executes deployment workflow
+
+= * 60
+ GUI TESTS
+= * 60
+[PASS] XAML file loads - MainWindow.xaml parses correctly
+[PASS] Code-behind loads - GUI functions available
+[PASS] Window creation - WPF window instantiates
