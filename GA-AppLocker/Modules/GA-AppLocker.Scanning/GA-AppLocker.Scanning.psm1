@@ -193,6 +193,12 @@ Export-ModuleMember -Function @(
     'Get-AppLockerEventLogs',
     'Start-ArtifactScan',
     'Get-ScanResults',
-    'Export-ScanResults'
+    'Export-ScanResults',
+    # Scheduled Scans
+    'New-ScheduledScan',
+    'Get-ScheduledScans',
+    'Remove-ScheduledScan',
+    'Set-ScheduledScanEnabled',
+    'Invoke-ScheduledScan'
 )
 #endregion

@@ -65,6 +65,28 @@ function script:Initialize-JsonIndex {
         }
     }
     else {
+        # Index doesn't exist - check if we have rule files to rebuild from
+        $dataPath = if (Get-Command -Name 'Get-AppLockerDataPath' -ErrorAction SilentlyContinue) {
+            Get-AppLockerDataPath
+        } else {
+            Join-Path $env:LOCALAPPDATA 'GA-AppLocker'
+        }
+        $rulesPath = Join-Path $dataPath 'Rules'
+        
+        if ((Test-Path $rulesPath) -and (Get-ChildItem $rulesPath -Filter '*.json' -ErrorAction SilentlyContinue | Select-Object -First 1)) {
+            # Rules exist but no index - rebuild it
+            Write-StorageLog -Message "Index missing but rules exist - rebuilding..."
+            $buildResult = Build-JsonIndexFromFiles -RulesPath $rulesPath
+            if ($buildResult.Success) {
+                Write-StorageLog -Message "Index rebuilt with $($buildResult.RuleCount) rules"
+                # Re-run initialization to load the newly built index
+                $script:JsonIndexLoaded = $false
+                Initialize-JsonIndex
+                return
+            }
+        }
+        
+        # No rules or rebuild failed - use empty index
         $script:JsonIndex = [PSCustomObject]@{ Rules = @(); LastUpdated = (Get-Date -Format 'o') }
         $script:HashIndex = @{}
         $script:PublisherIndex = @{}
@@ -86,6 +108,76 @@ function script:Save-JsonIndex {
     
     $script:JsonIndex.LastUpdated = Get-Date -Format 'o'
     $script:JsonIndex | ConvertTo-Json -Depth 10 -Compress | Set-Content -Path $indexPath -Encoding UTF8
+}
+
+function Update-RuleStatusInIndex {
+    <#
+    .SYNOPSIS
+        Updates rule status in the JSON index without full rebuild.
+
+    .DESCRIPTION
+        Efficiently updates the status field for one or more rules in the index.
+        Called after Set-BulkRuleStatus to keep index in sync with individual files.
+
+    .PARAMETER RuleIds
+        Array of rule IDs to update.
+
+    .PARAMETER Status
+        New status value to set.
+
+    .EXAMPLE
+        Update-RuleStatusInIndex -RuleIds @('id1', 'id2') -Status 'Approved'
+    #>
+    [CmdletBinding()]
+    [OutputType([PSCustomObject])]
+    param(
+        [Parameter(Mandatory)]
+        [string[]]$RuleIds,
+
+        [Parameter(Mandatory)]
+        [ValidateSet('Pending', 'Approved', 'Rejected', 'Review')]
+        [string]$Status
+    )
+
+    $result = [PSCustomObject]@{
+        Success      = $false
+        UpdatedCount = 0
+        Error        = $null
+    }
+
+    try {
+        Initialize-JsonIndex
+
+        $idsToUpdate = [System.Collections.Generic.HashSet[string]]::new($RuleIds, [System.StringComparer]::OrdinalIgnoreCase)
+        $updated = 0
+
+        # Update in-memory index
+        foreach ($rule in $script:JsonIndex.Rules) {
+            if ($idsToUpdate.Contains($rule.Id)) {
+                $rule.Status = $Status
+                $updated++
+
+                # Also update the hashtable reference
+                if ($script:RuleById.ContainsKey($rule.Id)) {
+                    $script:RuleById[$rule.Id].Status = $Status
+                }
+            }
+        }
+
+        if ($updated -gt 0) {
+            Save-JsonIndex
+            Write-StorageLog -Message "Updated $updated rule(s) status to '$Status' in index"
+        }
+
+        $result.Success = $true
+        $result.UpdatedCount = $updated
+    }
+    catch {
+        $result.Error = "Failed to update status in index: $($_.Exception.Message)"
+        Write-StorageLog -Message $result.Error -Level 'ERROR'
+    }
+
+    return $result
 }
 
 function script:Build-JsonIndexFromFiles {
@@ -386,6 +478,31 @@ if (-not $script:SqliteAssemblyLoaded) {
                 return $null
             }
             
+            if ($indexEntry.FilePath -and (Test-Path $indexEntry.FilePath)) {
+                return Get-Content $indexEntry.FilePath -Raw | ConvertFrom-Json
+            }
+            return $indexEntry
+        }
+        
+        return $null
+    }
+    
+    # Redefine Get-RuleFromDatabase for JSON mode (singular - get by ID)
+    function Get-RuleFromDatabase {
+        [CmdletBinding()]
+        [OutputType([PSCustomObject])]
+        param(
+            [Parameter(Mandatory)]
+            [string]$Id
+        )
+        
+        Initialize-JsonIndex
+        
+        # O(1) lookup using hashtable
+        if ($script:RuleById.ContainsKey($Id)) {
+            $indexEntry = $script:RuleById[$Id]
+            
+            # Return full rule from file if available
             if ($indexEntry.FilePath -and (Test-Path $indexEntry.FilePath)) {
                 return Get-Content $indexEntry.FilePath -Raw | ConvertFrom-Json
             }

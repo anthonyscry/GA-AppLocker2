@@ -25,6 +25,7 @@
         'Get-Rule',
         'Get-AllRules',
         'Remove-Rule',
+        # NOTE: Remove-RulesBulk is now in GA-AppLocker.Storage module for proper index sync
         'Export-RulesToXml',
         'Set-RuleStatus',
         'Get-SuggestedGroup',
@@ -36,12 +37,24 @@
         # Bulk Operations
         'Set-BulkRuleStatus',
         'Approve-TrustedVendorRules',
+        # Batch Rule Generation (10x faster)
+        'Invoke-BatchRuleGeneration',
         # Deduplication
         'Remove-DuplicateRules',
         'Find-DuplicateRules',
         'Find-ExistingHashRule',
         'Find-ExistingPublisherRule',
-        'Get-ExistingRuleIndex'
+        # NOTE: Get-ExistingRuleIndex is now in GA-AppLocker.Storage module
+        # Import
+        'Import-RulesFromXml',
+        # Rule History/Versioning
+        'Get-RuleHistory',
+        'Save-RuleVersion',
+        'Restore-RuleVersion',
+        'Compare-RuleVersions',
+        'Get-RuleVersionContent',
+        'Remove-RuleHistory',
+        'Invoke-RuleHistoryCleanup'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()

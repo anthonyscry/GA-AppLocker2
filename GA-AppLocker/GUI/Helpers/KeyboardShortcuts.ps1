@@ -220,6 +220,70 @@ function Invoke-KeyboardShortcut {
     }
     #endregion
 
+    #region Rules Panel Shortcuts (when not in textbox - already filtered above)
+    $currentPanel = $script:CurrentActivePanel
+    if ($currentPanel -eq 'PanelRules' -and -not $ctrl -and -not $shift -and -not $alt) {
+        switch ($key) {
+            ([System.Windows.Input.Key]::A) {
+                # A = Approve selected rules
+                Invoke-RuleShortcutAction -Window $Window -Action 'Approve'
+                return $true
+            }
+            ([System.Windows.Input.Key]::R) {
+                # R = Reject selected rules
+                Invoke-RuleShortcutAction -Window $Window -Action 'Reject'
+                return $true
+            }
+            ([System.Windows.Input.Key]::V) {
+                # V = Review (set to pending review)
+                Invoke-RuleShortcutAction -Window $Window -Action 'Review'
+                return $true
+            }
+            ([System.Windows.Input.Key]::P) {
+                # P = Add to Policy
+                Invoke-RuleShortcutAction -Window $Window -Action 'AddToPolicy'
+                return $true
+            }
+            ([System.Windows.Input.Key]::D) {
+                # D = View Details
+                Invoke-RuleShortcutAction -Window $Window -Action 'ViewDetails'
+                return $true
+            }
+            ([System.Windows.Input.Key]::G) {
+                # G = Generate rules (open wizard)
+                Invoke-ButtonAction -Action 'GenerateFromArtifacts'
+                Show-ShortcutToast -Message "Rule Generation Wizard"
+                return $true
+            }
+        }
+    }
+    #endregion
+
+    #region Scanner Panel Shortcuts
+    if ($currentPanel -eq 'PanelScanner' -and -not $ctrl -and -not $shift -and -not $alt) {
+        switch ($key) {
+            ([System.Windows.Input.Key]::S) {
+                # S = Start scan
+                Invoke-ButtonAction -Action 'StartScan'
+                Show-ShortcutToast -Message "Starting scan..."
+                return $true
+            }
+        }
+    }
+    #endregion
+
+    #region Policy Panel Shortcuts
+    if ($currentPanel -eq 'PanelPolicy' -and -not $ctrl -and -not $shift -and -not $alt) {
+        switch ($key) {
+            ([System.Windows.Input.Key]::X) {
+                # X = Export policy to XML
+                Invoke-ButtonAction -Action 'ExportPolicy'
+                return $true
+            }
+        }
+    }
+    #endregion
+
     return $false
 }
 

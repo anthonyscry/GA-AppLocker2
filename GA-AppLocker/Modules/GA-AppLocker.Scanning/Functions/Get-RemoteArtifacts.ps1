@@ -58,6 +58,9 @@ function Get-RemoteArtifacts {
         [switch]$Recurse,
 
         [Parameter()]
+        [switch]$SkipDllScanning,
+
+        [Parameter()]
         [int]$ThrottleLimit = 5,
 
         [Parameter()]
@@ -74,6 +77,12 @@ function Get-RemoteArtifacts {
 
     try {
         Write-ScanLog -Message "Starting remote artifact scan on $($ComputerName.Count) machine(s)"
+
+        # Filter out DLL extensions if SkipDllScanning is enabled
+        if ($SkipDllScanning) {
+            $Extensions = $Extensions | Where-Object { $_ -ne '.dll' }
+            Write-ScanLog -Message "Skipping DLL scanning for remote machines (performance optimization)"
+        }
 
         $allArtifacts = @()
         $machineResults = @{}

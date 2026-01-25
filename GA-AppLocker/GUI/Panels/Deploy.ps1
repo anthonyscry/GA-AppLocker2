@@ -79,8 +79,8 @@ function Initialize-DeploymentPanel {
     # Check module status
     Update-ModuleStatus -Window $Window
 
-    # Initial load - use async to keep UI responsive
-    Update-DeploymentJobsDataGrid -Window $Window -Async
+    # Initial load - sync mode (async hangs on module import in runspace)
+    Update-DeploymentJobsDataGrid -Window $Window
 }
 
 function Update-ModuleStatus {
@@ -151,7 +151,23 @@ function script:Update-DeploymentJobsDataGrid {
             $props = @{}
             $_.PSObject.Properties | ForEach-Object { $props[$_.Name] = $_.Value }
             $props['ProgressDisplay'] = "$($_.Progress)%"
-            $props['CreatedDisplay'] = if ($_.CreatedAt) { ([datetime]$_.CreatedAt).ToString('MM/dd HH:mm') } else { '' }
+            # Safely parse CreatedAt (may be DateTime, string, or PSCustomObject from JSON)
+            $createdDisplay = ''
+            if ($_.CreatedAt) {
+                try {
+                    $dateValue = $_.CreatedAt
+                    if ($dateValue -is [PSCustomObject] -and $dateValue.DateTime) {
+                        $createdDisplay = ([datetime]$dateValue.DateTime).ToString('MM/dd HH:mm')
+                    }
+                    elseif ($dateValue -is [datetime]) {
+                        $createdDisplay = $dateValue.ToString('MM/dd HH:mm')
+                    }
+                    elseif ($dateValue -is [string]) {
+                        $createdDisplay = ([datetime]$dateValue).ToString('MM/dd HH:mm')
+                    }
+                } catch { }
+            }
+            $props['CreatedDisplay'] = $createdDisplay
             [PSCustomObject]$props
         }
 

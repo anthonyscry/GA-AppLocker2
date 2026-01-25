@@ -19,6 +19,8 @@ $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
 . "$scriptPath\Helpers\AsyncHelpers.ps1"
 . "$scriptPath\Helpers\KeyboardShortcuts.ps1"
 . "$scriptPath\Helpers\DragDropHelpers.ps1"
+. "$scriptPath\Helpers\ThemeManager.ps1"
+. "$scriptPath\Helpers\GlobalSearch.ps1"
 
 # Load wizards
 if (Test-Path "$scriptPath\Wizards\SetupWizard.ps1") {
@@ -91,8 +93,12 @@ function global:Invoke-ButtonAction {
         'DeleteScan' { Invoke-DeleteSelectedScan -Window $win }
         'SelectMachines' { Invoke-SelectMachinesForScan -Window $win }
         'FilterArtifacts' { Update-ArtifactFilter -Window $win -Filter $args[0] }
+        # Scheduled Scans
+        'CreateScheduledScan' { Invoke-CreateScheduledScan -Window $win }
+        'RunScheduledScanNow' { Invoke-RunScheduledScanNow -Window $win }
+        'DeleteScheduledScan' { Invoke-DeleteScheduledScan -Window $win }
         # Rules panel
-        'GenerateFromArtifacts' { Invoke-GenerateRulesFromArtifacts -Window $win }
+        'GenerateFromArtifacts' { Invoke-LaunchRuleWizard -Window $win }  # New 3-step wizard (10x faster)
         'CreateManualRule' { Invoke-CreateManualRule -Window $win }
         'ExportRulesXml' { Invoke-ExportRulesToXml -Window $win }
         'ExportRulesCsv' { Invoke-ExportRulesToCsv -Window $win }
@@ -104,6 +110,7 @@ function global:Invoke-ButtonAction {
         'DeleteRule' { Invoke-DeleteSelectedRules -Window $win }
         'AddRuleToPolicy' { Invoke-AddSelectedRulesToPolicy -Window $win }
         'ViewRuleDetails' { Show-RuleDetails -Window $win }
+        'ViewRuleHistory' { Invoke-ViewRuleHistory -Window $win }
         # Policy panel
         'CreatePolicy' { Invoke-CreatePolicy -Window $win }
         'RefreshPolicies' { Update-PoliciesDataGrid -Window $win -Async }
@@ -117,6 +124,8 @@ function global:Invoke-ButtonAction {
         'SelectTargetOUs' { Invoke-SelectTargetOUs -Window $win }
         'SavePolicyTargets' { Invoke-SavePolicyTargets -Window $win }
         'SavePolicyChanges' { Invoke-SavePolicyChanges -Window $win }
+        'ComparePolicies' { Invoke-ComparePolicies -Window $win }
+        'ExportDiffReport' { Invoke-ExportDiffReport -Window $win }
         # Deployment panel
         'CreateDeploymentJob' { Invoke-CreateDeploymentJob -Window $win }
         'RefreshDeployments' { Update-DeploymentJobsDataGrid -Window $win -Async }
@@ -133,6 +142,14 @@ function global:Invoke-ButtonAction {
         # Dashboard Quick Actions
         'ApproveTrustedVendors' { Invoke-ApproveTrustedVendors -Window $win }
         'RemoveDuplicateRules' { Invoke-RemoveDuplicateRules -Window $win }
+        # Settings panel
+        'ToggleTheme' { Toggle-Theme -Window $win }
+        # Default case for unknown actions
+        default {
+            if (Get-Command -Name 'Write-AppLockerLog' -ErrorAction SilentlyContinue) {
+                Write-AppLockerLog -Message "Unknown button action: $Action" -Level 'WARNING'
+            }
+        }
     }
 }
 #endregion
@@ -166,8 +183,8 @@ $script:SidebarCollapsed = $false
 #endregion
 
 #region ===== NAVIGATION HANDLERS =====
-# Panel visibility management
-function Set-ActivePanel {
+# Panel visibility management (global for event handler access)
+function global:Set-ActivePanel {
     param([string]$PanelName)
 
     # Try script scope first, fall back to global
@@ -530,6 +547,14 @@ function Initialize-Navigation {
                 }
             })
     }
+    
+    # Theme toggle click event
+    $themeToggle = $Window.FindName('ThemeToggleBorder')
+    if ($themeToggle) {
+        $themeToggle.Add_MouseLeftButtonDown({
+            Invoke-ButtonAction -Action 'ToggleTheme'
+        })
+    }
 }
 #endregion
 
@@ -622,6 +647,24 @@ function Initialize-MainWindow {
     catch {
         Write-Log -Level Error -Message "Setup panel init failed: $($_.Exception.Message)"
     }
+    
+    # Initialize theme from saved preference
+    try {
+        Initialize-Theme -Window $Window
+        Write-Log -Message 'Theme initialized'
+    }
+    catch {
+        Write-Log -Level Warning -Message "Theme init failed: $($_.Exception.Message)"
+    }
+    
+    # Initialize global search
+    try {
+        Initialize-GlobalSearch -Window $Window
+        Write-Log -Message 'Global search initialized'
+    }
+    catch {
+        Write-Log -Level Warning -Message "Global search init failed: $($_.Exception.Message)"
+    }
 
     # Update domain info in status bar and dashboard
     try {
@@ -709,6 +752,72 @@ function Initialize-MainWindow {
         Write-Log -Level Warning -Message "Drag-drop handlers init failed: $($_.Exception.Message)"
     }
 
+    # Wire up Rule Generation Wizard buttons
+    try {
+        Initialize-WizardButtons -Window $Window
+        Write-Log -Message 'Rule generation wizard buttons wired'
+    }
+    catch {
+        Write-Log -Level Warning -Message "Wizard buttons init failed: $($_.Exception.Message)"
+    }
+
     Write-Log -Message 'Main window initialized'
+}
+
+function Initialize-WizardButtons {
+    <#
+    .SYNOPSIS
+        Wires up the Rule Generation Wizard overlay buttons.
+    #>
+    param([System.Windows.Window]$Window)
+    
+    # Wizard navigation buttons - call global functions directly
+    $btnNext = $Window.FindName('WizardBtnNext')
+    if ($btnNext) {
+        $btnNext.Add_Click({
+            try { global:Invoke-WizardNavigation -Direction 'Next' }
+            catch { Write-Host "[Wizard] Next button error: $_" -ForegroundColor Red }
+        })
+    }
+    
+    $btnBack = $Window.FindName('WizardBtnBack')
+    if ($btnBack) {
+        $btnBack.Add_Click({
+            try { global:Invoke-WizardNavigation -Direction 'Back' }
+            catch { Write-Host "[Wizard] Back button error: $_" -ForegroundColor Red }
+        })
+    }
+    
+    $btnGenerate = $Window.FindName('WizardBtnGenerate')
+    if ($btnGenerate) {
+        $btnGenerate.Add_Click({
+            try { global:Invoke-WizardNavigation -Direction 'Generate' }
+            catch { Write-Host "[Wizard] Generate button error: $_" -ForegroundColor Red }
+        })
+    }
+    
+    $btnCancel = $Window.FindName('WizardBtnCancel')
+    if ($btnCancel) {
+        $btnCancel.Add_Click({
+            try { global:Close-RuleGenerationWizard }
+            catch { Write-Host "[Wizard] Cancel button error: $_" -ForegroundColor Red }
+        })
+    }
+    
+    $btnClose = $Window.FindName('WizardBtnClose')
+    if ($btnClose) {
+        $btnClose.Add_Click({
+            try { global:Close-RuleGenerationWizard }
+            catch { Write-Host "[Wizard] Close button error: $_" -ForegroundColor Red }
+        })
+    }
+    
+    $btnMinimize = $Window.FindName('WizardBtnMinimize')
+    if ($btnMinimize) {
+        $btnMinimize.Add_Click({
+            try { global:Close-RuleGenerationWizard }
+            catch { Write-Host "[Wizard] Minimize button error: $_" -ForegroundColor Red }
+        })
+    }
 }
 #endregion

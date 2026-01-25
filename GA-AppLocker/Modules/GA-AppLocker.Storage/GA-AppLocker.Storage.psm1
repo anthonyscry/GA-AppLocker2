@@ -116,6 +116,14 @@ Export-ModuleMember -Function @(
     'Find-RuleByHash',
     'Find-RuleByPublisher',
     'Get-DuplicateRules',
+    # Bulk operations (batch rule generation)
+    'Save-RulesBulk',
+    'Add-RulesToIndex',
+    'Get-ExistingRuleIndex',
+    'Remove-RulesBulk',
+    'Remove-RulesFromIndex',
+    'Get-BatchPreview',
+    'Update-RuleStatusInIndex',
     # Index watcher functions
     'Start-RuleIndexWatcher',
     'Stop-RuleIndexWatcher',

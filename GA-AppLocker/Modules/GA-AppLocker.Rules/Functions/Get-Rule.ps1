@@ -268,6 +268,12 @@ function Remove-Rule {
         $ruleName = $rule.Name
 
         Remove-Item -Path $ruleFile -Force
+        
+        # Update the index to remove this rule
+        if (Get-Command -Name 'Remove-RulesFromIndex' -ErrorAction SilentlyContinue) {
+            Remove-RulesFromIndex -RuleIds @($Id) | Out-Null
+        }
+        
         $result.Success = $true
         Write-RuleLog -Message "Deleted rule: $ruleName ($Id)"
     }
@@ -278,6 +284,9 @@ function Remove-Rule {
 
     return $result
 }
+
+# NOTE: Remove-RulesBulk is now defined in GA-AppLocker.Storage/Functions/BulkOperations.ps1
+# Use that version for proper index synchronization.
 
 <#
 .SYNOPSIS
@@ -331,6 +340,22 @@ function Set-RuleStatus {
         $rule.ModifiedDate = Get-Date
 
         $rule | ConvertTo-Json -Depth 10 | Set-Content -Path $ruleFile -Encoding UTF8
+
+        # Update the index with new status
+        if (Get-Command -Name 'Update-RuleStatusInIndex' -ErrorAction SilentlyContinue) {
+            Update-RuleStatusInIndex -RuleIds @($Id) -Status $Status | Out-Null
+        }
+
+        # Save version history
+        if (Get-Command -Name 'Save-RuleVersion' -ErrorAction SilentlyContinue) {
+            Save-RuleVersion -Rule $rule -ChangeType 'StatusChanged' -ChangeSummary "Status changed from $oldStatus to $Status"
+        }
+        
+        # Write audit log
+        if (Get-Command -Name 'Write-AuditLog' -ErrorAction SilentlyContinue) {
+            Write-AuditLog -Action "Rule$Status" -Category 'Rule' -Target $rule.Name -TargetId $Id `
+                -Details "Status changed from $oldStatus to $Status" -OldValue $oldStatus -NewValue $Status
+        }
 
         $result.Success = $true
         $result.Data = $rule

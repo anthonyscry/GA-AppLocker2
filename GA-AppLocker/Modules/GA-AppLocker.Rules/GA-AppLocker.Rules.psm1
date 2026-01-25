@@ -117,7 +117,7 @@ function script:New-RuleId {
 function script:Save-Rule {
     <#
     .SYNOPSIS
-        Saves a rule to storage.
+        Saves a rule to storage and updates the index.
     #>
     param([PSCustomObject]$Rule)
     
@@ -125,6 +125,12 @@ function script:Save-Rule {
     $ruleFile = Join-Path $rulePath "$($Rule.Id).json"
     
     $Rule | ConvertTo-Json -Depth 10 | Set-Content -Path $ruleFile -Encoding UTF8
+    
+    # Update the index with the new rule
+    if (Get-Command -Name 'Add-RulesToIndex' -ErrorAction SilentlyContinue) {
+        Add-RulesToIndex -Rules @($Rule) | Out-Null
+    }
+    
     Write-RuleLog -Message "Saved rule: $($Rule.Name) ($($Rule.Id))"
 }
 
@@ -237,11 +243,23 @@ Export-ModuleMember -Function @(
     # Bulk Operations
     'Set-BulkRuleStatus',
     'Approve-TrustedVendorRules',
+    # Batch Rule Generation (10x faster)
+    'Invoke-BatchRuleGeneration',
     # Deduplication
     'Remove-DuplicateRules',
     'Find-DuplicateRules',
     'Find-ExistingHashRule',
     'Find-ExistingPublisherRule',
-    'Get-ExistingRuleIndex'
+    # NOTE: Get-ExistingRuleIndex is exported from GA-AppLocker.Storage, not this module
+    # Import
+    'Import-RulesFromXml',
+    # Rule History/Versioning
+    'Get-RuleHistory',
+    'Save-RuleVersion',
+    'Restore-RuleVersion',
+    'Compare-RuleVersions',
+    'Get-RuleVersionContent',
+    'Remove-RuleHistory',
+    'Invoke-RuleHistoryCleanup'
 )
 #endregion

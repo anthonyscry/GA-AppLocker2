@@ -69,14 +69,16 @@ function Remove-DuplicateRules {
 
     try {
         # Try Storage layer first for fast duplicate detection
+        # NOTE: Don't use -FullPayload - index data has all fields needed for duplicate detection
+        # (Hash, PublisherName, ProductName, Path, CollectionType, CreatedDate, Status, Id)
         if (Get-Command -Name 'Get-RulesFromDatabase' -ErrorAction SilentlyContinue) {
-            $dbResult = Get-RulesFromDatabase -Take 100000 -FullPayload
+            $dbResult = Get-RulesFromDatabase -Take 100000
             if ($dbResult.Success -and $dbResult.Data.Count -gt 0) {
                 $allRules = [System.Collections.Generic.List[PSCustomObject]]::new()
                 foreach ($rule in $dbResult.Data) {
                     $allRules.Add($rule)
                 }
-                Write-RuleLog -Message "Loaded $($allRules.Count) rules from storage index"
+                Write-RuleLog -Message "Loaded $($allRules.Count) rules from index (fast path)"
             }
             else {
                 # Fall back to JSON scan
@@ -132,22 +134,58 @@ function Remove-DuplicateRules {
             return $result
         }
 
-        # Find duplicates by type using List<T> for O(n) performance
+        # Find duplicates using O(n) hashtable approach (NOT Group-Object which is slow)
         $toRemove = [System.Collections.Generic.List[PSCustomObject]]::new()
         $keptRules = [System.Collections.Generic.List[PSCustomObject]]::new()
 
-        # Process Hash rules
-        if ($RuleType -eq 'Hash' -or $RuleType -eq 'All') {
-            $hashRules = $allRules | Where-Object { $_.RuleType -eq 'Hash' }
-            $hashGroups = $hashRules | Group-Object { "$($_.Hash)_$($_.CollectionType)" }
-            
-            foreach ($group in ($hashGroups | Where-Object { $_.Count -gt 1 })) {
-                $sorted = Sort-DuplicateGroup -Rules $group.Group -Strategy $Strategy
+        # Build hashtables for O(1) duplicate detection
+        $hashGroups = @{}      # key -> List of rules
+        $pubGroups = @{}       # key -> List of rules  
+        $pathGroups = @{}      # key -> List of rules
+
+        # Single pass through all rules - O(n)
+        foreach ($rule in $allRules) {
+            switch ($rule.RuleType) {
+                'Hash' {
+                    if ($RuleType -eq 'Hash' -or $RuleType -eq 'All') {
+                        $key = "$($rule.Hash)_$($rule.CollectionType)".ToLower()
+                        if (-not $hashGroups.ContainsKey($key)) {
+                            $hashGroups[$key] = [System.Collections.Generic.List[PSCustomObject]]::new()
+                        }
+                        $hashGroups[$key].Add($rule)
+                    }
+                }
+                'Publisher' {
+                    if ($RuleType -eq 'Publisher' -or $RuleType -eq 'All') {
+                        $key = "$($rule.PublisherName)_$($rule.ProductName)_$($rule.CollectionType)".ToLower()
+                        if (-not $pubGroups.ContainsKey($key)) {
+                            $pubGroups[$key] = [System.Collections.Generic.List[PSCustomObject]]::new()
+                        }
+                        $pubGroups[$key].Add($rule)
+                    }
+                }
+                'Path' {
+                    if ($RuleType -eq 'Path' -or $RuleType -eq 'All') {
+                        $key = "$($rule.Path)_$($rule.CollectionType)".ToLower()
+                        if (-not $pathGroups.ContainsKey($key)) {
+                            $pathGroups[$key] = [System.Collections.Generic.List[PSCustomObject]]::new()
+                        }
+                        $pathGroups[$key].Add($rule)
+                    }
+                }
+            }
+        }
+
+        # Process Hash duplicates
+        foreach ($key in $hashGroups.Keys) {
+            $group = $hashGroups[$key]
+            if ($group.Count -gt 1) {
+                $sorted = Sort-DuplicateGroup -Rules $group -Strategy $Strategy
                 $keep = $sorted[0]
-                $duplicates = @($sorted | Select-Object -Skip 1)
-                
-                $result.HashDuplicates += $duplicates.Count
-                foreach ($dup in $duplicates) { $toRemove.Add($dup) }
+                for ($i = 1; $i -lt $sorted.Count; $i++) {
+                    $toRemove.Add($sorted[$i])
+                    $result.HashDuplicates++
+                }
                 $keptRules.Add([PSCustomObject]@{
                     Id = $keep.Id
                     Name = $keep.Name
@@ -157,18 +195,16 @@ function Remove-DuplicateRules {
             }
         }
 
-        # Process Publisher rules
-        if ($RuleType -eq 'Publisher' -or $RuleType -eq 'All') {
-            $pubRules = $allRules | Where-Object { $_.RuleType -eq 'Publisher' }
-            $pubGroups = $pubRules | Group-Object { "$($_.PublisherName)_$($_.ProductName)_$($_.CollectionType)" }
-            
-            foreach ($group in ($pubGroups | Where-Object { $_.Count -gt 1 })) {
-                $sorted = Sort-DuplicateGroup -Rules $group.Group -Strategy $Strategy
+        # Process Publisher duplicates
+        foreach ($key in $pubGroups.Keys) {
+            $group = $pubGroups[$key]
+            if ($group.Count -gt 1) {
+                $sorted = Sort-DuplicateGroup -Rules $group -Strategy $Strategy
                 $keep = $sorted[0]
-                $duplicates = @($sorted | Select-Object -Skip 1)
-                
-                $result.PublisherDuplicates += $duplicates.Count
-                foreach ($dup in $duplicates) { $toRemove.Add($dup) }
+                for ($i = 1; $i -lt $sorted.Count; $i++) {
+                    $toRemove.Add($sorted[$i])
+                    $result.PublisherDuplicates++
+                }
                 $keptRules.Add([PSCustomObject]@{
                     Id = $keep.Id
                     Name = $keep.Name
@@ -178,18 +214,16 @@ function Remove-DuplicateRules {
             }
         }
 
-        # Process Path rules
-        if ($RuleType -eq 'Path' -or $RuleType -eq 'All') {
-            $pathRules = $allRules | Where-Object { $_.RuleType -eq 'Path' }
-            $pathGroups = $pathRules | Group-Object { "$($_.Path)_$($_.CollectionType)" }
-            
-            foreach ($group in ($pathGroups | Where-Object { $_.Count -gt 1 })) {
-                $sorted = Sort-DuplicateGroup -Rules $group.Group -Strategy $Strategy
+        # Process Path duplicates
+        foreach ($key in $pathGroups.Keys) {
+            $group = $pathGroups[$key]
+            if ($group.Count -gt 1) {
+                $sorted = Sort-DuplicateGroup -Rules $group -Strategy $Strategy
                 $keep = $sorted[0]
-                $duplicates = @($sorted | Select-Object -Skip 1)
-                
-                $result.PathDuplicates += $duplicates.Count
-                foreach ($dup in $duplicates) { $toRemove.Add($dup) }
+                for ($i = 1; $i -lt $sorted.Count; $i++) {
+                    $toRemove.Add($sorted[$i])
+                    $result.PathDuplicates++
+                }
                 $keptRules.Add([PSCustomObject]@{
                     Id = $keep.Id
                     Name = $keep.Name
@@ -262,6 +296,17 @@ function Remove-DuplicateRules {
 
         Write-Progress -Activity "Removing duplicates" -Completed
         $result.RemovedRules = $removedRules.ToArray()
+
+        # Update the JSON index to reflect removed rules
+        if ($result.RemovedCount -gt 0) {
+            $removedIds = @($removedRules | ForEach-Object { $_.Id })
+            if (Get-Command -Name 'Remove-RulesFromIndex' -ErrorAction SilentlyContinue) {
+                $indexResult = Remove-RulesFromIndex -RuleIds $removedIds
+                if (-not $indexResult.Success) {
+                    Write-RuleLog -Level Warning -Message "Index sync warning: $($indexResult.Error)"
+                }
+            }
+        }
 
         $result.Success = $true
         Write-RuleLog -Message "Removed $($result.RemovedCount) duplicate rules"
@@ -589,86 +634,6 @@ function Find-ExistingPublisherRule {
     return $null
 }
 
-<#
-.SYNOPSIS
-    Builds a fast lookup index of existing rule keys.
-
-.DESCRIPTION
-    Returns a HashSet of existing rule hashes and publisher keys for O(1) lookups.
-    Uses Storage layer if available (already indexed), falls back to JSON scan.
-    Use this to quickly filter artifacts that already have rules.
-
-.EXAMPLE
-    $index = Get-ExistingRuleIndex
-    if ($index.Hashes.Contains($artifact.Hash)) { "Already has rule" }
-
-.OUTPUTS
-    [PSCustomObject] With Hashes (HashSet) and Publishers (HashSet) properties.
-#>
-function Get-ExistingRuleIndex {
-    [CmdletBinding()]
-    [OutputType([PSCustomObject])]
-    param()
-
-    $result = [PSCustomObject]@{
-        Hashes = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-        Publishers = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-        HashCount = 0
-        PublisherCount = 0
-    }
-
-    # Try Storage layer first - it already has indexed data
-    if (Get-Command -Name 'Get-RulesFromDatabase' -ErrorAction SilentlyContinue) {
-        try {
-            # Get all rules from storage (metadata only, no full payload)
-            $dbResult = Get-RulesFromDatabase -Take 100000
-            
-            if ($dbResult.Success -and $dbResult.Data) {
-                foreach ($rule in $dbResult.Data) {
-                    if ($rule.RuleType -eq 'Hash' -and $rule.Hash) {
-                        [void]$result.Hashes.Add($rule.Hash.ToUpper())
-                        $result.HashCount++
-                    }
-                    elseif ($rule.RuleType -eq 'Publisher' -and $rule.PublisherName) {
-                        $key = "$($rule.PublisherName)|$($rule.ProductName)".ToLower()
-                        [void]$result.Publishers.Add($key)
-                        $result.PublisherCount++
-                    }
-                }
-                return $result
-            }
-        }
-        catch {
-            Write-RuleLog -Level Warning -Message "Storage layer index failed, falling back to JSON scan: $($_.Exception.Message)"
-        }
-    }
-
-    # Fallback: JSON file scan (O(n))
-    try {
-        $rulePath = Get-RuleStoragePath
-        $ruleFiles = Get-ChildItem -Path $rulePath -Filter '*.json' -File -ErrorAction SilentlyContinue
-
-        foreach ($file in $ruleFiles) {
-            try {
-                $content = Get-Content -Path $file.FullName -Raw -ErrorAction Stop
-                $rule = $content | ConvertFrom-Json
-
-                if ($rule.RuleType -eq 'Hash' -and $rule.Hash) {
-                    [void]$result.Hashes.Add($rule.Hash.ToUpper())
-                    $result.HashCount++
-                }
-                elseif ($rule.RuleType -eq 'Publisher' -and $rule.PublisherName) {
-                    $key = "$($rule.PublisherName)|$($rule.ProductName)".ToLower()
-                    [void]$result.Publishers.Add($key)
-                    $result.PublisherCount++
-                }
-            }
-            catch { }
-        }
-    }
-    catch {
-        Write-RuleLog -Level Warning -Message "Failed to build rule index: $($_.Exception.Message)"
-    }
-
-    return $result
-}
+# NOTE: Get-ExistingRuleIndex is now provided by GA-AppLocker.Storage module
+# See: GA-AppLocker.Storage\Functions\BulkOperations.ps1
+# The Storage module version uses the pre-built in-memory JSON index for O(1) lookups.

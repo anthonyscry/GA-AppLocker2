@@ -28,7 +28,7 @@ function Initialize-PolicyPanel {
         'BtnCreatePolicy', 'BtnRefreshPolicies', 'BtnActivatePolicy', 
         'BtnArchivePolicy', 'BtnExportPolicy', 'BtnDeletePolicy', 'BtnDeployPolicy',
         'BtnAddRulesToPolicy', 'BtnRemoveRulesFromPolicy', 'BtnSelectTargetOUs', 'BtnSaveTargets',
-        'BtnSavePolicyChanges'
+        'BtnSavePolicyChanges', 'BtnComparePolicies', 'BtnExportDiffReport'
     )
 
     foreach ($btnName in $actionButtons) {
@@ -52,6 +52,9 @@ function Initialize-PolicyPanel {
 
     # Initial load - use async to keep UI responsive
     Update-PoliciesDataGrid -Window $Window -Async
+    
+    # Initialize Compare tab dropdowns
+    Initialize-PolicyCompareDropdowns -Window $Window
 }
 
 function script:Update-PoliciesDataGrid {
@@ -631,6 +634,137 @@ function Invoke-SavePolicyTargets {
     }
     catch {
         [System.Windows.MessageBox]::Show("Error: $($_.Exception.Message)", 'Error', 'OK', 'Error')
+    }
+}
+
+#endregion
+
+#region ===== POLICY COMPARISON HANDLERS =====
+
+function Initialize-PolicyCompareDropdowns {
+    param([System.Windows.Window]$Window)
+    
+    $cboSource = $Window.FindName('CboCompareSource')
+    $cboTarget = $Window.FindName('CboCompareTarget')
+    
+    if (-not $cboSource -or -not $cboTarget) { return }
+    
+    # Get all policies
+    $result = Get-AllPolicies
+    if ($result.Success -and $result.Data) {
+        $policies = $result.Data | Sort-Object Name
+        $cboSource.ItemsSource = $policies
+        $cboTarget.ItemsSource = $policies
+    }
+}
+
+function Invoke-ComparePolicies {
+    param([System.Windows.Window]$Window)
+    
+    $cboSource = $Window.FindName('CboCompareSource')
+    $cboTarget = $Window.FindName('CboCompareTarget')
+    
+    if (-not $cboSource.SelectedItem -or -not $cboTarget.SelectedItem) {
+        Show-Toast -Message 'Please select both source and target policies.' -Type 'Warning'
+        return
+    }
+    
+    $sourcePolicy = $cboSource.SelectedItem
+    $targetPolicy = $cboTarget.SelectedItem
+    
+    if ($sourcePolicy.PolicyId -eq $targetPolicy.PolicyId) {
+        Show-Toast -Message 'Source and target policies are the same. Select different policies.' -Type 'Warning'
+        return
+    }
+    
+    try {
+        Show-LoadingOverlay -Message 'Comparing policies...'
+        
+        $result = Compare-Policies -SourcePolicyId $sourcePolicy.PolicyId -TargetPolicyId $targetPolicy.PolicyId
+        
+        Hide-LoadingOverlay
+        
+        if ($result.Success) {
+            $data = $result.Data
+            $summary = $data.Summary
+            
+            # Build result message
+            $msg = @"
+Policy Comparison Results
+========================
+
+Source: $($sourcePolicy.Name)
+Target: $($targetPolicy.Name)
+
+Summary:
+- Added (in target only): $($summary.AddedCount) rule(s)
+- Removed (in source only): $($summary.RemovedCount) rule(s)
+- Modified: $($summary.ModifiedCount) rule(s)
+- Unchanged: $($summary.UnchangedCount) rule(s)
+"@
+            
+            # Store comparison result for export
+            $script:LastPolicyComparison = @{
+                SourcePolicy = $sourcePolicy
+                TargetPolicy = $targetPolicy
+                Result = $result
+            }
+            
+            # Enable export button
+            $btnExport = $Window.FindName('BtnExportDiffReport')
+            if ($btnExport) { $btnExport.IsEnabled = $true }
+            
+            [System.Windows.MessageBox]::Show($msg, 'Comparison Results', 'OK', 'Information')
+        }
+        else {
+            Show-Toast -Message "Comparison failed: $($result.Error)" -Type 'Error'
+        }
+    }
+    catch {
+        Hide-LoadingOverlay
+        Show-Toast -Message "Error: $($_.Exception.Message)" -Type 'Error'
+    }
+}
+
+function Invoke-ExportDiffReport {
+    param([System.Windows.Window]$Window)
+    
+    if (-not $script:LastPolicyComparison) {
+        Show-Toast -Message 'No comparison results available. Compare policies first.' -Type 'Warning'
+        return
+    }
+    
+    Add-Type -AssemblyName System.Windows.Forms
+    
+    $dialog = [System.Windows.Forms.SaveFileDialog]::new()
+    $dialog.Title = 'Export Policy Diff Report'
+    $dialog.Filter = 'Markdown Files (*.md)|*.md|HTML Files (*.html)|*.html|Text Files (*.txt)|*.txt'
+    $dialog.FileName = "PolicyDiff_$(Get-Date -Format 'yyyyMMdd_HHmmss').md"
+    
+    if ($dialog.ShowDialog() -eq 'OK') {
+        try {
+            $format = switch ([System.IO.Path]::GetExtension($dialog.FileName).ToLower()) {
+                '.html' { 'Html' }
+                '.md' { 'Markdown' }
+                default { 'Text' }
+            }
+            
+            $sourceId = $script:LastPolicyComparison.SourcePolicy.PolicyId
+            $targetId = $script:LastPolicyComparison.TargetPolicy.PolicyId
+            
+            $report = Get-PolicyDiffReport -SourcePolicyId $sourceId -TargetPolicyId $targetId -Format $format
+            
+            if ($report.Success) {
+                $report.Data | Set-Content -Path $dialog.FileName -Encoding UTF8
+                Show-Toast -Message "Report exported to: $($dialog.FileName)" -Type 'Success'
+            }
+            else {
+                Show-Toast -Message "Export failed: $($report.Error)" -Type 'Error'
+            }
+        }
+        catch {
+            Show-Toast -Message "Error: $($_.Exception.Message)" -Type 'Error'
+        }
     }
 }
 

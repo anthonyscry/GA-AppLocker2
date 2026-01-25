@@ -75,8 +75,9 @@ function Invoke-AsyncOperation {
         Show-LoadingOverlay -Message $LoadingMessage -SubMessage $LoadingSubMessage
     }
 
-    # Create runspace
-    $runspace = [runspacefactory]::CreateRunspace()
+    # Create runspace with full PowerShell environment (includes Get-Command, etc.)
+    $initialState = [System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault()
+    $runspace = [runspacefactory]::CreateRunspace($initialState)
     $runspace.ApartmentState = 'STA'
     $runspace.ThreadOptions = 'ReuseThread'
     $runspace.Open()
@@ -95,8 +96,16 @@ function Invoke-AsyncOperation {
         
         try {
             # Import the main module in the runspace
+            $moduleLoaded = $false
             if ($ModulePath -and (Test-Path $ModulePath)) {
-                Import-Module $ModulePath -Force -ErrorAction SilentlyContinue
+                try {
+                    Import-Module $ModulePath -Force -ErrorAction Stop
+                    $moduleLoaded = $true
+                }
+                catch {
+                    # Module import failed - continue but note the error
+                    $moduleError = $_.Exception.Message
+                }
             }
             
             # Execute the script block with arguments
@@ -114,10 +123,16 @@ function Invoke-AsyncOperation {
             }
         }
         catch {
+            # Provide a cleaner error message for common runspace issues
+            $errorMsg = $_.Exception.Message
+            if ($errorMsg -match "is not recognized as the name of a cmdlet") {
+                $cmdName = if ($errorMsg -match "'([^']+)'") { $matches[1] } else { "Unknown" }
+                $errorMsg = "Function '$cmdName' not available (async module load issue)"
+            }
             return @{
                 Success = $false
                 Result = $null
-                Error = $_.Exception.Message
+                Error = $errorMsg
             }
         }
     })
@@ -398,8 +413,9 @@ function Invoke-AsyncWithProgress {
         LastUpdate = [datetime]::MinValue
     })
 
-    # Create runspace
-    $runspace = [runspacefactory]::CreateRunspace()
+    # Create runspace with full PowerShell environment (includes Get-Command, etc.)
+    $initialState = [System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault()
+    $runspace = [runspacefactory]::CreateRunspace($initialState)
     $runspace.ApartmentState = 'STA'
     $runspace.ThreadOptions = 'ReuseThread'
     $runspace.Open()
@@ -414,8 +430,16 @@ function Invoke-AsyncWithProgress {
         
         try {
             # Import the main module in the runspace
+            $moduleLoaded = $false
             if ($ModulePath -and (Test-Path $ModulePath)) {
-                Import-Module $ModulePath -Force -ErrorAction SilentlyContinue
+                try {
+                    Import-Module $ModulePath -Force -ErrorAction Stop
+                    $moduleLoaded = $true
+                }
+                catch {
+                    # Module import failed - continue but note the error
+                    $moduleError = $_.Exception.Message
+                }
             }
             
             # Execute the script block with progress hashtable
@@ -428,10 +452,16 @@ function Invoke-AsyncWithProgress {
             }
         }
         catch {
+            # Provide a cleaner error message for common runspace issues
+            $errorMsg = $_.Exception.Message
+            if ($errorMsg -match "is not recognized as the name of a cmdlet") {
+                $cmdName = if ($errorMsg -match "'([^']+)'") { $matches[1] } else { "Unknown" }
+                $errorMsg = "Function '$cmdName' not available (async module load issue)"
+            }
             return @{
                 Success = $false
                 Result = $null
-                Error = $_.Exception.Message
+                Error = $errorMsg
             }
         }
     })

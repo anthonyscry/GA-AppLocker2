@@ -153,6 +153,38 @@ function Initialize-ScannerPanel {
         })
     }
 
+    # Wire up Generate Rules from Artifacts button (launches wizard)
+    # Note: Dedupe/exclusion UI moved to wizard - functions kept for programmatic use
+    $btnGenerateFromArtifacts = $Window.FindName('BtnGenerateFromArtifacts')
+    if ($btnGenerateFromArtifacts) {
+        $btnGenerateFromArtifacts.Add_Click({
+            Invoke-LaunchRuleWizard -Window $script:MainWindow
+        })
+    }
+
+    # Wire up Select All / Deselect All buttons for ArtifactDataGrid
+    $btnSelectAll = $Window.FindName('BtnSelectAllArtifacts')
+    if ($btnSelectAll) {
+        $btnSelectAll.Add_Click({
+            Invoke-SelectAllArtifacts -Window $script:MainWindow -SelectAll $true
+        })
+    }
+    
+    $btnDeselectAll = $Window.FindName('BtnDeselectAllArtifacts')
+    if ($btnDeselectAll) {
+        $btnDeselectAll.Add_Click({
+            Invoke-SelectAllArtifacts -Window $script:MainWindow -SelectAll $false
+        })
+    }
+    
+    # Wire up DataGrid selection changed for count update
+    $artifactGrid = $Window.FindName('ArtifactDataGrid')
+    if ($artifactGrid) {
+        $artifactGrid.Add_SelectionChanged({
+            Update-ArtifactSelectionCount -Window $script:MainWindow
+        })
+    }
+
     # Load saved scans list
     try {
         Update-SavedScansList -Window $Window
@@ -160,9 +192,27 @@ function Initialize-ScannerPanel {
     catch {
         Write-Log -Level Error -Message "Failed to load saved scans: $($_.Exception.Message)"
     }
+    
+    # Wire up scheduled scan buttons
+    $btnCreateSchedule = $Window.FindName('BtnCreateSchedule')
+    if ($btnCreateSchedule) { $btnCreateSchedule.Add_Click({ Invoke-ButtonAction -Action 'CreateScheduledScan' }) }
+    
+    $btnRunScheduleNow = $Window.FindName('BtnRunScheduleNow')
+    if ($btnRunScheduleNow) { $btnRunScheduleNow.Add_Click({ Invoke-ButtonAction -Action 'RunScheduledScanNow' }) }
+    
+    $btnDeleteSchedule = $Window.FindName('BtnDeleteSchedule')
+    if ($btnDeleteSchedule) { $btnDeleteSchedule.Add_Click({ Invoke-ButtonAction -Action 'DeleteScheduledScan' }) }
+    
+    # Load scheduled scans list
+    try {
+        Initialize-ScheduledScansList -Window $Window
+    }
+    catch {
+        Write-Log -Level Error -Message "Failed to load scheduled scans: $($_.Exception.Message)"
+    }
 }
 
-function Invoke-StartArtifactScan {
+function global:Invoke-StartArtifactScan {
     param([System.Windows.Window]$Window)
 
     if ($script:ScanInProgress) {
@@ -175,6 +225,7 @@ function Invoke-StartArtifactScan {
     $scanRemote = $Window.FindName('ChkScanRemote').IsChecked
     $includeEvents = $Window.FindName('ChkIncludeEventLogs').IsChecked
     $includeHighRisk = $Window.FindName('ChkIncludeHighRisk').IsChecked
+    $skipDllScanning = $Window.FindName('ChkSkipDllScanning').IsChecked
     $saveResults = $Window.FindName('ChkSaveResults').IsChecked
     $scanName = $Window.FindName('TxtScanName').Text
     $pathsText = $Window.FindName('TxtScanPaths').Text
@@ -228,6 +279,7 @@ function Invoke-StartArtifactScan {
 
     if ($scanLocal) { $scanParams.ScanLocal = $true }
     if ($includeEvents) { $scanParams.IncludeEventLogs = $true }
+    if ($skipDllScanning) { $scanParams.SkipDllScanning = $true }
     if ($paths.Count -gt 0) { $scanParams.Paths = $paths }
     if ($scanRemote -and $script:SelectedScanMachines.Count -gt 0) {
         $scanParams.Machines = $script:SelectedScanMachines
@@ -371,6 +423,8 @@ function Invoke-StartArtifactScan {
 
                     # Update counters
                     $win.FindName('ScanArtifactCount').Text = "$($result.Summary.TotalArtifacts) artifacts"
+                    $preGen = $win.FindName('TxtArtifactCountPreGen')
+                    if ($preGen) { $preGen.Text = "$($result.Summary.TotalArtifacts)" }
                     $win.FindName('ScanSignedCount').Text = "$($result.Summary.SignedArtifacts)"
                     $win.FindName('ScanUnsignedCount').Text = "$($result.Summary.UnsignedArtifacts)"
                     $win.FindName('ScanStatusLabel').Text = "Complete"
@@ -398,7 +452,7 @@ function Invoke-StartArtifactScan {
     $script:ScanTimer.Start()
 }
 
-function Invoke-StopArtifactScan {
+function global:Invoke-StopArtifactScan {
     param([System.Windows.Window]$Window)
 
     # Signal cancellation - the timer tick handler will clean up
@@ -440,48 +494,67 @@ function Update-ScanProgress {
 function script:Update-ArtifactDataGrid {
     param([System.Windows.Window]$Window)
 
-    $dataGrid = $Window.FindName('ArtifactDataGrid')
-    if (-not $dataGrid) { return }
+    try {
+        $dataGrid = $Window.FindName('ArtifactDataGrid')
+        if (-not $dataGrid) { return }
 
-    $artifacts = $script:CurrentScanArtifacts
-    if (-not $artifacts) {
-        $dataGrid.ItemsSource = $null
-        return
+        $artifacts = $script:CurrentScanArtifacts
+        if (-not $artifacts) {
+            $dataGrid.ItemsSource = $null
+            return
+        }
+
+        # Apply type filter first
+        $typeFilter = $script:CurrentArtifactFilter
+        if ($typeFilter -and $typeFilter -ne 'All') {
+            $artifacts = switch ($typeFilter) {
+                'EXE' { @($artifacts | Where-Object { $_.ArtifactType -eq 'EXE' }) }
+                'DLL' { @($artifacts | Where-Object { $_.ArtifactType -eq 'DLL' }) }
+                'MSI' { @($artifacts | Where-Object { $_.ArtifactType -eq 'MSI' }) }
+                'Script' { @($artifacts | Where-Object { $_.ArtifactType -in @('PS1', 'BAT', 'CMD', 'VBS', 'JS') }) }
+                'Signed' { @($artifacts | Where-Object { $_.IsSigned }) }
+                'Unsigned' { @($artifacts | Where-Object { -not $_.IsSigned }) }
+                default { $artifacts }
+            }
+        }
+
+        # Apply text filter
+        $filterBox = $Window.FindName('ArtifactFilterBox')
+        $filterText = if ($filterBox) { $filterBox.Text } else { '' }
+
+        if (-not [string]::IsNullOrWhiteSpace($filterText)) {
+            $artifacts = @($artifacts | Where-Object {
+                $_.FileName -like "*$filterText*" -or
+                $_.Publisher -like "*$filterText*" -or
+                $_.FilePath -like "*$filterText*"
+            })
+        }
+
+        # Add display properties
+        $displayData = @($artifacts | ForEach-Object {
+            $signedIcon = if ($_.IsSigned) { [char]0x2714 } else { [char]0x2718 }
+            $_ | Add-Member -NotePropertyName 'SignedIcon' -NotePropertyValue $signedIcon -PassThru -Force
+        })
+
+        $dataGrid.ItemsSource = $displayData
+        
+        # Update row count display
+        $totalCount = if ($script:CurrentScanArtifacts) { $script:CurrentScanArtifacts.Count } else { 0 }
+        $filteredCount = $displayData.Count
+        
+        $txtTotal = $Window.FindName('TxtArtifactTotalCount')
+        $txtFiltered = $Window.FindName('TxtArtifactFilteredCount')
+        if ($txtTotal) { $txtTotal.Text = "$totalCount" }
+        if ($txtFiltered) { $txtFiltered.Text = "$filteredCount" }
+        
+        # Update selection count
+        Update-ArtifactSelectionCount -Window $Window
     }
-
-    # Apply type filter first
-    $typeFilter = $script:CurrentArtifactFilter
-    if ($typeFilter -and $typeFilter -ne 'All') {
-        $artifacts = switch ($typeFilter) {
-            'EXE' { @($artifacts | Where-Object { $_.ArtifactType -eq 'EXE' }) }
-            'DLL' { @($artifacts | Where-Object { $_.ArtifactType -eq 'DLL' }) }
-            'MSI' { @($artifacts | Where-Object { $_.ArtifactType -eq 'MSI' }) }
-            'Script' { @($artifacts | Where-Object { $_.ArtifactType -in @('PS1', 'BAT', 'CMD', 'VBS', 'JS') }) }
-            'Signed' { @($artifacts | Where-Object { $_.IsSigned }) }
-            'Unsigned' { @($artifacts | Where-Object { -not $_.IsSigned }) }
-            default { $artifacts }
+    catch {
+        if (Get-Command -Name 'Write-AppLockerLog' -ErrorAction SilentlyContinue) {
+            Write-AppLockerLog -Message "Error updating artifact grid: $($_.Exception.Message)" -Level 'ERROR'
         }
     }
-
-    # Apply text filter
-    $filterBox = $Window.FindName('ArtifactFilterBox')
-    $filterText = if ($filterBox) { $filterBox.Text } else { '' }
-
-    if (-not [string]::IsNullOrWhiteSpace($filterText)) {
-        $artifacts = @($artifacts | Where-Object {
-            $_.FileName -like "*$filterText*" -or
-            $_.Publisher -like "*$filterText*" -or
-            $_.FilePath -like "*$filterText*"
-        })
-    }
-
-    # Add display properties
-    $displayData = @($artifacts | ForEach-Object {
-        $signedIcon = if ($_.IsSigned) { [char]0x2714 } else { [char]0x2718 }
-        $_ | Add-Member -NotePropertyName 'SignedIcon' -NotePropertyValue $signedIcon -PassThru -Force
-    })
-
-    $dataGrid.ItemsSource = $displayData
 }
 
 function global:Update-ArtifactFilter {
@@ -520,7 +593,46 @@ function global:Update-ArtifactFilter {
     Update-ArtifactDataGrid -Window $Window
 }
 
-function Update-SavedScansList {
+function global:Invoke-SelectAllArtifacts {
+    <#
+    .SYNOPSIS
+        Selects or deselects all artifacts in the ArtifactDataGrid.
+    #>
+    param(
+        [System.Windows.Window]$Window,
+        [bool]$SelectAll = $true
+    )
+    
+    $dataGrid = $Window.FindName('ArtifactDataGrid')
+    if (-not $dataGrid) { return }
+    
+    if ($SelectAll) {
+        $dataGrid.SelectAll()
+    }
+    else {
+        $dataGrid.UnselectAll()
+    }
+    
+    Update-ArtifactSelectionCount -Window $Window
+}
+
+function global:Update-ArtifactSelectionCount {
+    <#
+    .SYNOPSIS
+        Updates the selected artifact count display.
+    #>
+    param([System.Windows.Window]$Window)
+    
+    $dataGrid = $Window.FindName('ArtifactDataGrid')
+    $countText = $Window.FindName('TxtSelectedArtifactCount')
+    
+    if (-not $dataGrid -or -not $countText) { return }
+    
+    $selectedCount = $dataGrid.SelectedItems.Count
+    $countText.Text = "$selectedCount"
+}
+
+function global:Update-SavedScansList {
     param([System.Windows.Window]$Window)
 
     $listBox = $Window.FindName('SavedScansList')
@@ -540,7 +652,7 @@ function Update-SavedScansList {
     }
 }
 
-function Invoke-LoadSelectedScan {
+function global:Invoke-LoadSelectedScan {
     param([System.Windows.Window]$Window)
 
     $listBox = $Window.FindName('SavedScansList')
@@ -592,6 +704,8 @@ function Invoke-LoadSelectedScan {
         $signed = ($script:CurrentScanArtifacts | Where-Object { $_.IsSigned }).Count
         $unsigned = $script:CurrentScanArtifacts.Count - $signed
         $Window.FindName('ScanArtifactCount').Text = "$($script:CurrentScanArtifacts.Count) artifacts"
+        $preGen = $Window.FindName('TxtArtifactCountPreGen')
+        if ($preGen) { $preGen.Text = "$($script:CurrentScanArtifacts.Count)" }
         $Window.FindName('ScanSignedCount').Text = "$signed"
         $Window.FindName('ScanUnsignedCount').Text = "$unsigned"
         $Window.FindName('ScanStatusLabel').Text = $statusText
@@ -604,7 +718,7 @@ function Invoke-LoadSelectedScan {
     }
 }
 
-function Invoke-DeleteSelectedScan {
+function global:Invoke-DeleteSelectedScan {
     param([System.Windows.Window]$Window)
 
     $listBox = $Window.FindName('SavedScansList')
@@ -634,7 +748,7 @@ function Invoke-DeleteSelectedScan {
     }
 }
 
-function Invoke-ImportArtifacts {
+function global:Invoke-ImportArtifacts {
     param([System.Windows.Window]$Window)
 
     Add-Type -AssemblyName System.Windows.Forms
@@ -704,6 +818,8 @@ function Invoke-ImportArtifacts {
             $signed = ($script:CurrentScanArtifacts | Where-Object { $_.IsSigned }).Count
             $unsigned = $script:CurrentScanArtifacts.Count - $signed
             $Window.FindName('ScanArtifactCount').Text = "$($script:CurrentScanArtifacts.Count) artifacts"
+            $preGen = $Window.FindName('TxtArtifactCountPreGen')
+            if ($preGen) { $preGen.Text = "$($script:CurrentScanArtifacts.Count)" }
             $Window.FindName('ScanSignedCount').Text = "$signed"
             $Window.FindName('ScanUnsignedCount').Text = "$unsigned"
             $Window.FindName('ScanStatusLabel').Text = $statusText
@@ -717,18 +833,26 @@ function Invoke-ImportArtifacts {
     }
 }
 
-function Invoke-ExportArtifacts {
+function global:Invoke-ExportArtifacts {
     param([System.Windows.Window]$Window)
 
-    if (-not $script:CurrentScanArtifacts -or $script:CurrentScanArtifacts.Count -eq 0) {
-        [System.Windows.MessageBox]::Show('No artifacts to export. Run a scan first.', 'No Data', 'OK', 'Information')
+    # Get artifacts from DataGrid (respects current filters)
+    $dataGrid = $Window.FindName('ArtifactDataGrid')
+    $artifacts = if ($dataGrid -and $dataGrid.ItemsSource) {
+        @($dataGrid.ItemsSource)
+    } else {
+        @()
+    }
+    
+    if ($artifacts.Count -eq 0) {
+        [System.Windows.MessageBox]::Show('No artifacts to export. Run a scan or adjust filters.', 'No Data', 'OK', 'Information')
         return
     }
 
     Add-Type -AssemblyName System.Windows.Forms
 
     $dialog = [System.Windows.Forms.SaveFileDialog]::new()
-    $dialog.Title = 'Export Artifacts'
+    $dialog.Title = 'Export Artifacts (Current Filtered View)'
     $dialog.Filter = 'CSV Files (*.csv)|*.csv|JSON Files (*.json)|*.json'
     $dialog.FilterIndex = 1
     $dialog.FileName = "Artifacts_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
@@ -737,13 +861,20 @@ function Invoke-ExportArtifacts {
         try {
             $extension = [System.IO.Path]::GetExtension($dialog.FileName).ToLower()
             
+            # Remove display-only properties for cleaner export
+            $exportData = $artifacts | Select-Object FileName, FilePath, ArtifactType, Publisher, 
+                ProductName, FileVersion, IsSigned, SHA256Hash, FileSize, ComputerName
+            
             switch ($extension) {
-                '.csv' { $script:CurrentScanArtifacts | Export-Csv -Path $dialog.FileName -NoTypeInformation -Encoding UTF8 }
-                '.json' { $script:CurrentScanArtifacts | ConvertTo-Json -Depth 5 | Set-Content -Path $dialog.FileName -Encoding UTF8 }
+                '.csv' { $exportData | Export-Csv -Path $dialog.FileName -NoTypeInformation -Encoding UTF8 }
+                '.json' { $exportData | ConvertTo-Json -Depth 5 | Set-Content -Path $dialog.FileName -Encoding UTF8 }
             }
 
+            $totalCount = if ($script:CurrentScanArtifacts) { $script:CurrentScanArtifacts.Count } else { 0 }
+            $filterInfo = if ($artifacts.Count -lt $totalCount) { " (filtered from $totalCount total)" } else { "" }
+            
             [System.Windows.MessageBox]::Show(
-                "Exported $($script:CurrentScanArtifacts.Count) artifacts to:`n$($dialog.FileName)",
+                "Exported $($artifacts.Count) artifacts$filterInfo to:`n$($dialog.FileName)",
                 'Export Complete',
                 'OK',
                 'Information'
@@ -919,7 +1050,7 @@ function Show-MachineSelectionDialog {
     return $null
 }
 
-function Invoke-SelectMachinesForScan {
+function global:Invoke-SelectMachinesForScan {
     param([System.Windows.Window]$Window)
 
     if ($script:DiscoveredMachines.Count -eq 0) {
@@ -948,6 +1079,521 @@ function Invoke-SelectMachinesForScan {
     Show-Toast -Message "Selected $($script:SelectedScanMachines.Count) machines for scanning" -Type 'Success'
 }
 
+# NOTE: This function is implemented but not yet wired to the UI.
+# To enable: Add button to Scanner panel XAML and wire via Invoke-ButtonAction in MainWindow.xaml.ps1
+function global:Invoke-DedupeArtifacts {
+    param([System.Windows.Window]$Window)
 
+    if (-not $script:CurrentScanArtifacts -or $script:CurrentScanArtifacts.Count -eq 0) {
+        Show-Toast -Message 'No artifacts loaded. Run a scan first.' -Type 'Warning'
+        return
+    }
+
+    # Get dedupe mode from dropdown
+    $dedupeMode = 'Hash'
+    $cboMode = $Window.FindName('CboDedupeMode')
+    if ($cboMode -and $cboMode.SelectedItem) {
+        $dedupeMode = $cboMode.SelectedItem.Tag
+    }
+
+    $originalCount = $script:CurrentScanArtifacts.Count
+
+    # Build hash set for O(n) deduplication
+    $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    $uniqueArtifacts = [System.Collections.Generic.List[object]]::new()
+
+    foreach ($artifact in $script:CurrentScanArtifacts) {
+        $key = switch ($dedupeMode) {
+            'Smart' {
+                # Smart: Publisher+Product for signed, Hash for unsigned (matches Smart rule generation)
+                if ($artifact.IsSigned -and $artifact.Publisher) {
+                    $product = if ($artifact.ProductName) { $artifact.ProductName } else { 'Unknown' }
+                    "PUB|$($artifact.Publisher)|$product"
+                } else {
+                    # Unsigned: use hash
+                    if ($artifact.SHA256Hash) { $artifact.SHA256Hash } 
+                    else { "$($artifact.FilePath)|$($artifact.FileSize)" }
+                }
+            }
+            'Publisher' {
+                # Dedupe by publisher name only (one artifact per vendor)
+                if ($artifact.Publisher) {
+                    "PUB|$($artifact.Publisher)"
+                } else {
+                    # No publisher: fall back to hash
+                    if ($artifact.SHA256Hash) { $artifact.SHA256Hash } 
+                    else { "$($artifact.FilePath)|$($artifact.FileSize)" }
+                }
+            }
+            'PublisherProduct' {
+                # Dedupe by publisher + product (one artifact per product)
+                if ($artifact.Publisher) {
+                    $product = if ($artifact.ProductName) { $artifact.ProductName } else { 'Unknown' }
+                    "PUB|$($artifact.Publisher)|$product"
+                } else {
+                    # No publisher: fall back to hash
+                    if ($artifact.SHA256Hash) { $artifact.SHA256Hash } 
+                    else { "$($artifact.FilePath)|$($artifact.FileSize)" }
+                }
+            }
+            default {
+                # Hash mode: exact file match
+                if ($artifact.SHA256Hash) { $artifact.SHA256Hash } 
+                else { "$($artifact.FilePath)|$($artifact.FileSize)" }
+            }
+        }
+        
+        if ($seen.Add($key)) {
+            $uniqueArtifacts.Add($artifact)
+        }
+    }
+
+    $removed = $originalCount - $uniqueArtifacts.Count
+    $script:CurrentScanArtifacts = $uniqueArtifacts
+
+    # Update displays
+    Update-ArtifactDataGrid -Window $Window
+    
+    $artifactCount = $Window.FindName('ScanArtifactCount')
+    if ($artifactCount) { $artifactCount.Text = "$($uniqueArtifacts.Count) artifacts" }
+    
+    $preGenCount = $Window.FindName('TxtArtifactCountPreGen')
+    if ($preGenCount) { $preGenCount.Text = "$($uniqueArtifacts.Count)" }
+
+    $modeText = switch ($dedupeMode) { 'Smart' { 'smart' }; 'Publisher' { 'publisher' }; 'PublisherProduct' { 'publisher+product' }; default { 'hash' } }
+    if ($removed -gt 0) {
+        Show-Toast -Message "Removed $removed duplicates (by $modeText). $($uniqueArtifacts.Count) unique remaining." -Type 'Success'
+        Write-Log -Message "Deduplicated artifacts by $modeText`: $originalCount -> $($uniqueArtifacts.Count) ($removed removed)"
+    } else {
+        Show-Toast -Message "No duplicates found by $modeText. All $($uniqueArtifacts.Count) artifacts unique." -Type 'Info'
+    }
+}
+
+# NOTE: This function is implemented but not yet wired to the UI.
+# To enable: Add exclusion checkboxes to Scanner panel XAML and wire via Invoke-ButtonAction in MainWindow.xaml.ps1
+function global:Invoke-ApplyArtifactExclusions {
+    param([System.Windows.Window]$Window)
+
+    if (-not $script:CurrentScanArtifacts -or $script:CurrentScanArtifacts.Count -eq 0) {
+        Show-Toast -Message 'No artifacts loaded. Run a scan first.' -Type 'Warning'
+        return
+    }
+
+    # Get exclusion checkboxes
+    $excludeDll = $Window.FindName('ChkExcludeDll').IsChecked
+    $excludeJs = $Window.FindName('ChkExcludeJs').IsChecked
+    $excludeScripts = $Window.FindName('ChkExcludeScripts').IsChecked
+    $excludeUnsigned = $Window.FindName('ChkExcludeUnsigned').IsChecked
+
+    if (-not $excludeDll -and -not $excludeJs -and -not $excludeScripts -and -not $excludeUnsigned) {
+        Show-Toast -Message 'No exclusions selected.' -Type 'Info'
+        return
+    }
+
+    $originalCount = $script:CurrentScanArtifacts.Count
+    $excluded = @()
+
+    # Build list of extensions to exclude
+    $excludeExtensions = @()
+    if ($excludeDll) { $excludeExtensions += '.dll' }
+    if ($excludeJs) { $excludeExtensions += '.js' }
+    if ($excludeScripts) { $excludeExtensions += @('.ps1', '.bat', '.cmd', '.vbs', '.wsf') }
+
+    # Filter artifacts
+    $filtered = $script:CurrentScanArtifacts | Where-Object {
+        $dominated = $false
+        
+        # Check extension exclusions
+        if ($excludeExtensions.Count -gt 0) {
+            $ext = $_.Extension
+            if (-not $ext -and $_.FileName) { $ext = [System.IO.Path]::GetExtension($_.FileName) }
+            if ($ext -and $excludeExtensions -contains $ext.ToLower()) { $dominated = $true }
+        }
+        
+        # Check unsigned exclusion
+        if (-not $dominated -and $excludeUnsigned -and -not $_.IsSigned) { $dominated = $true }
+        
+        -not $dominated
+    }
+
+    $script:CurrentScanArtifacts = @($filtered)
+    $removedCount = $originalCount - $script:CurrentScanArtifacts.Count
+
+    # Update displays
+    Update-ArtifactDataGrid -Window $Window
+    
+    $artifactCount = $Window.FindName('ScanArtifactCount')
+    if ($artifactCount) { $artifactCount.Text = "$($script:CurrentScanArtifacts.Count) artifacts" }
+    
+    $preGenCount = $Window.FindName('TxtArtifactCountPreGen')
+    if ($preGenCount) { $preGenCount.Text = "$($script:CurrentScanArtifacts.Count)" }
+
+    # Build exclusion description
+    $excludeDesc = @()
+    if ($excludeDll) { $excludeDesc += 'DLLs' }
+    if ($excludeJs) { $excludeDesc += 'JS' }
+    if ($excludeScripts) { $excludeDesc += 'Scripts' }
+    if ($excludeUnsigned) { $excludeDesc += 'Unsigned' }
+
+    Show-Toast -Message "Excluded $removedCount artifacts ($($excludeDesc -join ', ')). $($script:CurrentScanArtifacts.Count) remaining." -Type 'Success'
+    Write-Log -Message "Applied exclusions ($($excludeDesc -join ', ')): $originalCount -> $($script:CurrentScanArtifacts.Count) ($removedCount removed)"
+}
+
+#endregion
+
+#region ===== SCHEDULED SCANS =====
+function global:Initialize-ScheduledScansList {
+    <#
+    .SYNOPSIS
+        Loads scheduled scans into the ScheduledScansList ListBox.
+    #>
+    param([System.Windows.Window]$Window)
+    
+    $listBox = $Window.FindName('ScheduledScansList')
+    if (-not $listBox) { return }
+    
+    if (-not (Get-Command -Name 'Get-ScheduledScans' -ErrorAction SilentlyContinue)) {
+        return
+    }
+    
+    try {
+        $result = Get-ScheduledScans
+        if ($result.Success -and $result.Data -and $result.Data.Count -gt 0) {
+            # Format for display - matches XAML DataTemplate bindings: Name, Schedule, Time
+            # Backend returns: Id, Name, Schedule, Time, Enabled, NextRunAt
+            $displayItems = @($result.Data | ForEach-Object {
+                $status = if ($_.Enabled) { '' } else { '[OFF] ' }
+                [PSCustomObject]@{
+                    Name = "$status$($_.Name)"
+                    Schedule = $_.Schedule
+                    Time = $_.Time
+                    ScheduleId = $_.Id           # Backend uses 'Id' not 'ScheduleId'
+                    Enabled = $_.Enabled
+                }
+            })
+            $listBox.ItemsSource = $displayItems
+        }
+        else {
+            $listBox.ItemsSource = $null
+        }
+    }
+    catch {
+        Write-Log -Level Error -Message "Failed to load scheduled scans: $($_.Exception.Message)"
+        $listBox.ItemsSource = $null
+    }
+}
+
+function global:Invoke-CreateScheduledScan {
+    <#
+    .SYNOPSIS
+        Creates a new scheduled scan from UI values.
+    #>
+    param([System.Windows.Window]$Window)
+    
+    if (-not (Get-Command -Name 'New-ScheduledScan' -ErrorAction SilentlyContinue)) {
+        Show-Toast -Message 'Scheduled scan functions not available.' -Type 'Error'
+        return
+    }
+    
+    # Get UI values
+    $txtName = $Window.FindName('TxtScheduleName')
+    $cboType = $Window.FindName('CboScheduleType')
+    $txtTime = $Window.FindName('TxtScheduleTime')
+    $chkEnabled = $Window.FindName('ChkScheduleEnabled')
+    $txtPaths = $Window.FindName('TxtScanPaths')
+    
+    # Validate inputs
+    $scheduleName = if ($txtName) { $txtName.Text.Trim() } else { '' }
+    if ([string]::IsNullOrWhiteSpace($scheduleName)) {
+        $scheduleName = "Schedule_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+        if ($txtName) { $txtName.Text = $scheduleName }
+    }
+    
+    $scheduleType = 'Daily'
+    if ($cboType -and $cboType.SelectedItem) {
+        $selectedItem = $cboType.SelectedItem
+        if ($selectedItem -is [System.Windows.Controls.ComboBoxItem]) {
+            $scheduleType = $selectedItem.Content.ToString()
+        }
+        elseif ($selectedItem.Content) {
+            $scheduleType = $selectedItem.Content.ToString()
+        }
+        else {
+            $scheduleType = $selectedItem.ToString()
+        }
+    }
+    
+    $scheduleTime = if ($txtTime) { $txtTime.Text.Trim() } else { '02:00' }
+    if ([string]::IsNullOrWhiteSpace($scheduleTime)) {
+        $scheduleTime = '02:00'
+    }
+    
+    # Validate time format (HH:mm)
+    if ($scheduleTime -notmatch '^\d{1,2}:\d{2}$') {
+        Show-Toast -Message "Invalid time format. Use HH:mm (e.g., 02:00 or 14:30)" -Type 'Warning'
+        return
+    }
+    
+    $enabled = if ($chkEnabled) { $chkEnabled.IsChecked } else { $true }
+    
+    # Get scan paths
+    $paths = @()
+    if ($txtPaths -and -not [string]::IsNullOrWhiteSpace($txtPaths.Text)) {
+        $paths = $txtPaths.Text -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -and $_ -notmatch '^#' }
+    }
+    
+    if ($paths.Count -eq 0) {
+        $paths = @(
+            'C:\Program Files',
+            'C:\Program Files (x86)',
+            'C:\ProgramData'
+        )
+    }
+    
+    # Get other scan options
+    $skipDll = $Window.FindName('ChkSkipDllScanning')
+    $includeEvents = $Window.FindName('ChkIncludeEventLogs')
+    
+    try {
+        Show-LoadingOverlay -Message "Creating scheduled scan..."
+        
+        # Note: Parameter names match backend New-ScheduledScan function
+        $params = @{
+            Name = $scheduleName
+            Schedule = $scheduleType       # Backend expects 'Schedule' not 'ScheduleType'
+            Time = $scheduleTime           # Backend expects 'Time' not 'ScheduleTime'
+            ScanPaths = $paths             # Backend expects 'ScanPaths' not 'Paths'
+        }
+        
+        if ($enabled) {
+            $params.Enabled = $true
+        }
+        
+        if ($skipDll -and $skipDll.IsChecked) {
+            $params.SkipDllScanning = $true
+        }
+        
+        $result = New-ScheduledScan @params
+        
+        Hide-LoadingOverlay
+        
+        if ($result.Success) {
+            Show-Toast -Message "Scheduled scan '$scheduleName' created successfully." -Type 'Success'
+            
+            # Clear name field for next entry
+            if ($txtName) { $txtName.Text = '' }
+            
+            # Refresh the list
+            Initialize-ScheduledScansList -Window $Window
+        }
+        else {
+            Show-Toast -Message "Failed to create schedule: $($result.Error)" -Type 'Error'
+        }
+    }
+    catch {
+        Hide-LoadingOverlay
+        Show-Toast -Message "Error creating schedule: $($_.Exception.Message)" -Type 'Error'
+    }
+}
+
+function global:Invoke-RunScheduledScanNow {
+    <#
+    .SYNOPSIS
+        Runs the selected scheduled scan immediately.
+    #>
+    param([System.Windows.Window]$Window)
+    
+    $listBox = $Window.FindName('ScheduledScansList')
+    if (-not $listBox -or -not $listBox.SelectedItem) {
+        Show-Toast -Message 'Please select a scheduled scan to run.' -Type 'Warning'
+        return
+    }
+    
+    if (-not (Get-Command -Name 'Invoke-ScheduledScan' -ErrorAction SilentlyContinue)) {
+        Show-Toast -Message 'Scheduled scan functions not available.' -Type 'Error'
+        return
+    }
+    
+    $selectedSchedule = $listBox.SelectedItem
+    $scheduleId = $selectedSchedule.ScheduleId
+    $scheduleName = $selectedSchedule.Name
+    
+    $confirm = [System.Windows.MessageBox]::Show(
+        "Run scheduled scan '$scheduleName' now?",
+        'Confirm Run',
+        'YesNo',
+        'Question'
+    )
+    
+    if ($confirm -ne 'Yes') { return }
+    
+    try {
+        Show-LoadingOverlay -Message "Starting scheduled scan '$scheduleName'..."
+        
+        # Backend Invoke-ScheduledScan expects -Id parameter
+        $result = Invoke-ScheduledScan -Id $scheduleId
+        
+        Hide-LoadingOverlay
+        
+        if ($result.Success) {
+            Show-Toast -Message "Scheduled scan '$scheduleName' started. Check History tab for results." -Type 'Success'
+            
+            # Optionally refresh saved scans list to show new results
+            Update-SavedScansList -Window $Window
+        }
+        else {
+            Show-Toast -Message "Failed to run scan: $($result.Error)" -Type 'Error'
+        }
+    }
+    catch {
+        Hide-LoadingOverlay
+        Show-Toast -Message "Error running scan: $($_.Exception.Message)" -Type 'Error'
+    }
+}
+
+function global:Invoke-DeleteScheduledScan {
+    <#
+    .SYNOPSIS
+        Deletes the selected scheduled scan.
+    #>
+    param([System.Windows.Window]$Window)
+    
+    $listBox = $Window.FindName('ScheduledScansList')
+    if (-not $listBox -or -not $listBox.SelectedItem) {
+        Show-Toast -Message 'Please select a scheduled scan to delete.' -Type 'Warning'
+        return
+    }
+    
+    if (-not (Get-Command -Name 'Remove-ScheduledScan' -ErrorAction SilentlyContinue)) {
+        Show-Toast -Message 'Scheduled scan functions not available.' -Type 'Error'
+        return
+    }
+    
+    $selectedSchedule = $listBox.SelectedItem
+    $scheduleId = $selectedSchedule.ScheduleId
+    $scheduleName = $selectedSchedule.Name
+    
+    $confirm = [System.Windows.MessageBox]::Show(
+        "Are you sure you want to delete scheduled scan '$scheduleName'?`n`nThis will also remove the Windows Task Scheduler task.",
+        'Confirm Delete',
+        'YesNo',
+        'Warning'
+    )
+    
+    if ($confirm -ne 'Yes') { return }
+    
+    try {
+        # Backend Remove-ScheduledScan expects -Id parameter
+        $result = Remove-ScheduledScan -Id $scheduleId
+        
+        if ($result.Success) {
+            Show-Toast -Message "Scheduled scan '$scheduleName' deleted." -Type 'Success'
+            Initialize-ScheduledScansList -Window $Window
+        }
+        else {
+            Show-Toast -Message "Failed to delete: $($result.Error)" -Type 'Error'
+        }
+    }
+    catch {
+        Show-Toast -Message "Error deleting schedule: $($_.Exception.Message)" -Type 'Error'
+    }
+}
+
+function global:Invoke-ToggleScheduledScan {
+    <#
+    .SYNOPSIS
+        Toggles the enabled state of the selected scheduled scan.
+    #>
+    param([System.Windows.Window]$Window)
+    
+    $listBox = $Window.FindName('ScheduledScansList')
+    if (-not $listBox -or -not $listBox.SelectedItem) {
+        Show-Toast -Message 'Please select a scheduled scan to toggle.' -Type 'Warning'
+        return
+    }
+    
+    if (-not (Get-Command -Name 'Set-ScheduledScanEnabled' -ErrorAction SilentlyContinue)) {
+        Show-Toast -Message 'Scheduled scan functions not available.' -Type 'Error'
+        return
+    }
+    
+    $selectedSchedule = $listBox.SelectedItem
+    $scheduleId = $selectedSchedule.ScheduleId
+    $scheduleName = $selectedSchedule.Name
+    $newState = -not $selectedSchedule.Enabled
+    
+    try {
+        # Backend Set-ScheduledScanEnabled expects -Id parameter
+        $result = Set-ScheduledScanEnabled -Id $scheduleId -Enabled $newState
+        
+        if ($result.Success) {
+            $stateText = if ($newState) { 'enabled' } else { 'disabled' }
+            Show-Toast -Message "Scheduled scan '$scheduleName' $stateText." -Type 'Success'
+            Initialize-ScheduledScansList -Window $Window
+        }
+        else {
+            Show-Toast -Message "Failed to update: $($result.Error)" -Type 'Error'
+        }
+    }
+    catch {
+        Show-Toast -Message "Error updating schedule: $($_.Exception.Message)" -Type 'Error'
+    }
+}
+#endregion
+
+#region ===== RULE GENERATION =====
+function global:Invoke-LaunchRuleWizard {
+    <#
+    .SYNOPSIS
+        Generates rules directly from current scan artifacts using batch generation.
+    #>
+    param([System.Windows.Window]$Window)
+    
+    if (-not $script:CurrentScanArtifacts -or $script:CurrentScanArtifacts.Count -eq 0) {
+        Show-Toast -Message "No artifacts available. Run a scan first." -Type 'Warning'
+        return
+    }
+    
+    $artifactCount = $script:CurrentScanArtifacts.Count
+    Show-Toast -Message "Generating rules from $artifactCount artifacts (Smart mode)..." -Type 'Info'
+    Write-Log -Message "Starting batch rule generation for $artifactCount artifacts"
+    
+    # Show loading overlay
+    if (Get-Command -Name 'Show-LoadingOverlay' -ErrorAction SilentlyContinue) {
+        Show-LoadingOverlay -Message "Generating Rules..." -SubMessage "Processing $artifactCount artifacts..."
+    }
+    
+    try {
+        # Use batch generation with sensible defaults
+        $result = Invoke-BatchRuleGeneration -Artifacts $script:CurrentScanArtifacts `
+            -Mode 'Smart' `
+            -Action 'Allow' `
+            -Status 'Pending' `
+            -DedupeMode 'Smart'
+        
+        # Hide loading overlay
+        if (Get-Command -Name 'Hide-LoadingOverlay' -ErrorAction SilentlyContinue) {
+            Hide-LoadingOverlay
+        }
+        
+        # Show results
+        $msg = "Created $($result.RulesCreated) rules"
+        if ($result.AlreadyExisted -gt 0) { $msg += " ($($result.AlreadyExisted) already existed)" }
+        Show-Toast -Message $msg -Type 'Success'
+        Write-Log -Message "Batch generation complete: $($result.RulesCreated) created, $($result.AlreadyExisted) existed"
+        
+        # Navigate to Rules panel to see results
+        if (Get-Command -Name 'Set-ActivePanel' -ErrorAction SilentlyContinue) {
+            Set-ActivePanel -PanelName 'PanelRules'
+        }
+    }
+    catch {
+        if (Get-Command -Name 'Hide-LoadingOverlay' -ErrorAction SilentlyContinue) {
+            Hide-LoadingOverlay
+        }
+        Show-Toast -Message "Generation failed: $($_.Exception.Message)" -Type 'Error'
+        Write-Log -Level Error -Message "Batch generation failed: $($_.Exception.Message)"
+    }
+}
 #endregion
 #endregion

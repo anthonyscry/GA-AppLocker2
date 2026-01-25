@@ -98,6 +98,12 @@ Features:
         'Start-ArtifactScan',
         'Get-ScanResults',
         'Export-ScanResults',
+        # Scanning - Scheduled
+        'New-ScheduledScan',
+        'Get-ScheduledScans',
+        'Remove-ScheduledScan',
+        'Set-ScheduledScanEnabled',
+        'Invoke-ScheduledScan',
         # Rules module
         'New-PublisherRule',
         'New-HashRule',
@@ -121,7 +127,18 @@ Features:
         'Find-DuplicateRules',
         'Find-ExistingHashRule',
         'Find-ExistingPublisherRule',
-        'Get-ExistingRuleIndex',
+        # Rules - Batch Generation (10x faster)
+        'Invoke-BatchRuleGeneration',
+        # Rules - Import
+        'Import-RulesFromXml',
+        # Rules - History/Versioning
+        'Get-RuleHistory',
+        'Save-RuleVersion',
+        'Restore-RuleVersion',
+        'Compare-RuleVersions',
+        'Get-RuleVersionContent',
+        'Remove-RuleHistory',
+        'Invoke-RuleHistoryCleanup',
         # Storage module (SQLite)
         'Initialize-RuleDatabase',
         'Get-RuleDatabasePath',
@@ -136,6 +153,28 @@ Features:
         'Find-RuleByHash',
         'Find-RuleByPublisher',
         'Get-DuplicateRules',
+        # Storage - Bulk Operations
+        'Save-RulesBulk',
+        'Add-RulesToIndex',
+        'Get-ExistingRuleIndex',
+        'Remove-RulesBulk',
+        'Remove-RulesFromIndex',
+        'Get-BatchPreview',
+        'Update-RuleStatusInIndex',
+        # Storage - Index Watcher
+        'Start-RuleIndexWatcher',
+        'Stop-RuleIndexWatcher',
+        'Get-RuleIndexWatcherStatus',
+        'Set-RuleIndexWatcherDebounce',
+        'Invoke-RuleIndexRebuild',
+        # Storage - Repository Pattern
+        'Get-RuleFromRepository',
+        'Save-RuleToRepository',
+        'Remove-RuleFromRepository',
+        'Find-RulesInRepository',
+        'Get-RuleCountsFromRepository',
+        'Invoke-RuleBatchOperation',
+        'Test-RuleExistsInRepository',
         # Policy module
         'New-Policy',
         'Get-Policy',
@@ -148,6 +187,13 @@ Features:
         'Set-PolicyTarget',
         'Export-PolicyToXml',
         'Test-PolicyCompliance',
+        # Policy - Comparison & Snapshots
+        'Compare-Policies',
+        'Get-PolicyDiffReport',
+        'New-PolicySnapshot',
+        'Get-PolicySnapshots',
+        'Restore-PolicySnapshot',
+        'Invoke-PolicySnapshotCleanup',
         # Deployment module
         'New-DeploymentJob',
         'Get-DeploymentJob',
@@ -167,6 +213,61 @@ Features:
         'Get-SetupStatus',
         'Enable-WinRMGPO',
         'Disable-WinRMGPO',
+        # Audit Trail
+        'Write-AuditLog',
+        'Get-AuditLog',
+        'Export-AuditLog',
+        'Clear-AuditLog',
+        'Get-AuditLogPath',
+        'Get-AuditLogSummary',
+        # Email Notifications
+        'Get-EmailSettings',
+        'Set-EmailSettings',
+        'Set-EmailNotifyOn',
+        'Send-AppLockerNotification',
+        'Test-EmailSettings',
+        # Reporting Export
+        'Export-AppLockerReport',
+        'Export-ForPowerBI',
+        # Backup & Restore
+        'Backup-AppLockerData',
+        'Restore-AppLockerData',
+        'Get-BackupHistory',
+        # Cache Management
+        'Get-CachedValue',
+        'Set-CachedValue',
+        'Clear-AppLockerCache',
+        'Get-CacheStatistics',
+        'Test-CacheKey',
+        'Invoke-CacheCleanup',
+        # Event System
+        'Register-AppLockerEvent',
+        'Publish-AppLockerEvent',
+        'Unregister-AppLockerEvent',
+        'Get-AppLockerEventHandlers',
+        'Get-AppLockerEventHistory',
+        'Clear-AppLockerEventHistory',
+        'Get-AppLockerStandardEvents',
+        # Validation Helpers
+        'Test-ValidHash',
+        'Test-ValidSid',
+        'Test-ValidGuid',
+        'Test-ValidPath',
+        'Test-ValidDistinguishedName',
+        'Test-ValidHostname',
+        'Test-ValidCollectionType',
+        'Test-ValidRuleAction',
+        'Test-ValidRuleStatus',
+        'Test-ValidPolicyStatus',
+        'Test-ValidEnforcementMode',
+        'Test-ValidTier',
+        'Assert-NotNullOrEmpty',
+        'Assert-InRange',
+        'Assert-MatchesPattern',
+        'Assert-InSet',
+        'ConvertTo-SafeFileName',
+        'ConvertTo-SafeXmlString',
+        'Get-ValidValues',
         # Main module
         'Start-AppLockerDashboard'
     )

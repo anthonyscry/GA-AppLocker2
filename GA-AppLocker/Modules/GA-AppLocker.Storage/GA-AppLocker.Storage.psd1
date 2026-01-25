@@ -19,14 +19,37 @@
         'Update-RuleInDatabase',
         'Remove-RuleFromDatabase',
         
-        # Bulk Operations
+        # Bulk Operations (Batch Rule Generation)
         'Import-RulesToDatabase',
         'Get-RuleCounts',
+        'Save-RulesBulk',
+        'Add-RulesToIndex',
+        'Get-ExistingRuleIndex',
+        'Remove-RulesBulk',
+        'Remove-RulesFromIndex',
+        'Get-BatchPreview',
+        'Update-RuleStatusInIndex',
         
         # Query Helpers
         'Find-RuleByHash',
         'Find-RuleByPublisher',
-        'Get-DuplicateRules'
+        'Get-DuplicateRules',
+        
+        # Index Watcher Functions
+        'Start-RuleIndexWatcher',
+        'Stop-RuleIndexWatcher',
+        'Get-RuleIndexWatcherStatus',
+        'Set-RuleIndexWatcherDebounce',
+        'Invoke-RuleIndexRebuild',
+        
+        # Repository Pattern Functions
+        'Get-RuleFromRepository',
+        'Save-RuleToRepository',
+        'Remove-RuleFromRepository',
+        'Find-RulesInRepository',
+        'Get-RuleCountsFromRepository',
+        'Invoke-RuleBatchOperation',
+        'Test-RuleExistsInRepository'
     )
     
     PrivateData = @{

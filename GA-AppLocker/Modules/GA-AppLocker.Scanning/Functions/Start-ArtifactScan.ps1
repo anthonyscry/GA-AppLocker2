@@ -76,6 +76,9 @@ function Start-ArtifactScan {
         [int]$BatchSize = 50,
 
         [Parameter()]
+        [switch]$SkipDllScanning,
+
+        [Parameter()]
         [hashtable]$SyncHash = $null
     )
 
@@ -107,6 +110,7 @@ function Start-ArtifactScan {
             if ($Paths) { $localParams.Paths = $Paths }
             $localParams.Recurse = $true
             if ($SyncHash) { $localParams.SyncHash = $SyncHash }
+            if ($SkipDllScanning) { $localParams.SkipDllScanning = $true }
 
             $localResult = Get-LocalArtifacts @localParams
             if ($localResult.Success) {
@@ -179,6 +183,7 @@ function Start-ArtifactScan {
                     BatchSize    = $BatchSize
                 }
                 if ($Paths) { $remoteParams.Paths = $Paths }
+                if ($SkipDllScanning) { $remoteParams.SkipDllScanning = $true }
 
                 $remoteResult = Get-RemoteArtifacts @remoteParams
                 if ($remoteResult.Success) {

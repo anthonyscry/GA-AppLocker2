@@ -27,7 +27,18 @@
         'Remove-RuleFromPolicy',
         'Set-PolicyTarget',
         'Export-PolicyToXml',
-        'Test-PolicyCompliance'
+        'Test-PolicyCompliance',
+        # Policy Comparison
+        'Compare-Policies',
+        'Compare-RuleProperties',
+        'Get-PolicyDiffReport',
+        # Policy Snapshots
+        'New-PolicySnapshot',
+        'Get-PolicySnapshots',
+        'Get-PolicySnapshot',
+        'Restore-PolicySnapshot',
+        'Remove-PolicySnapshot',
+        'Invoke-PolicySnapshotCleanup'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()

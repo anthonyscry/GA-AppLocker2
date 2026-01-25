@@ -37,10 +37,13 @@ function Update-DashboardStats {
 
     # Update stats from actual data
     try {
-        # Machines count
+        # Update charts
+        Update-DashboardCharts -Window $Window
+        # Machines count (null-safe)
         $statMachines = $Window.FindName('StatMachines')
         if ($statMachines) { 
-            $statMachines.Text = $script:DiscoveredMachines.Count.ToString()
+            $machineCount = if ($script:DiscoveredMachines) { $script:DiscoveredMachines.Count } else { 0 }
+            $statMachines.Text = $machineCount.ToString()
         }
 
         # Artifacts count - sum from all saved scans + current session
@@ -126,9 +129,25 @@ function Update-DashboardStats {
                 # Ensure Data is always an array
                 $scanData = @($scansResult.Data)
                 $recentScans = @($scanData | Select-Object -First 5 | ForEach-Object {
+                        # Safely parse Date (may be DateTime, string, or PSCustomObject from JSON)
+                        $dateDisplay = ''
+                        if ($_.Date) {
+                            try {
+                                $dateValue = $_.Date
+                                if ($dateValue -is [PSCustomObject] -and $dateValue.DateTime) {
+                                    $dateDisplay = ([datetime]$dateValue.DateTime).ToString('MM/dd HH:mm')
+                                }
+                                elseif ($dateValue -is [datetime]) {
+                                    $dateDisplay = $dateValue.ToString('MM/dd HH:mm')
+                                }
+                                elseif ($dateValue -is [string]) {
+                                    $dateDisplay = ([datetime]$dateValue).ToString('MM/dd HH:mm')
+                                }
+                            } catch { }
+                        }
                         [PSCustomObject]@{
                             Name  = $_.ScanName
-                            Date  = $_.Date.ToString('MM/dd HH:mm')
+                            Date  = $dateDisplay
                             Count = "$($_.Artifacts) items"
                         }
                     })
@@ -138,6 +157,97 @@ function Update-DashboardStats {
     }
     catch {
         Write-Log -Level Warning -Message "Failed to update dashboard stats: $($_.Exception.Message)"
+    }
+}
+
+function Update-DashboardCharts {
+    <#
+    .SYNOPSIS
+        Updates the dashboard chart widgets with current data.
+    #>
+    param([System.Windows.Window]$Window)
+    
+    try {
+        $rulesResult = Get-AllRules
+        if (-not $rulesResult.Success) { return }
+        
+        $allRules = @($rulesResult.Data)
+        $totalRules = $allRules.Count
+        
+        if ($totalRules -eq 0) { return }
+        
+        # Group by status
+        $statusGroups = $allRules | Group-Object Status
+        $approved = ($statusGroups | Where-Object Name -eq 'Approved' | Select-Object -ExpandProperty Count) -as [int]
+        $pending = ($statusGroups | Where-Object Name -eq 'Pending' | Select-Object -ExpandProperty Count) -as [int]
+        $rejected = ($statusGroups | Where-Object Name -eq 'Rejected' | Select-Object -ExpandProperty Count) -as [int]
+        $review = ($statusGroups | Where-Object Name -eq 'Review' | Select-Object -ExpandProperty Count) -as [int]
+        
+        if (-not $approved) { $approved = 0 }
+        if (-not $pending) { $pending = 0 }
+        if (-not $rejected) { $rejected = 0 }
+        if (-not $review) { $review = 0 }
+        
+        # Group by rule type
+        $typeGroups = $allRules | Group-Object RuleType
+        $publisherCount = ($typeGroups | Where-Object Name -eq 'Publisher' | Select-Object -ExpandProperty Count) -as [int]
+        $hashCount = ($typeGroups | Where-Object Name -eq 'Hash' | Select-Object -ExpandProperty Count) -as [int]
+        $pathCount = ($typeGroups | Where-Object Name -eq 'Path' | Select-Object -ExpandProperty Count) -as [int]
+        
+        if (-not $publisherCount) { $publisherCount = 0 }
+        if (-not $hashCount) { $hashCount = 0 }
+        if (-not $pathCount) { $pathCount = 0 }
+        
+        # Calculate max for scaling (use 200 pixels as max width)
+        $maxBarWidth = 200
+        $maxStatus = [Math]::Max([Math]::Max($approved, $pending), [Math]::Max($rejected, $review))
+        $maxType = [Math]::Max([Math]::Max($publisherCount, $hashCount), $pathCount)
+        
+        if ($maxStatus -eq 0) { $maxStatus = 1 }
+        if ($maxType -eq 0) { $maxType = 1 }
+        
+        # Update Status Chart bars and labels
+        $barApproved = $Window.FindName('ChartBarApproved')
+        $barPending = $Window.FindName('ChartBarPending')
+        $barRejected = $Window.FindName('ChartBarRejected')
+        $barReview = $Window.FindName('ChartBarReview')
+        
+        $labelApproved = $Window.FindName('ChartLabelApproved')
+        $labelPending = $Window.FindName('ChartLabelPending')
+        $labelRejected = $Window.FindName('ChartLabelRejected')
+        $labelReview = $Window.FindName('ChartLabelReview')
+        $labelTotal = $Window.FindName('ChartTotalRules')
+        
+        if ($barApproved) { $barApproved.Width = [Math]::Max(($approved / $maxStatus) * $maxBarWidth, 2) }
+        if ($barPending) { $barPending.Width = [Math]::Max(($pending / $maxStatus) * $maxBarWidth, 2) }
+        if ($barRejected) { $barRejected.Width = [Math]::Max(($rejected / $maxStatus) * $maxBarWidth, 2) }
+        if ($barReview) { $barReview.Width = [Math]::Max(($review / $maxStatus) * $maxBarWidth, 2) }
+        
+        if ($labelApproved) { $labelApproved.Text = $approved.ToString() }
+        if ($labelPending) { $labelPending.Text = $pending.ToString() }
+        if ($labelRejected) { $labelRejected.Text = $rejected.ToString() }
+        if ($labelReview) { $labelReview.Text = $review.ToString() }
+        if ($labelTotal) { $labelTotal.Text = $totalRules.ToString() }
+        
+        # Update Type Chart bars and labels
+        $barPublisher = $Window.FindName('ChartBarPublisher')
+        $barHash = $Window.FindName('ChartBarHash')
+        $barPath = $Window.FindName('ChartBarPath')
+        
+        $labelPublisher = $Window.FindName('ChartLabelPublisher')
+        $labelHash = $Window.FindName('ChartLabelHash')
+        $labelPath = $Window.FindName('ChartLabelPath')
+        
+        if ($barPublisher) { $barPublisher.Width = [Math]::Max(($publisherCount / $maxType) * $maxBarWidth, 2) }
+        if ($barHash) { $barHash.Width = [Math]::Max(($hashCount / $maxType) * $maxBarWidth, 2) }
+        if ($barPath) { $barPath.Width = [Math]::Max(($pathCount / $maxType) * $maxBarWidth, 2) }
+        
+        if ($labelPublisher) { $labelPublisher.Text = $publisherCount.ToString() }
+        if ($labelHash) { $labelHash.Text = $hashCount.ToString() }
+        if ($labelPath) { $labelPath.Text = $pathCount.ToString() }
+    }
+    catch {
+        Write-Log -Level Warning -Message "Failed to update dashboard charts: $($_.Exception.Message)"
     }
 }
 

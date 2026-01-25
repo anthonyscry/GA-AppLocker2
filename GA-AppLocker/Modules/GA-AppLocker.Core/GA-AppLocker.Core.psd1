@@ -36,15 +36,84 @@
 
     # Functions to export from this module
     FunctionsToExport = @(
+        # Logging
         'Write-AppLockerLog',
+        
+        # Configuration
         'Get-AppLockerConfig',
         'Set-AppLockerConfig',
-        'Test-Prerequisites',
         'Get-AppLockerDataPath',
+        
+        # Utilities
+        'Test-Prerequisites',
         'Invoke-WithRetry',
+        
+        # Session State
         'Save-SessionState',
         'Restore-SessionState',
-        'Clear-SessionState'
+        'Clear-SessionState',
+        
+        # Audit Trail
+        'Write-AuditLog',
+        'Get-AuditLog',
+        'Export-AuditLog',
+        'Clear-AuditLog',
+        'Get-AuditLogPath',
+        'Get-AuditLogSummary',
+        
+        # Email Notifications
+        'Get-EmailSettings',
+        'Set-EmailSettings',
+        'Set-EmailNotifyOn',
+        'Send-AppLockerNotification',
+        'Test-EmailSettings',
+        
+        # Reporting/Export
+        'Export-AppLockerReport',
+        'Export-ForPowerBI',
+        
+        # Backup/Restore
+        'Backup-AppLockerData',
+        'Restore-AppLockerData',
+        'Get-BackupHistory',
+        
+        # Cache Management
+        'Get-CachedValue',
+        'Set-CachedValue',
+        'Clear-AppLockerCache',
+        'Get-CacheStatistics',
+        'Test-CacheKey',
+        'Invoke-CacheCleanup',
+        
+        # Event System
+        'Register-AppLockerEvent',
+        'Publish-AppLockerEvent',
+        'Unregister-AppLockerEvent',
+        'Get-AppLockerEventHandlers',
+        'Get-AppLockerEventHistory',
+        'Clear-AppLockerEventHistory',
+        'Get-AppLockerStandardEvents',
+        
+        # Validation Helpers
+        'Test-ValidHash',
+        'Test-ValidSid',
+        'Test-ValidGuid',
+        'Test-ValidPath',
+        'Test-ValidDistinguishedName',
+        'Test-ValidHostname',
+        'Test-ValidCollectionType',
+        'Test-ValidRuleAction',
+        'Test-ValidRuleStatus',
+        'Test-ValidPolicyStatus',
+        'Test-ValidEnforcementMode',
+        'Test-ValidTier',
+        'Assert-NotNullOrEmpty',
+        'Assert-InRange',
+        'Assert-MatchesPattern',
+        'Assert-InSet',
+        'ConvertTo-SafeFileName',
+        'ConvertTo-SafeXmlString',
+        'Get-ValidValues'
     )
 
     # Cmdlets to export from this module

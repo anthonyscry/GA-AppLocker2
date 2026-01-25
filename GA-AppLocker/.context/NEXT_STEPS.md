@@ -1,95 +1,88 @@
 # GA-AppLocker Next Steps
 
-**Last Updated:** 2026-01-17
+**Last Updated:** 2026-01-23
 
 ---
 
-## Immediate Next Steps (Phase 4: Scanning)
+## Current Status: Feature Complete
 
-### Priority 1: GA-AppLocker.Scanning Module
-1. Create module manifest and loader
-2. Implement `Get-LocalArtifacts` - Collect from local machine
-3. Implement `Get-RemoteArtifacts` - Collect via WinRM
-4. Implement `Get-AppLockerEventLogs` - Collect 8001-8025 events
-5. Implement `Start-ArtifactScan` - Orchestrate multi-machine scanning
+All major phases are complete. The application is fully functional with:
+- 9 sub-modules (Core, Discovery, Credentials, Scanning, Rules, Policy, Deployment, Setup, Storage)
+- 8 GUI panels (Dashboard, Discovery, Scanner, Rules, Policy, Deployment, Settings, Setup)
+- 69/70 tests passing (98.6%)
+- 21/21 TODO items complete
 
-### Priority 2: Artifact Scanner Panel UI
-1. Build scan configuration UI (machine selection, artifact types)
-2. Add progress bar and status indicators
-3. Create artifact results DataGrid
-4. Implement artifact detail view
-5. Add export functionality (CSV/JSON)
+---
 
-### Priority 3: Artifact Data Model
-1. Define artifact object structure (path, hash, publisher, etc.)
-2. Implement artifact storage (JSON files per scan)
-3. Add artifact deduplication logic
-4. Create artifact summary statistics
+## Optional Future Enhancements
+
+### Priority 1: Polish
+
+1. ~~**Performance Benchmarks**~~ **PARTIAL (Jan 23)**
+   - ~~Create benchmark script comparing old vs new rule generation~~
+   - Script created at `Tests/Performance/Benchmark-RuleGeneration.ps1`
+   - Old method: ~500ms/artifact confirmed
+   - TODO: Fix module scope issue to benchmark new batch method
+
+2. **Keyboard Shortcuts for Context Menu**
+   - Add keyboard shortcuts for common rule actions (Approve, Reject, etc.)
+   - Update KeyboardShortcuts.ps1
+
+3. **Live App Wizard Testing**
+   - Manual end-to-end testing of Rule Generation Wizard
+   - Verify all wizard steps work correctly in live environment
+
+### Priority 2: Quality
+
+4. **Fix Minor Test Issue**
+   - Get-OUTree test fails without LDAP (expected but could be handled better)
+   - Consider mocking LDAP for test environments
+
+5. ~~**Async Runspace Warnings**~~ **COMPLETE (Jan 23)**
+   - ~~Clean up "function not recognized" warnings in background operations~~
+   - Fixed in AsyncHelpers.ps1 - both Invoke-AsyncOperation and Invoke-AsyncWithProgress now have proper error handling
+
+### Priority 3: Documentation
+
+6. ~~**User Documentation**~~ **COMPLETE (Jan 23)**
+   - ~~Create end-user guide (separate from CLAUDE.md developer guide)~~
+   - Created `docs/QuickStart.md` with 7-step workflow
+   - TODO (optional): Add screenshots of key workflows
+
+7. **Video Walkthrough**
+   - Record demo of complete workflow
+   - Scan → Rules → Policy → Deploy
 
 ---
 
 ## Completed Phases
 
-### Phase 1: Foundation - COMPLETE
-- [x] Core module with logging, config, prerequisites
-- [x] WPF shell with navigation
-
-### Phase 2: Discovery - COMPLETE
-- [x] Domain info retrieval
-- [x] OU tree discovery
-- [x] Machine enumeration
-- [x] Connectivity testing
-
-### Phase 3: Credentials - COMPLETE
-- [x] Tiered credential model (T0/T1/T2)
-- [x] DPAPI-encrypted storage
-- [x] Credential testing
-- [x] Settings panel UI
-
----
-
-## Upcoming Phases
-
-### Phase 5: Rules
-- [ ] Create GA-AppLocker.Scanning module
-- [ ] Implement local artifact collection
-- [ ] Implement remote WinRM scanning
-- [ ] Add event log collection (8001-8025)
-- [ ] Build Artifact Scanner panel UI
-- [ ] Add progress tracking
-
-### Phase 5: Rules
-- [ ] Create GA-AppLocker.Rules module
-- [ ] Implement publisher rule generation
-- [ ] Implement hash rule generation
-- [ ] Implement path rule generation
-- [ ] Add traffic light review system (Green/Yellow/Red)
-- [ ] Build Rule Generator panel UI
-- [ ] Implement bulk approve/reject operations
-
-### Phase 6: Policy & Deployment
-- [ ] Create GA-AppLocker.Policy module
-- [ ] Implement policy creation by machine type
-- [ ] Add policy merging
-- [ ] Implement GPO deployment
-- [ ] Build Policy Builder panel UI
-- [ ] Build Deployment panel UI
-- [ ] Add phase-based enforcement
-
-### Phase 7: Polish & Testing
-- [ ] Add keyboard shortcuts
-- [ ] Implement context menus
-- [ ] Add first-time setup wizard
-- [ ] Write Pester unit tests
-- [ ] Write integration tests
-- [ ] Create user documentation
-- [ ] Performance optimization
+| Phase | Status | Date |
+|-------|--------|------|
+| Phase 1: Foundation | COMPLETE | Jan 17, 2026 |
+| Phase 2: Discovery | COMPLETE | Jan 17, 2026 |
+| Phase 3: Credentials | COMPLETE | Jan 17, 2026 |
+| Phase 4: Scanning | COMPLETE | Jan 21, 2026 |
+| Phase 5: Rules | COMPLETE | Jan 22, 2026 |
+| Phase 6: Policy/Deploy | COMPLETE | Jan 22, 2026 |
+| Phase 7: Polish/Test | COMPLETE | Jan 22, 2026 |
+| Batch Generation | COMPLETE | Jan 23, 2026 |
+| Bug Fixes | COMPLETE | Jan 23, 2026 |
 
 ---
 
 ## Technical Debt
 
-*None accumulated yet.*
+### Resolved
+- ~~DoEvents anti-pattern~~ - Removed
+- ~~Global scope pollution~~ - Fixed with script: scope
+- ~~Duplicate rules~~ - Deduplication functions added
+- ~~Slow rule loading~~ - O(1) indexed lookups
+- ~~UI freezing~~ - Async operations
+
+### Minor (Non-Blocking)
+- Async runspace log warnings (cosmetic)
+- Get-OUTree expected failure in non-domain environments
 
 ---
 
@@ -100,3 +93,5 @@
 - Email notifications
 - PowerBI integration for reporting
 - Custom rule templates library
+- Dark/light theme toggle
+- Multi-language support

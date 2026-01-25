@@ -111,6 +111,26 @@ Export-ModuleMember -Function @(
     'Assert-InSet',
     'ConvertTo-SafeFileName',
     'ConvertTo-SafeXmlString',
-    'Get-ValidValues'
+    'Get-ValidValues',
+    # Audit Trail
+    'Write-AuditLog',
+    'Get-AuditLog',
+    'Export-AuditLog',
+    'Clear-AuditLog',
+    'Get-AuditLogPath',
+    'Get-AuditLogSummary',
+    # Email Notifications
+    'Get-EmailSettings',
+    'Set-EmailSettings',
+    'Set-EmailNotifyOn',
+    'Send-AppLockerNotification',
+    'Test-EmailSettings',
+    # Reporting Export
+    'Export-AppLockerReport',
+    'Export-ForPowerBI',
+    # Backup & Restore
+    'Backup-AppLockerData',
+    'Restore-AppLockerData',
+    'Get-BackupHistory'
 )
 #endregion

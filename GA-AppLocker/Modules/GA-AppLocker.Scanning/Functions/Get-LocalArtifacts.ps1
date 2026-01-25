@@ -48,6 +48,9 @@ function Get-LocalArtifacts {
         [int]$MaxDepth = 0,
 
         [Parameter()]
+        [switch]$SkipDllScanning,
+
+        [Parameter()]
         [hashtable]$SyncHash = $null
     )
 
@@ -60,6 +63,12 @@ function Get-LocalArtifacts {
 
     try {
         Write-ScanLog -Message "Starting local artifact scan on $env:COMPUTERNAME"
+        
+        # Filter out DLL extensions if SkipDllScanning is enabled
+        if ($SkipDllScanning) {
+            $Extensions = $Extensions | Where-Object { $_ -ne '.dll' }
+            Write-ScanLog -Message "Skipping DLL scanning (performance optimization)"
+        }
         
         # Use List<T> for O(n) performance instead of array += O(n²)
         $artifacts = [System.Collections.Generic.List[PSCustomObject]]::new()

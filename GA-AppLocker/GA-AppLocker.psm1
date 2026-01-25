@@ -45,7 +45,8 @@ Add-Type -AssemblyName WindowsBase
 #region ===== LOAD NESTED MODULES =====
 # Explicitly import nested modules in dependency order
 # Core first (no dependencies), then others
-$modulePath = Split-Path -Parent $PSScriptRoot
+# $PSScriptRoot = C:\projects\ga-applocker2\GA-AppLocker (where this .psm1 lives)
+$modulePath = $PSScriptRoot
 
 try {
     # Core module - foundation for all other modules
@@ -232,13 +233,21 @@ function Start-AppLockerDashboard {
         # Add handler for unhandled dispatcher exceptions
         [System.Windows.Threading.Dispatcher]::CurrentDispatcher.add_UnhandledException({
             param($sender, $e)
-            Write-AppLockerLog -Level Error -Message "WPF Dispatcher exception: $($e.Exception.Message)"
+            if (Get-Command -Name 'Write-AppLockerLog' -ErrorAction SilentlyContinue) {
+                Write-AppLockerLog -Level Error -Message "WPF Dispatcher exception: $($e.Exception.Message)"
+            } else {
+                Write-Warning "WPF Dispatcher exception: $($e.Exception.Message)"
+            }
             $e.Handled = $true
         })
 
         # Add loaded event to verify window renders
         $window.add_Loaded({
-            Write-AppLockerLog -Message 'Window Loaded event fired'
+            if (Get-Command -Name 'Write-AppLockerLog' -ErrorAction SilentlyContinue) {
+                Write-AppLockerLog -Message 'Window Loaded event fired'
+            } else {
+                Write-Host '[Info] Window Loaded event fired' -ForegroundColor White
+            }
         })
 
         # Ensure window is activated and visible
@@ -251,7 +260,11 @@ function Start-AppLockerDashboard {
         Write-AppLockerLog -Message 'Application closed'
     }
     catch {
-        Write-AppLockerLog -Level Error -Message "Failed to start GUI: $($_.Exception.Message)"
+        if (Get-Command -Name 'Write-AppLockerLog' -ErrorAction SilentlyContinue) {
+            Write-AppLockerLog -Level Error -Message "Failed to start GUI: $($_.Exception.Message)"
+        } else {
+            Write-Host "[Error] Failed to start GUI: $($_.Exception.Message)" -ForegroundColor Red
+        }
         [System.Windows.MessageBox]::Show(
             "Failed to start GA-AppLocker Dashboard:`n`n$($_.Exception.Message)",
             'Startup Error',
@@ -307,6 +320,12 @@ Export-ModuleMember -Function @(
     'Start-ArtifactScan',
     'Get-ScanResults',
     'Export-ScanResults',
+    # Scanning - Scheduled
+    'New-ScheduledScan',
+    'Get-ScheduledScans',
+    'Remove-ScheduledScan',
+    'Set-ScheduledScanEnabled',
+    'Invoke-ScheduledScan',
     # Rules module
     'New-PublisherRule',
     'New-HashRule',
@@ -330,7 +349,19 @@ Export-ModuleMember -Function @(
     'Find-DuplicateRules',
     'Find-ExistingHashRule',
     'Find-ExistingPublisherRule',
-    'Get-ExistingRuleIndex',
+    # NOTE: Get-ExistingRuleIndex is exported from Storage module
+    # Rules - Import
+    'Import-RulesFromXml',
+    # Rules - History/Versioning
+    'Get-RuleHistory',
+    'Save-RuleVersion',
+    'Restore-RuleVersion',
+    'Compare-RuleVersions',
+    'Get-RuleVersionContent',
+    'Remove-RuleHistory',
+    'Invoke-RuleHistoryCleanup',
+    # Rules - Batch Generation
+    'Invoke-BatchRuleGeneration',
     # Storage module (SQLite)
     'Initialize-RuleDatabase',
     'Get-RuleDatabasePath',
@@ -345,10 +376,33 @@ Export-ModuleMember -Function @(
     'Find-RuleByHash',
     'Find-RuleByPublisher',
     'Get-DuplicateRules',
+    # Storage - Bulk Operations
+    'Save-RulesBulk',
+    'Add-RulesToIndex',
+    'Get-ExistingRuleIndex',
+    'Remove-RulesBulk',
+    'Remove-RulesFromIndex',
+    'Get-BatchPreview',
+    'Update-RuleStatusInIndex',
+    # Storage - Index Watcher
+    'Start-RuleIndexWatcher',
+    'Stop-RuleIndexWatcher',
+    'Get-RuleIndexWatcherStatus',
+    'Set-RuleIndexWatcherDebounce',
+    'Invoke-RuleIndexRebuild',
+    # Storage - Repository Pattern
+    'Get-RuleFromRepository',
+    'Save-RuleToRepository',
+    'Remove-RuleFromRepository',
+    'Find-RulesInRepository',
+    'Get-RuleCountsFromRepository',
+    'Invoke-RuleBatchOperation',
+    'Test-RuleExistsInRepository',
     # Policy module
     'New-Policy',
     'Get-Policy',
     'Get-AllPolicies',
+    'Update-Policy',
     'Remove-Policy',
     'Set-PolicyStatus',
     'Add-RuleToPolicy',
@@ -356,6 +410,13 @@ Export-ModuleMember -Function @(
     'Set-PolicyTarget',
     'Export-PolicyToXml',
     'Test-PolicyCompliance',
+    # Policy - Comparison & Snapshots
+    'Compare-Policies',
+    'Get-PolicyDiffReport',
+    'New-PolicySnapshot',
+    'Get-PolicySnapshots',
+    'Restore-PolicySnapshot',
+    'Invoke-PolicySnapshotCleanup',
     # Deployment module
     'New-DeploymentJob',
     'Get-DeploymentJob',
@@ -366,6 +427,69 @@ Export-ModuleMember -Function @(
     'Test-GPOExists',
     'New-AppLockerGPO',
     'Import-PolicyToGPO',
-    'Get-DeploymentHistory'
+    'Get-DeploymentHistory',
+    # Audit Trail
+    'Write-AuditLog',
+    'Get-AuditLog',
+    'Export-AuditLog',
+    'Clear-AuditLog',
+    'Get-AuditLogPath',
+    'Get-AuditLogSummary',
+    # Email Notifications
+    'Get-EmailSettings',
+    'Set-EmailSettings',
+    'Set-EmailNotifyOn',
+    'Send-AppLockerNotification',
+    'Test-EmailSettings',
+    # Reporting Export
+    'Export-AppLockerReport',
+    'Export-ForPowerBI',
+    # Backup & Restore
+    'Backup-AppLockerData',
+    'Restore-AppLockerData',
+    'Get-BackupHistory',
+    # Setup module
+    'Initialize-WinRMGPO',
+    'Initialize-AppLockerGPOs',
+    'Initialize-ADStructure',
+    'Initialize-AppLockerEnvironment',
+    'Get-SetupStatus',
+    'Enable-WinRMGPO',
+    'Disable-WinRMGPO',
+    # Cache Management
+    'Get-CachedValue',
+    'Set-CachedValue',
+    'Clear-AppLockerCache',
+    'Get-CacheStatistics',
+    'Test-CacheKey',
+    'Invoke-CacheCleanup',
+    # Event System
+    'Register-AppLockerEvent',
+    'Publish-AppLockerEvent',
+    'Unregister-AppLockerEvent',
+    'Get-AppLockerEventHandlers',
+    'Get-AppLockerEventHistory',
+    'Clear-AppLockerEventHistory',
+    'Get-AppLockerStandardEvents',
+    # Validation Helpers
+    'Test-ValidHash',
+    'Test-ValidSid',
+    'Test-ValidGuid',
+    'Test-ValidPath',
+    'Test-ValidDistinguishedName',
+    'Test-ValidHostname',
+    'Test-ValidCollectionType',
+    'Test-ValidRuleAction',
+    'Test-ValidRuleStatus',
+    'Test-ValidPolicyStatus',
+    'Test-ValidEnforcementMode',
+    'Test-ValidTier',
+    'Assert-NotNullOrEmpty',
+    'Assert-InRange',
+    'Assert-MatchesPattern',
+    'Assert-InSet',
+    'ConvertTo-SafeFileName',
+    'ConvertTo-SafeXmlString',
+    'Get-ValidValues'
 )
 #endregion

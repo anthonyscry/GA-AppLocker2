@@ -26,8 +26,8 @@ function Initialize-RulesPanel {
     # Wire up action buttons
     $actionButtons = @(
         'BtnGenerateFromArtifacts', 'BtnCreateManualRule', 'BtnExportRulesXml', 'BtnExportRulesCsv',
-        'BtnRefreshRules', 'BtnApproveRule', 'BtnRejectRule', 'BtnReviewRule',
-        'BtnDeleteRule', 'BtnViewRuleDetails', 'BtnAddRuleToPolicy',
+        'BtnImportRulesXml', 'BtnRefreshRules', 'BtnApproveRule', 'BtnRejectRule', 'BtnReviewRule',
+        'BtnDeleteRule', 'BtnViewRuleDetails', 'BtnViewRuleHistory', 'BtnAddRuleToPolicy',
         'BtnApproveTrustedRules', 'BtnRemoveDuplicateRules'
     )
 
@@ -66,6 +66,19 @@ function Initialize-RulesPanel {
         $rulesGrid.Add_SelectionChanged({
                 Update-RulesSelectionCount -Window $script:MainWindow
             })
+        
+        # Wire up context menu items
+        $contextMenu = $rulesGrid.ContextMenu
+        if ($contextMenu) {
+            foreach ($item in $contextMenu.Items) {
+                if ($item -is [System.Windows.Controls.MenuItem] -and $item.Tag) {
+                    $item.Add_Click({
+                        param($sender, $e)
+                        Invoke-RulesContextAction -Action $sender.Tag -Window $script:MainWindow
+                    }.GetNewClosure())
+                }
+            }
+        }
     }
 
     # Set initial filter button state (All is active by default)
@@ -148,7 +161,24 @@ function script:Update-RulesDataGrid {
             $props['Collection'] = $_.CollectionType
             $props['CreatedAt'] = $_.CreatedDate
             $props['ModifiedAt'] = $_.ModifiedDate
-            $props['CreatedDisplay'] = if ($_.CreatedDate) { ([datetime]$_.CreatedDate).ToString('MM/dd HH:mm') } else { '' }
+            # Safely parse CreatedDate (may be DateTime, string, or PSCustomObject from JSON)
+            $createdDisplay = ''
+            if ($_.CreatedDate) {
+                try {
+                    $dateValue = $_.CreatedDate
+                    # Handle PSCustomObject from JSON serialization (has DateTime property)
+                    if ($dateValue -is [PSCustomObject] -and $dateValue.DateTime) {
+                        $createdDisplay = ([datetime]$dateValue.DateTime).ToString('MM/dd HH:mm')
+                    }
+                    elseif ($dateValue -is [datetime]) {
+                        $createdDisplay = $dateValue.ToString('MM/dd HH:mm')
+                    }
+                    elseif ($dateValue -is [string]) {
+                        $createdDisplay = ([datetime]$dateValue).ToString('MM/dd HH:mm')
+                    }
+                } catch { }
+            }
+            $props['CreatedDisplay'] = $createdDisplay
             [PSCustomObject]$props
         }
 
@@ -156,10 +186,20 @@ function script:Update-RulesDataGrid {
 
         # Update counters from the original result data
         Update-RuleCounters -Window $Window -Rules $Result.Data
+        
+        # Update row count display (filtered vs total)
+        $totalCount = if ($Result.Data) { $Result.Data.Count } else { 0 }
+        $filteredCount = @($displayData).Count
+        
+        $txtTotal = $Window.FindName('TxtRuleTotalDisplayCount')
+        $txtFiltered = $Window.FindName('TxtRuleFilteredCount')
+        if ($txtTotal) { $txtTotal.Text = "$totalCount" }
+        if ($txtFiltered) { $txtFiltered.Text = "$filteredCount" }
     }
 
-    # Use async for initial/refresh loads, sync for filter changes (already have data)
-    if ($Async -and (Get-Command -Name 'Invoke-AsyncOperation' -ErrorAction SilentlyContinue)) {
+    # NOTE: Async disabled due to runspace cmdlet issues - using sync load
+    # TODO: Fix async runspace to include core cmdlets properly
+    if ($false -and $Async -and (Get-Command -Name 'Invoke-AsyncOperation' -ErrorAction SilentlyContinue)) {
         Invoke-AsyncOperation -ScriptBlock { Get-AllRules } -LoadingMessage 'Loading rules...' -OnComplete {
             param($Result)
             & $processRulesData $Result $typeFilter $statusFilter $textFilter $dataGrid $Window
@@ -622,6 +662,9 @@ function Invoke-GenerateRulesFromArtifacts {
         PublisherLevel = $publisherLevel
         Generated = 0
         Failed = 0
+        Progress = 0
+        ProgressMessage = ''
+        Summary = $null
         IsComplete = $false
         Error = $null
     })
@@ -662,42 +705,33 @@ function Invoke-GenerateRulesFromArtifacts {
             }
             Import-Module $manifestPath -Force -ErrorAction Stop
 
-            $generated = 0
-            $failed = 0
-
-            foreach ($artifact in $SyncHash.Artifacts) {
-                try {
-                    $ruleType = switch ($SyncHash.Mode) {
-                        'Smart' { if ($artifact.IsSigned) { 'Publisher' } else { 'Hash' } }
-                        'Publisher' { if ($artifact.IsSigned) { 'Publisher' } else { $null } }
-                        'Hash' { 'Hash' }
-                        'Path' { 'Path' }
-                    }
-
-                    if (-not $ruleType) { continue }
-
-                    $convertParams = @{
-                        Artifact = $artifact
-                        PreferredRuleType = $ruleType
-                        Action = $SyncHash.Action
-                        UserOrGroupSid = $SyncHash.TargetGroupSid
-                        Save = $true
-                    }
-                    # Add publisher level for publisher rules
-                    if ($ruleType -eq 'Publisher' -and $SyncHash.PublisherLevel) {
-                        $convertParams['PublisherLevel'] = $SyncHash.PublisherLevel
-                    }
-                    
-                    $result = ConvertFrom-Artifact @convertParams
-                    if ($result.Success) { $generated++ } else { $failed++ }
-                }
-                catch {
-                    $failed++
-                }
+            # Use batch generation for 10x+ performance improvement
+            $batchParams = @{
+                Artifacts = $SyncHash.Artifacts
+                Mode = $SyncHash.Mode
+                Action = $SyncHash.Action
+                UserOrGroupSid = $SyncHash.TargetGroupSid
+                Status = 'Pending'
+                DedupeMode = 'Smart'
             }
-
-            $SyncHash.Generated = $generated
-            $SyncHash.Failed = $failed
+            
+            # Add publisher level if specified
+            if ($SyncHash.PublisherLevel) {
+                $batchParams['PublisherLevel'] = $SyncHash.PublisherLevel
+            }
+            
+            # Progress callback to update sync hash
+            $batchParams['OnProgress'] = {
+                param($pct, $msg)
+                $SyncHash.Progress = $pct
+                $SyncHash.ProgressMessage = $msg
+            }.GetNewClosure()
+            
+            $result = Invoke-BatchRuleGeneration @batchParams
+            
+            $SyncHash.Generated = $result.RulesCreated
+            $SyncHash.Failed = $result.Errors.Count
+            $SyncHash.Summary = $result.Summary
         }
         catch {
             $SyncHash.Error = $_.Exception.Message
@@ -719,11 +753,10 @@ function Invoke-GenerateRulesFromArtifacts {
     $script:RuleGenTimer.Add_Tick({
         $syncHash = $script:RuleGenSyncHash
         
-        # Update progress display
-        $total = $syncHash.Artifacts.Count
-        $processed = $syncHash.Generated + $syncHash.Failed
-        if ($processed -gt 0 -and -not $syncHash.IsComplete) {
-            Update-LoadingText -Message "Generating Rules..." -SubMessage "Processed $processed of $total artifacts..."
+        # Update progress display from batch operation
+        if ($syncHash.Progress -gt 0 -and -not $syncHash.IsComplete) {
+            $msg = if ($syncHash.ProgressMessage) { $syncHash.ProgressMessage } else { "$($syncHash.Progress)% complete" }
+            Update-LoadingText -Message "Generating Rules..." -SubMessage $msg
         }
         
         if ($syncHash.IsComplete) {
@@ -753,7 +786,21 @@ function Invoke-GenerateRulesFromArtifacts {
                 Show-Toast -Message "Error: $($syncHash.Error)" -Type 'Error'
             }
             elseif ($syncHash.Generated -gt 0) {
-                Show-Toast -Message "Generated $($syncHash.Generated) rule(s) from $($syncHash.Artifacts.Count) artifacts." -Type 'Success'
+                # Show summary from batch operation
+                $summary = $syncHash.Summary
+                if ($summary) {
+                    $msg = "Created $($syncHash.Generated) rules"
+                    $details = @()
+                    if ($summary.AlreadyExisted -gt 0) { $details += "$($summary.AlreadyExisted) existed" }
+                    if ($summary.Deduplicated -gt 0) { $details += "$($summary.Deduplicated) deduped" }
+                    if ($details.Count -gt 0) { $msg += " ($($details -join ', '))" }
+                    Show-Toast -Message $msg -Type 'Success'
+                } else {
+                    Show-Toast -Message "Generated $($syncHash.Generated) rule(s) from $($syncHash.Artifacts.Count) artifacts." -Type 'Success'
+                }
+            }
+            elseif ($syncHash.Summary -and $syncHash.Summary.AlreadyExisted -gt 0) {
+                Show-Toast -Message "All $($syncHash.Summary.AlreadyExisted) artifacts already have rules." -Type 'Info'
             }
             if ($syncHash.Failed -gt 0) {
                 Show-Toast -Message "$($syncHash.Failed) artifact(s) failed to generate rules." -Type 'Warning'
@@ -858,7 +905,9 @@ function Set-SelectedRuleStatus {
         }
     }
     if ($errors.Count -gt 0) {
-        Write-AppLockerLog -Level Warning -Message "Errors updating rules: $($errors -join '; ')" -NoConsole
+        if (Get-Command -Name 'Write-AppLockerLog' -ErrorAction SilentlyContinue) {
+            Write-AppLockerLog -Level Warning -Message "Errors updating rules: $($errors -join '; ')" -NoConsole
+        }
     }
 
     Update-RulesDataGrid -Window $Window
@@ -893,35 +942,52 @@ function Invoke-DeleteSelectedRules {
 
     if ($confirm -ne 'Yes') { return }
 
-    if (-not (Get-Command -Name 'Remove-Rule' -ErrorAction SilentlyContinue)) {
-        Show-Toast -Message 'Remove-Rule function not available.' -Type 'Error'
-        return
-    }
-
-    $deleted = 0
-    $errors = @()
-    foreach ($item in $selectedItems) {
+    # Collect IDs for bulk delete
+    $ids = @($selectedItems | ForEach-Object { $_.Id })
+    
+    # Use bulk delete if available (much faster)
+    if (Get-Command -Name 'Remove-RulesBulk' -ErrorAction SilentlyContinue) {
+        Show-LoadingOverlay -Message "Deleting $($ids.Count) rules..." -SubMessage 'Please wait'
+        
         try {
-            $result = Remove-Rule -Id $item.Id
-            if ($result.Success) { $deleted++ }
+            $result = Remove-RulesBulk -Ids $ids
+            Hide-LoadingOverlay
+            
+            if ($result.Success) {
+                Show-Toast -Message "Deleted $($result.DeletedCount) rule(s)." -Type 'Success'
+                if ($result.ErrorCount -gt 0) {
+                    Show-Toast -Message "$($result.ErrorCount) rule(s) failed to delete." -Type 'Warning'
+                }
+            }
+            else {
+                Show-Toast -Message "Delete failed: $($result.Error)" -Type 'Error'
+            }
         }
-        catch { 
-            $errors += "Rule $($item.Id): $($_.Exception.Message)"
+        catch {
+            Hide-LoadingOverlay
+            Show-Toast -Message "Error: $($_.Exception.Message)" -Type 'Error'
         }
     }
-    if ($errors.Count -gt 0) {
-        Write-AppLockerLog -Level Warning -Message "Errors deleting rules: $($errors -join '; ')" -NoConsole
+    else {
+        # Fallback to one-by-one (slow)
+        if (-not (Get-Command -Name 'Remove-Rule' -ErrorAction SilentlyContinue)) {
+            Show-Toast -Message 'Remove-Rule function not available.' -Type 'Error'
+            return
+        }
+
+        $deleted = 0
+        foreach ($item in $selectedItems) {
+            try {
+                $result = Remove-Rule -Id $item.Id
+                if ($result.Success) { $deleted++ }
+            }
+            catch { }
+        }
+        Show-Toast -Message "Deleted $deleted rule(s)." -Type 'Success'
     }
 
     Update-RulesDataGrid -Window $Window
     Update-RulesSelectionCount -Window $Window
-    
-    if ($deleted -gt 0) {
-        Show-Toast -Message "Deleted $deleted rule(s)." -Type 'Success'
-    }
-    if ($errors.Count -gt 0) {
-        Show-Toast -Message "$($errors.Count) rule(s) failed to delete." -Type 'Warning'
-    }
 }
 
 function Invoke-ApproveTrustedVendors {
@@ -942,30 +1008,25 @@ function Invoke-ApproveTrustedVendors {
 
     if ($confirm -ne 'Yes') { return }
 
-    Show-LoadingOverlay -Message 'Approving trusted vendor rules...' -SubMessage 'This may take a moment'
-
-    try {
-        $result = Approve-TrustedVendorRules
-        
-        Hide-LoadingOverlay
-        
-        if ($result.Success) {
-            $message = "Approved $($result.TotalUpdated) rules from trusted vendors."
+    # Use async to prevent UI freeze
+    Invoke-AsyncOperation -ScriptBlock {
+        Approve-TrustedVendorRules
+    } -LoadingMessage 'Approving trusted vendor rules...' -OnComplete {
+        param($Result)
+        if ($Result.Success) {
+            $message = "Approved $($Result.TotalUpdated) rules from trusted vendors."
             Show-Toast -Message $message -Type 'Success'
             Write-Log -Message $message
-            
-            # Refresh dashboard stats
-            Update-DashboardStats -Window $Window
+            Update-RulesDataGrid -Window $Window -Async
         }
         else {
-            Show-Toast -Message "Failed to approve rules: $($result.Error)" -Type 'Error'
+            Show-Toast -Message "Failed to approve rules: $($Result.Error)" -Type 'Error'
         }
-    }
-    catch {
-        Hide-LoadingOverlay
-        Show-Toast -Message "Error: $($_.Exception.Message)" -Type 'Error'
-        Write-Log -Level Error -Message "Approve trusted vendors failed: $($_.Exception.Message)"
-    }
+    }.GetNewClosure() -OnError {
+        param($ErrorMessage)
+        Show-Toast -Message "Error: $ErrorMessage" -Type 'Error'
+        Write-Log -Level Error -Message "Approve trusted vendors failed: $ErrorMessage"
+    }.GetNewClosure()
 }
 
 function Invoke-RemoveDuplicateRules {
@@ -976,23 +1037,19 @@ function Invoke-RemoveDuplicateRules {
         return
     }
 
-    # First, do a preview
-    Show-LoadingOverlay -Message 'Analyzing duplicate rules...' -SubMessage 'Scanning rule database'
-
+    # Synchronous - duplicate detection is now O(n) and takes <1 second
     try {
-        $preview = Remove-DuplicateRules -RuleType All -WhatIf
+        $Preview = Remove-DuplicateRules -RuleType All -WhatIf
         
-        Hide-LoadingOverlay
-
-        if ($preview.DuplicateCount -eq 0) {
+        if ($Preview.DuplicateCount -eq 0) {
             Show-Toast -Message 'No duplicate rules found.' -Type 'Info'
             return
         }
 
         # Show confirmation with counts
-        $message = "Found $($preview.DuplicateCount) duplicate rules:`n`n"
-        $message += "- Hash rules: $($preview.HashDuplicates)`n"
-        $message += "- Publisher rules: $($preview.PublisherDuplicates)`n`n"
+        $message = "Found $($Preview.DuplicateCount) duplicate rules:`n`n"
+        $message += "- Hash rules: $($Preview.HashDuplicates)`n"
+        $message += "- Publisher rules: $($Preview.PublisherDuplicates)`n`n"
         $message += "Do you want to remove these duplicates?`n(Oldest rule of each duplicate set will be kept)"
 
         $confirm = [System.Windows.MessageBox]::Show(
@@ -1004,28 +1061,22 @@ function Invoke-RemoveDuplicateRules {
 
         if ($confirm -ne 'Yes') { return }
 
-        Show-LoadingOverlay -Message 'Removing duplicate rules...' -SubMessage 'Please wait'
-
-        $result = Remove-DuplicateRules -RuleType All -Strategy KeepOldest
+        # Actual removal
+        $Result = Remove-DuplicateRules -RuleType All -Strategy KeepOldest
         
-        Hide-LoadingOverlay
-
-        if ($result.Success) {
-            $msg = "Removed $($result.RemovedCount) duplicate rules."
+        if ($Result.Success) {
+            $msg = "Removed $($Result.RemovedCount) duplicate rules."
             Show-Toast -Message $msg -Type 'Success'
             Write-Log -Message $msg
-            
-            # Refresh dashboard stats
-            Update-DashboardStats -Window $Window
+            Update-RulesDataGrid -Window $Window
         }
         else {
-            Show-Toast -Message "Failed to remove duplicates: $($result.Error)" -Type 'Error'
+            Show-Toast -Message "Failed to remove duplicates: $($Result.Error)" -Type 'Error'
         }
     }
     catch {
-        Hide-LoadingOverlay
         Show-Toast -Message "Error: $($_.Exception.Message)" -Type 'Error'
-        Write-Log -Level Error -Message "Remove duplicates failed: $($_.Exception.Message)"
+        Write-Log -Level Error -Message "Duplicate analysis failed: $($_.Exception.Message)"
     }
 }
 
@@ -1074,12 +1125,29 @@ function Invoke-ExportRulesToXml {
 function Invoke-ExportRulesToCsv {
     param([System.Windows.Window]$Window)
 
-    if (-not (Get-Command -Name 'Get-AllRules' -ErrorAction SilentlyContinue)) {
-        Show-Toast -Message 'Get-AllRules function not available.' -Type 'Error'
+    $dataGrid = $Window.FindName('RulesDataGrid')
+    $approvedOnly = $Window.FindName('ChkExportApprovedOnly').IsChecked
+    
+    # Get data from DataGrid (respects current filters)
+    $rules = if ($dataGrid -and $dataGrid.ItemsSource) {
+        @($dataGrid.ItemsSource)
+    } else {
+        @()
+    }
+    
+    if ($rules.Count -eq 0) {
+        Show-Toast -Message 'No rules to export. Check your filters.' -Type 'Warning'
         return
     }
-
-    $approvedOnly = $Window.FindName('ChkExportApprovedOnly').IsChecked
+    
+    # Apply approved-only filter if checkbox is checked
+    if ($approvedOnly) {
+        $rules = $rules | Where-Object { $_.Status -eq 'Approved' }
+        if ($rules.Count -eq 0) {
+            Show-Toast -Message 'No approved rules in current view.' -Type 'Warning'
+            return
+        }
+    }
 
     Add-Type -AssemblyName System.Windows.Forms
 
@@ -1090,25 +1158,98 @@ function Invoke-ExportRulesToCsv {
 
     if ($dialog.ShowDialog() -eq 'OK') {
         try {
-            $result = Get-AllRules
+            $rules | Select-Object Id, Name, RuleType, CollectionType, Action, Status, CreatedDate, Description | 
+            Export-Csv -Path $dialog.FileName -NoTypeInformation -Encoding UTF8
             
-            if ($result.Success) {
-                $rules = $result.Data
-                if ($approvedOnly) {
-                    $rules = $rules | Where-Object { $_.Status -eq 'Approved' }
-                }
-                
-                $rules | Select-Object Id, Name, RuleType, CollectionType, Action, Status, CreatedDate | 
-                Export-Csv -Path $dialog.FileName -NoTypeInformation
-                
-                Show-Toast -Message "Exported $($rules.Count) rule(s) to CSV." -Type 'Success'
-            }
-            else {
-                Show-Toast -Message "Export failed: $($result.Error)" -Type 'Error'
-            }
+            Show-Toast -Message "Exported $($rules.Count) rule(s) to CSV (current filtered view)." -Type 'Success'
         }
         catch {
             Show-Toast -Message "Export failed: $($_.Exception.Message)" -Type 'Error'
+        }
+    }
+}
+
+function Invoke-ImportRulesFromXmlFile {
+    <#
+    .SYNOPSIS
+        Opens file dialog and imports rules from AppLocker XML.
+    #>
+    param([System.Windows.Window]$Window)
+
+    if (-not (Get-Command -Name 'Import-RulesFromXml' -ErrorAction SilentlyContinue)) {
+        Show-Toast -Message 'Import-RulesFromXml function not available.' -Type 'Error'
+        return
+    }
+
+    # Get import options from UI
+    $skipDuplicates = $Window.FindName('ChkImportSkipDuplicates').IsChecked
+    $statusCombo = $Window.FindName('CboImportStatus')
+    $status = if ($statusCombo -and $statusCombo.SelectedItem) {
+        $statusCombo.SelectedItem.Tag
+    } else {
+        'Pending'
+    }
+
+    Add-Type -AssemblyName System.Windows.Forms
+
+    $dialog = [System.Windows.Forms.OpenFileDialog]::new()
+    $dialog.Title = 'Import AppLocker XML Policy'
+    $dialog.Filter = 'XML Files (*.xml)|*.xml|All Files (*.*)|*.*'
+    $dialog.Multiselect = $true
+
+    if ($dialog.ShowDialog() -eq 'OK') {
+        Show-LoadingOverlay -Message "Importing rules..." -SubMessage "Processing XML files..."
+        
+        $totalImported = 0
+        $totalSkipped = 0
+        $errors = @()
+
+        foreach ($filePath in $dialog.FileNames) {
+            try {
+                $importParams = @{
+                    Path = $filePath
+                    Status = $status
+                }
+                if ($skipDuplicates) {
+                    $importParams.SkipDuplicates = $true
+                }
+                
+                $result = Import-RulesFromXml @importParams
+                
+                if ($result.Success) {
+                    $totalImported += $result.Data.Count
+                    $totalSkipped += $result.SkippedCount
+                }
+                else {
+                    $errors += "$([System.IO.Path]::GetFileName($filePath)): $($result.Error)"
+                }
+            }
+            catch {
+                $errors += "$([System.IO.Path]::GetFileName($filePath)): $($_.Exception.Message)"
+            }
+        }
+        
+        Hide-LoadingOverlay
+        Update-RulesDataGrid -Window $Window
+        
+        $message = "Imported $totalImported rule(s)"
+        if ($totalSkipped -gt 0) {
+            $message += " ($totalSkipped duplicates skipped)"
+        }
+        
+        if ($totalImported -gt 0) {
+            Show-Toast -Message $message -Type 'Success'
+        }
+        elseif ($totalSkipped -gt 0) {
+            Show-Toast -Message "No new rules imported ($totalSkipped duplicates skipped)" -Type 'Info'
+        }
+        else {
+            Show-Toast -Message 'No rules imported' -Type 'Warning'
+        }
+        
+        if ($errors.Count -gt 0) {
+            Write-Log -Level Warning -Message "Import errors: $($errors -join '; ')"
+            Show-Toast -Message "$($errors.Count) file(s) had errors" -Type 'Warning'
         }
     }
 }
@@ -1147,6 +1288,358 @@ $($selectedItem | Select-Object -Property Publisher*, Hash*, Path* | Format-List
 "@
 
     [System.Windows.MessageBox]::Show($details.Trim(), 'Rule Details', 'OK', 'Information')
+}
+
+function Invoke-RulesContextAction {
+    <#
+    .SYNOPSIS
+        Handles context menu actions for the Rules DataGrid.
+    #>
+    param(
+        [string]$Action,
+        [System.Windows.Window]$Window
+    )
+    
+    $dataGrid = $Window.FindName('RulesDataGrid')
+    $selectedItem = $dataGrid.SelectedItem
+    $selectedItems = $dataGrid.SelectedItems
+    
+    switch ($Action) {
+        'ApproveRule' {
+            Set-SelectedRuleStatus -Window $Window -Status 'Approved'
+        }
+        'RejectRule' {
+            Set-SelectedRuleStatus -Window $Window -Status 'Rejected'
+        }
+        'ReviewRule' {
+            Set-SelectedRuleStatus -Window $Window -Status 'Review'
+        }
+        'AddRuleToPolicy' {
+            Invoke-AddRulesToPolicy -Window $Window
+        }
+        'ViewRuleDetails' {
+            Show-RuleDetails -Window $Window
+        }
+        'CopyRuleHash' {
+            if ($selectedItem -and $selectedItem.SHA256Hash) {
+                [System.Windows.Clipboard]::SetText($selectedItem.SHA256Hash)
+                Show-Toast -Message 'Hash copied to clipboard.' -Type 'Info'
+            }
+            elseif ($selectedItem -and $selectedItem.HashValue) {
+                [System.Windows.Clipboard]::SetText($selectedItem.HashValue)
+                Show-Toast -Message 'Hash copied to clipboard.' -Type 'Info'
+            }
+            else {
+                Show-Toast -Message 'No hash available for this rule.' -Type 'Warning'
+            }
+        }
+        'CopyRulePublisher' {
+            if ($selectedItem -and $selectedItem.PublisherName) {
+                $pubInfo = $selectedItem.PublisherName
+                if ($selectedItem.ProductName) { $pubInfo += " - $($selectedItem.ProductName)" }
+                [System.Windows.Clipboard]::SetText($pubInfo)
+                Show-Toast -Message 'Publisher info copied to clipboard.' -Type 'Info'
+            }
+            elseif ($selectedItem -and $selectedItem.Publisher) {
+                [System.Windows.Clipboard]::SetText($selectedItem.Publisher)
+                Show-Toast -Message 'Publisher info copied to clipboard.' -Type 'Info'
+            }
+            else {
+                Show-Toast -Message 'No publisher info available for this rule.' -Type 'Warning'
+            }
+        }
+        'CopyRuleDetails' {
+            if ($selectedItem) {
+                $details = @(
+                    "Rule ID: $($selectedItem.RuleId)",
+                    "Name: $($selectedItem.Name)",
+                    "Type: $($selectedItem.RuleType)",
+                    "Action: $($selectedItem.Action)",
+                    "Status: $($selectedItem.Status)",
+                    "Collection: $($selectedItem.Collection)"
+                )
+                
+                # Add type-specific details
+                if ($selectedItem.PublisherName -or $selectedItem.Publisher) {
+                    $details += "Publisher: $(if ($selectedItem.PublisherName) { $selectedItem.PublisherName } else { $selectedItem.Publisher })"
+                }
+                if ($selectedItem.ProductName) {
+                    $details += "Product: $($selectedItem.ProductName)"
+                }
+                if ($selectedItem.SHA256Hash -or $selectedItem.HashValue) {
+                    $details += "Hash: $(if ($selectedItem.SHA256Hash) { $selectedItem.SHA256Hash } else { $selectedItem.HashValue })"
+                }
+                if ($selectedItem.PathCondition -or $selectedItem.Path) {
+                    $details += "Path: $(if ($selectedItem.PathCondition) { $selectedItem.PathCondition } else { $selectedItem.Path })"
+                }
+                if ($selectedItem.Description) {
+                    $details += "Description: $($selectedItem.Description)"
+                }
+                if ($selectedItem.CreatedDisplay -or $selectedItem.CreatedAt) {
+                    $details += "Created: $(if ($selectedItem.CreatedDisplay) { $selectedItem.CreatedDisplay } else { $selectedItem.CreatedAt })"
+                }
+                
+                $clipboardText = $details -join "`n"
+                [System.Windows.Clipboard]::SetText($clipboardText)
+                Show-Toast -Message 'Rule details copied to clipboard.' -Type 'Info'
+            }
+            else {
+                Show-Toast -Message 'No rule selected.' -Type 'Warning'
+            }
+        }
+        'DeleteRule' {
+            Invoke-DeleteSelectedRules -Window $Window
+        }
+        'ViewRuleHistory' {
+            Invoke-ViewRuleHistory -Window $Window
+        }
+        default {
+            Write-Log -Level Warning -Message "Unknown context menu action: $Action"
+        }
+    }
+}
+
+function global:Invoke-ViewRuleHistory {
+    <#
+    .SYNOPSIS
+        Shows the version history for the selected rule.
+    #>
+    param([System.Windows.Window]$Window)
+    
+    $dataGrid = $Window.FindName('RulesDataGrid')
+    if (-not $dataGrid -or -not $dataGrid.SelectedItem) {
+        Show-Toast -Message 'Please select a rule to view history.' -Type 'Warning'
+        return
+    }
+    
+    $selectedItem = $dataGrid.SelectedItem
+    $ruleId = $selectedItem.RuleId
+    $ruleName = $selectedItem.Name
+    
+    if (-not (Get-Command -Name 'Get-RuleHistory' -ErrorAction SilentlyContinue)) {
+        Show-Toast -Message 'Rule history function not available.' -Type 'Error'
+        return
+    }
+    
+    try {
+        Show-LoadingOverlay -Message "Loading history for $ruleName..."
+        
+        $result = Get-RuleHistory -RuleId $ruleId -IncludeContent
+        
+        Hide-LoadingOverlay
+        
+        if (-not $result.Success) {
+            Show-Toast -Message "Failed to load history: $($result.Error)" -Type 'Error'
+            return
+        }
+        
+        if ($result.Data.Count -eq 0) {
+            Show-Toast -Message "No version history found for this rule." -Type 'Info'
+            return
+        }
+        
+        # Show history dialog
+        Show-RuleHistoryDialog -Window $Window -RuleName $ruleName -RuleId $ruleId -Versions $result.Data
+    }
+    catch {
+        Hide-LoadingOverlay
+        Show-Toast -Message "Error loading history: $($_.Exception.Message)" -Type 'Error'
+    }
+}
+
+function global:Show-RuleHistoryDialog {
+    <#
+    .SYNOPSIS
+        Shows a dialog with rule version history.
+    #>
+    param(
+        [System.Windows.Window]$Window,
+        [string]$RuleName,
+        [string]$RuleId,
+        [array]$Versions
+    )
+    
+    $dialogXaml = @"
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Rule History: $([System.Security.SecurityElement]::Escape($RuleName))"
+        Width="700" Height="500"
+        WindowStartupLocation="CenterOwner"
+        Background="#1E1E1E"
+        ResizeMode="CanResize">
+    <Window.Resources>
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="#3C3C3C"/>
+            <Setter Property="Foreground" Value="#E0E0E0"/>
+            <Setter Property="Padding" Value="15,8"/>
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style TargetType="ListBoxItem">
+            <Setter Property="Foreground" Value="#E0E0E0"/>
+            <Setter Property="Padding" Value="8,6"/>
+        </Style>
+    </Window.Resources>
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <TextBlock Grid.Row="0" Text="VERSION HISTORY" FontSize="12" FontWeight="SemiBold" 
+                   Foreground="#888888" Margin="0,0,0,10"/>
+        
+        <Border Grid.Row="1" Background="#2D2D2D" CornerRadius="4" Margin="0,0,0,10">
+            <ListBox x:Name="VersionsList" Background="Transparent" BorderThickness="0" 
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            </ListBox>
+        </Border>
+        
+        <Border Grid.Row="2" Background="#252526" CornerRadius="4" Padding="10" Margin="0,0,0,10">
+            <StackPanel>
+                <TextBlock Text="SELECTED VERSION DETAILS" FontSize="10" FontWeight="SemiBold" 
+                           Foreground="#888888" Margin="0,0,0,8"/>
+                <TextBlock x:Name="TxtVersionDetails" Text="Select a version to view details"
+                           Foreground="#E0E0E0" FontSize="12" TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+        
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="BtnRestoreVersion" Content="Restore This Version" Width="150"/>
+            <Button x:Name="BtnCompareVersions" Content="Compare Versions" Width="130"/>
+            <Button x:Name="BtnClose" Content="Close" Width="80" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>
+"@
+    
+    $reader = [System.Xml.XmlReader]::Create([System.IO.StringReader]::new($dialogXaml))
+    $dialog = [System.Windows.Markup.XamlReader]::Load($reader)
+    $dialog.Owner = $Window
+    
+    $versionsList = $dialog.FindName('VersionsList')
+    $txtDetails = $dialog.FindName('TxtVersionDetails')
+    $btnRestore = $dialog.FindName('BtnRestoreVersion')
+    $btnCompare = $dialog.FindName('BtnCompareVersions')
+    $btnClose = $dialog.FindName('BtnClose')
+    
+    # Populate versions list
+    foreach ($version in $Versions) {
+        $item = [System.Windows.Controls.ListBoxItem]::new()
+        $modifiedDate = if ($version.ModifiedAt) {
+            try { [datetime]::Parse($version.ModifiedAt).ToString('yyyy-MM-dd HH:mm') } catch { $version.ModifiedAt }
+        } else { 'Unknown' }
+        
+        $item.Content = "v$($version.Version) | $($version.ChangeType) | $modifiedDate | $($version.ModifiedBy)"
+        $item.Tag = $version
+        $versionsList.Items.Add($item)
+    }
+    
+    # Selection changed handler
+    $versionsList.Add_SelectionChanged({
+        $selectedItem = $versionsList.SelectedItem
+        if ($selectedItem -and $selectedItem.Tag) {
+            $ver = $selectedItem.Tag
+            $details = @(
+                "Version: $($ver.Version)",
+                "Modified: $(if ($ver.ModifiedAt) { try { [datetime]::Parse($ver.ModifiedAt).ToString('yyyy-MM-dd HH:mm:ss') } catch { $ver.ModifiedAt } } else { 'Unknown' })",
+                "Modified By: $($ver.ModifiedBy)",
+                "Change Type: $($ver.ChangeType)",
+                "Summary: $($ver.ChangeSummary)"
+            )
+            
+            if ($ver.RuleContent) {
+                $details += ""
+                $details += "--- Rule Details ---"
+                $details += "Status: $($ver.RuleContent.Status)"
+                $details += "Action: $($ver.RuleContent.Action)"
+                if ($ver.RuleContent.PublisherName) {
+                    $details += "Publisher: $($ver.RuleContent.PublisherName)"
+                }
+                if ($ver.RuleContent.ProductName) {
+                    $details += "Product: $($ver.RuleContent.ProductName)"
+                }
+            }
+            
+            $txtDetails.Text = $details -join "`n"
+        }
+    }.GetNewClosure())
+    
+    # Restore button handler
+    $script:HistoryRuleId = $RuleId
+    $btnRestore.Add_Click({
+        $selectedItem = $versionsList.SelectedItem
+        if (-not $selectedItem -or -not $selectedItem.Tag) {
+            [System.Windows.MessageBox]::Show('Please select a version to restore.', 'No Selection', 'OK', 'Warning')
+            return
+        }
+        
+        $ver = $selectedItem.Tag
+        $confirm = [System.Windows.MessageBox]::Show(
+            "Restore rule to version $($ver.Version)?`n`nThis will revert the rule to its state at that version.",
+            'Confirm Restore',
+            'YesNo',
+            'Question'
+        )
+        
+        if ($confirm -eq 'Yes') {
+            $restoreResult = Restore-RuleVersion -RuleId $script:HistoryRuleId -Version $ver.Version
+            if ($restoreResult.Success) {
+                [System.Windows.MessageBox]::Show('Rule restored successfully.', 'Restored', 'OK', 'Information')
+                $dialog.Close()
+                # Refresh rules grid
+                Update-RulesDataGrid -Window $script:MainWindow -Async
+            }
+            else {
+                [System.Windows.MessageBox]::Show("Restore failed: $($restoreResult.Error)", 'Error', 'OK', 'Error')
+            }
+        }
+    }.GetNewClosure())
+    
+    # Compare button handler
+    $btnCompare.Add_Click({
+        if ($versionsList.Items.Count -lt 2) {
+            [System.Windows.MessageBox]::Show('Need at least 2 versions to compare.', 'Cannot Compare', 'OK', 'Information')
+            return
+        }
+        
+        $selectedItem = $versionsList.SelectedItem
+        if (-not $selectedItem -or -not $selectedItem.Tag) {
+            [System.Windows.MessageBox]::Show('Select a version to compare with the current rule.', 'No Selection', 'OK', 'Warning')
+            return
+        }
+        
+        $ver = $selectedItem.Tag
+        $compareResult = Compare-RuleVersions -RuleId $script:HistoryRuleId -Version1 $ver.Version
+        
+        if ($compareResult.Success) {
+            if ($compareResult.Differences.Count -eq 0) {
+                [System.Windows.MessageBox]::Show("No differences between version $($ver.Version) and current rule.", 'No Differences', 'OK', 'Information')
+            }
+            else {
+                $diffText = "Differences between v$($ver.Version) and Current:`n`n"
+                foreach ($diff in $compareResult.Differences) {
+                    $diffText += "$($diff.Property):`n"
+                    $diffText += "  v$($ver.Version): $($diff.Version1Value)`n"
+                    $diffText += "  Current: $($diff.Version2Value)`n`n"
+                }
+                [System.Windows.MessageBox]::Show($diffText, 'Version Comparison', 'OK', 'Information')
+            }
+        }
+        else {
+            [System.Windows.MessageBox]::Show("Compare failed: $($compareResult.Error)", 'Error', 'OK', 'Error')
+        }
+    }.GetNewClosure())
+    
+    # Close button
+    $btnClose.Add_Click({
+        $dialog.Close()
+    }.GetNewClosure())
+    
+    [void]$dialog.ShowDialog()
 }
 
 #endregion

@@ -3,6 +3,119 @@
     CRUD operations for rules in SQLite database.
 #>
 
+function Get-RulesFromJsonIndex {
+    <#
+    .SYNOPSIS
+        Gets rules from JSON index when SQLite is unavailable.
+    #>
+    [CmdletBinding()]
+    param(
+        [string]$Status,
+        [string]$RuleType,
+        [string]$CollectionType,
+        [string]$SearchText,
+        [string]$GroupVendor,
+        [int]$Skip = 0,
+        [int]$Take = 1000,
+        [switch]$CountOnly,
+        [switch]$FullPayload
+    )
+    
+    $result = [PSCustomObject]@{
+        Success = $false
+        Data    = @()
+        Total   = 0
+        Error   = $null
+    }
+    
+    try {
+        # Ensure JSON index is loaded
+        Initialize-JsonIndex
+        
+        # Get rules from index
+        $rules = @($script:JsonIndex.Rules)
+        
+        # Apply filters
+        if ($Status) {
+            $rules = @($rules | Where-Object { $_.Status -eq $Status })
+        }
+        if ($RuleType) {
+            $rules = @($rules | Where-Object { $_.RuleType -eq $RuleType })
+        }
+        if ($CollectionType) {
+            $rules = @($rules | Where-Object { $_.CollectionType -eq $CollectionType })
+        }
+        if ($GroupVendor) {
+            $rules = @($rules | Where-Object { $_.GroupVendor -like "*$GroupVendor*" })
+        }
+        if ($SearchText) {
+            $searchLower = $SearchText.ToLower()
+            $rules = @($rules | Where-Object {
+                ($_.Name -and $_.Name.ToLower().Contains($searchLower)) -or
+                ($_.PublisherName -and $_.PublisherName.ToLower().Contains($searchLower)) -or
+                ($_.Path -and $_.Path.ToLower().Contains($searchLower)) -or
+                ($_.Hash -and $_.Hash.ToLower().Contains($searchLower))
+            })
+        }
+        
+        $result.Total = $rules.Count
+        
+        if ($CountOnly) {
+            $result.Success = $true
+            return $result
+        }
+        
+        # Apply pagination
+        if ($Skip -gt 0) {
+            $rules = @($rules | Select-Object -Skip $Skip)
+        }
+        if ($Take -gt 0) {
+            $rules = @($rules | Select-Object -First $Take)
+        }
+        
+        # If full payload requested, load full rule from JSON files
+        if ($FullPayload) {
+            $dataPath = if (Get-Command -Name 'Get-AppLockerDataPath' -ErrorAction SilentlyContinue) {
+                Get-AppLockerDataPath
+            } else {
+                Join-Path $env:LOCALAPPDATA 'GA-AppLocker'
+            }
+            $rulesPath = Join-Path $dataPath 'Rules'
+            
+            $fullRules = [System.Collections.Generic.List[PSCustomObject]]::new()
+            foreach ($indexEntry in $rules) {
+                $rulePath = Join-Path $rulesPath "$($indexEntry.Id).json"
+                if (Test-Path $rulePath) {
+                    try {
+                        $content = [System.IO.File]::ReadAllText($rulePath)
+                        $fullRule = $content | ConvertFrom-Json
+                        $fullRules.Add($fullRule)
+                    }
+                    catch {
+                        # If can't load full rule, use index entry
+                        $fullRules.Add($indexEntry)
+                    }
+                }
+                else {
+                    $fullRules.Add($indexEntry)
+                }
+            }
+            $result.Data = @($fullRules)
+        }
+        else {
+            $result.Data = @($rules)
+        }
+        
+        $result.Success = $true
+    }
+    catch {
+        $result.Error = "JSON index query failed: $($_.Exception.Message)"
+        Write-StorageLog -Message $result.Error -Level 'ERROR'
+    }
+    
+    return $result
+}
+
 function Add-RuleToDatabase {
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
@@ -134,8 +247,10 @@ function Get-RulesFromDatabase {
     
     $dbPath = Get-RuleDatabasePath
     if (-not (Test-Path $dbPath)) {
-        $result.Success = $true
-        return $result
+        # SQLite DB doesn't exist - fall back to JSON index
+        return Get-RulesFromJsonIndex -Status $Status -RuleType $RuleType -CollectionType $CollectionType `
+            -SearchText $SearchText -GroupVendor $GroupVendor -Skip $Skip -Take $Take `
+            -CountOnly:$CountOnly -FullPayload:$FullPayload
     }
     
     $conn = Get-SqliteConnection -DatabasePath $dbPath

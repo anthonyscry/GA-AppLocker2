@@ -256,6 +256,17 @@ function Set-BulkRuleStatus {
 
         Write-Progress -Activity "Updating rules" -Completed
 
+        # Sync the JSON index with updated statuses
+        if ($result.UpdatedCount -gt 0) {
+            $updatedIds = @($matchedRules | ForEach-Object { $_.Rule.Id })
+            if (Get-Command -Name 'Update-RuleStatusInIndex' -ErrorAction SilentlyContinue) {
+                $indexResult = Update-RuleStatusInIndex -RuleIds $updatedIds -Status $Status
+                if (-not $indexResult.Success) {
+                    Write-RuleLog -Level Warning -Message "Index sync warning: $($indexResult.Error)"
+                }
+            }
+        }
+
         $result.Success = $true
         $result.Summary = "Updated $($result.UpdatedCount) rules to status '$Status'`n$summaryText"
         
