@@ -982,9 +982,8 @@ function Invoke-DeleteSelectedRules {
             Show-Toast -Message "Delete operation failed." -Type 'Error'
         }
         
-        # Refresh the grid after delete
-        Update-RulesDataGrid -Window $script:MainWindow
-        Update-RulesSelectionCount -Window $script:MainWindow
+        # Refresh the grid after delete using global action dispatcher
+        Invoke-ButtonAction -Action 'RefreshRules'
     } -OnError {
         param($ErrorMessage)
         Show-Toast -Message "Error: $ErrorMessage" -Type 'Error'
