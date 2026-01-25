@@ -942,52 +942,53 @@ function Invoke-DeleteSelectedRules {
 
     if ($confirm -ne 'Yes') { return }
 
-    # Collect IDs for bulk delete
+    # Collect IDs for bulk delete (copy now, before async)
     $ids = @($selectedItems | ForEach-Object { $_.Id })
+    $count = $ids.Count
     
-    # Use bulk delete if available (much faster)
-    if (Get-Command -Name 'Remove-RulesBulk' -ErrorAction SilentlyContinue) {
-        Show-LoadingOverlay -Message "Deleting $($ids.Count) rules..." -SubMessage 'Please wait'
+    # Run delete operation asynchronously to prevent UI freeze
+    Invoke-AsyncOperation -ScriptBlock {
+        param($RuleIds)
         
-        try {
-            $result = Remove-RulesBulk -Ids $ids
-            Hide-LoadingOverlay
-            
-            if ($result.Success) {
-                Show-Toast -Message "Deleted $($result.DeletedCount) rule(s)." -Type 'Success'
-                if ($result.ErrorCount -gt 0) {
-                    Show-Toast -Message "$($result.ErrorCount) rule(s) failed to delete." -Type 'Warning'
-                }
-            }
-            else {
-                Show-Toast -Message "Delete failed: $($result.Error)" -Type 'Error'
-            }
+        # Try bulk delete first
+        if (Get-Command -Name 'Remove-RulesBulk' -ErrorAction SilentlyContinue) {
+            return Remove-RulesBulk -Ids $RuleIds
         }
-        catch {
-            Hide-LoadingOverlay
-            Show-Toast -Message "Error: $($_.Exception.Message)" -Type 'Error'
-        }
-    }
-    else {
-        # Fallback to one-by-one (slow)
-        if (-not (Get-Command -Name 'Remove-Rule' -ErrorAction SilentlyContinue)) {
-            Show-Toast -Message 'Remove-Rule function not available.' -Type 'Error'
-            return
-        }
-
+        
+        # Fallback to one-by-one
         $deleted = 0
-        foreach ($item in $selectedItems) {
+        $errors = 0
+        foreach ($id in $RuleIds) {
             try {
-                $result = Remove-Rule -Id $item.Id
-                if ($result.Success) { $deleted++ }
+                $result = Remove-Rule -Id $id
+                if ($result.Success) { $deleted++ } else { $errors++ }
             }
-            catch { }
+            catch { $errors++ }
         }
-        Show-Toast -Message "Deleted $deleted rule(s)." -Type 'Success'
+        return @{ Success = $true; DeletedCount = $deleted; ErrorCount = $errors }
+    } -Arguments @{ RuleIds = $ids } -LoadingMessage "Deleting $count rules..." -LoadingSubMessage 'Please wait' -OnComplete {
+        param($Result)
+        
+        if ($Result -and $Result.Success) {
+            Show-Toast -Message "Deleted $($Result.DeletedCount) rule(s)." -Type 'Success'
+            if ($Result.ErrorCount -gt 0) {
+                Show-Toast -Message "$($Result.ErrorCount) rule(s) failed to delete." -Type 'Warning'
+            }
+        }
+        elseif ($Result) {
+            Show-Toast -Message "Delete failed: $($Result.Error)" -Type 'Error'
+        }
+        else {
+            Show-Toast -Message "Delete operation failed." -Type 'Error'
+        }
+        
+        # Refresh the grid after delete
+        Update-RulesDataGrid -Window $script:MainWindow
+        Update-RulesSelectionCount -Window $script:MainWindow
+    } -OnError {
+        param($ErrorMessage)
+        Show-Toast -Message "Error: $ErrorMessage" -Type 'Error'
     }
-
-    Update-RulesDataGrid -Window $Window
-    Update-RulesSelectionCount -Window $Window
 }
 
 function Invoke-ApproveTrustedVendors {
