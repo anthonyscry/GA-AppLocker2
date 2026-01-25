@@ -6,7 +6,14 @@
 .DESCRIPTION
     Provides search across all data types: machines, artifacts, rules, policies.
     Results are displayed in a popup with categorized sections.
+    Uses 300ms debouncing to prevent excessive searches during rapid typing.
 #>
+
+# Script-scoped debounce timer
+$script:SearchDebounceTimer = $null
+
+# Script-scoped handler storage for memory leak prevention
+$script:SearchResultHandlers = @()
 
 function Initialize-GlobalSearch {
     <#
@@ -22,7 +29,7 @@ function Initialize-GlobalSearch {
     
     if (-not $searchBox) { return }
     
-    # Text changed event - search as user types
+    # Text changed event - search as user types with 300ms debouncing
     $searchBox.Add_TextChanged({
         param($sender, $e)
         $win = $script:MainWindow
@@ -41,27 +48,51 @@ function Initialize-GlobalSearch {
             $clearBtn.Visibility = if ([string]::IsNullOrWhiteSpace($text)) { 'Collapsed' } else { 'Visible' }
         }
         
-        # Perform search if text length >= 2
-        if ($text.Length -ge 2) {
-            $results = Invoke-GlobalSearch -Query $text
-            Update-SearchResultsPopup -Window $win -Results $results
-            if ($popup) { $popup.IsOpen = $true }
-        } else {
-            if ($popup) { $popup.IsOpen = $false }
+        # Stop existing timer if running
+        if ($script:SearchDebounceTimer) {
+            $script:SearchDebounceTimer.Stop()
         }
+        
+        # If text too short, close popup and return
+        if ($text.Length -lt 2) {
+            if ($popup) { $popup.IsOpen = $false }
+            return
+        }
+        
+        # Create debounce timer if not exists
+        if (-not $script:SearchDebounceTimer) {
+            $script:SearchDebounceTimer = New-Object System.Windows.Threading.DispatcherTimer
+            $script:SearchDebounceTimer.Interval = [TimeSpan]::FromMilliseconds(300)
+        }
+        
+        # Store current search text for the timer callback
+        $script:PendingSearchQuery = $text
+        
+        # Set up timer tick handler (remove old one first to avoid accumulation)
+        $script:SearchDebounceTimer.Remove_Tick($script:SearchDebounceTickHandler)
+        $script:SearchDebounceTickHandler = {
+            $script:SearchDebounceTimer.Stop()
+            $query = $script:PendingSearchQuery
+            
+            if ($query -and $query.Length -ge 2) {
+                # Use async operation for background search
+                Invoke-AsyncGlobalSearch -Query $query
+            }
+        }
+        $script:SearchDebounceTimer.Add_Tick($script:SearchDebounceTickHandler)
+        
+        # Start the debounce timer
+        $script:SearchDebounceTimer.Start()
     })
     
     # Focus event - show results if text exists
     $searchBox.Add_GotFocus({
         param($sender, $e)
-        $win = $script:MainWindow
         $text = $sender.Text
-        $popup = $win.FindName('GlobalSearchPopup')
         
-        if ($text.Length -ge 2 -and $popup) {
-            $results = Invoke-GlobalSearch -Query $text
-            Update-SearchResultsPopup -Window $win -Results $results
-            $popup.IsOpen = $true
+        if ($text.Length -ge 2) {
+            # Use async search for non-blocking UI
+            Invoke-AsyncGlobalSearch -Query $text
         }
     })
     
@@ -114,10 +145,132 @@ function Initialize-GlobalSearch {
     })
 }
 
+function Invoke-AsyncGlobalSearch {
+    <#
+    .SYNOPSIS
+        Performs global search asynchronously in a background runspace.
+    .DESCRIPTION
+        Moves the search filtering to a background thread to prevent UI blocking.
+        Uses pre-fetched cached data for rules/policies.
+    #>
+    param([string]$Query)
+    
+    $win = $script:MainWindow
+    $popup = $win.FindName('GlobalSearchPopup')
+    
+    # Pre-fetch data on UI thread (uses cache, so fast)
+    $machines = @()
+    $artifacts = @()
+    $allRules = @()
+    $allPolicies = @()
+    
+    # Machines - from in-memory discovery data
+    if (Get-Command -Name 'Get-DiscoveredMachine' -ErrorAction SilentlyContinue) {
+        $machines = @(Get-DiscoveredMachine -ErrorAction SilentlyContinue)
+    }
+    
+    # Artifacts - from script-scoped scan data
+    if ($script:CurrentScanArtifacts -and $script:CurrentScanArtifacts.Count -gt 0) {
+        $artifacts = @($script:CurrentScanArtifacts)
+    }
+    
+    # Rules - from cache (60s TTL)
+    if (Get-Command -Name 'Get-AllRules' -ErrorAction SilentlyContinue) {
+        $allRules = Get-CachedValue -Key 'GlobalSearch_AllRules' -MaxAgeSeconds 60 -Factory {
+            $result = Get-AllRules -ErrorAction SilentlyContinue
+            if ($result.Success -and $result.Data) { $result.Data } else { @() }
+        }
+    }
+    
+    # Policies - from cache (60s TTL)
+    if (Get-Command -Name 'Get-AllPolicies' -ErrorAction SilentlyContinue) {
+        $allPolicies = Get-CachedValue -Key 'GlobalSearch_AllPolicies' -MaxAgeSeconds 60 -Factory {
+            $result = Get-AllPolicies -ErrorAction SilentlyContinue
+            if ($result.Success -and $result.Data) { $result.Data } else { @() }
+        }
+    }
+    
+    # Run filtering in background runspace
+    Invoke-AsyncOperation -ScriptBlock {
+        param($Query, $Machines, $Artifacts, $AllRules, $AllPolicies)
+        
+        $query = $Query.ToLower().Trim()
+        $results = @{
+            Machines = @()
+            Artifacts = @()
+            Rules = @()
+            Policies = @()
+        }
+        
+        if ([string]::IsNullOrWhiteSpace($query)) { return $results }
+        
+        # Filter Machines
+        if ($Machines -and $Machines.Count -gt 0) {
+            $results.Machines = @($Machines.Where({
+                $_.Name -like "*$query*" -or
+                $_.DNSHostName -like "*$query*" -or
+                $_.OU -like "*$query*" -or
+                $_.OperatingSystem -like "*$query*"
+            }) | Select-Object -First 5)
+        }
+        
+        # Filter Artifacts
+        if ($Artifacts -and $Artifacts.Count -gt 0) {
+            $results.Artifacts = @($Artifacts.Where({
+                $_.FileName -like "*$query*" -or
+                $_.Publisher -like "*$query*" -or
+                $_.ProductName -like "*$query*" -or
+                $_.FilePath -like "*$query*"
+            }) | Select-Object -First 5)
+        }
+        
+        # Filter Rules
+        if ($AllRules -and $AllRules.Count -gt 0) {
+            $results.Rules = @($AllRules.Where({
+                $_.Name -like "*$query*" -or
+                $_.Publisher -like "*$query*" -or
+                $_.ProductName -like "*$query*" -or
+                $_.FileName -like "*$query*" -or
+                $_.Description -like "*$query*"
+            }) | Select-Object -First 5)
+        }
+        
+        # Filter Policies
+        if ($AllPolicies -and $AllPolicies.Count -gt 0) {
+            $results.Policies = @($AllPolicies.Where({
+                $_.Name -like "*$query*" -or
+                $_.Description -like "*$query*"
+            }) | Select-Object -First 5)
+        }
+        
+        return $results
+    } -Arguments @{
+        Query = $Query
+        Machines = $machines
+        Artifacts = $artifacts
+        AllRules = $allRules
+        AllPolicies = $allPolicies
+    } -OnComplete {
+        param($Result)
+        $win = $script:MainWindow
+        $popup = $win.FindName('GlobalSearchPopup')
+        
+        if ($Result -and $Result.Success -and $Result.Result) {
+            Update-SearchResultsPopup -Window $win -Results $Result.Result
+            if ($popup) { $popup.IsOpen = $true }
+        } elseif ($Result -and -not $Result.Success) {
+            Write-Log -Message "Async search error: $($Result.Error)" -Level Warning
+        }
+    } -NoLoadingOverlay
+}
+
 function Invoke-GlobalSearch {
     <#
     .SYNOPSIS
-        Performs search across all data types.
+        Performs search across all data types (synchronous version).
+    .DESCRIPTION
+        Used for direct calls. The async version (Invoke-AsyncGlobalSearch) 
+        should be preferred for UI interactions.
     #>
     param([string]$Query)
     
@@ -136,47 +289,53 @@ function Invoke-GlobalSearch {
         if (Get-Command -Name 'Get-DiscoveredMachine' -ErrorAction SilentlyContinue) {
             $machines = Get-DiscoveredMachine -ErrorAction SilentlyContinue
             if ($machines) {
-                $results.Machines = @($machines | Where-Object {
+                $results.Machines = @($machines.Where({
                     $_.Name -like "*$query*" -or
                     $_.DNSHostName -like "*$query*" -or
                     $_.OU -like "*$query*" -or
                     $_.OperatingSystem -like "*$query*"
-                } | Select-Object -First 5)
+                }) | Select-Object -First 5)
             }
         }
         
         # Search Artifacts (from current scan data)
         if ($script:CurrentScanArtifacts -and $script:CurrentScanArtifacts.Count -gt 0) {
-            $results.Artifacts = @($script:CurrentScanArtifacts | Where-Object {
+            $results.Artifacts = @($script:CurrentScanArtifacts.Where({
                 $_.FileName -like "*$query*" -or
                 $_.Publisher -like "*$query*" -or
                 $_.ProductName -like "*$query*" -or
                 $_.FilePath -like "*$query*"
-            } | Select-Object -First 5)
+            }) | Select-Object -First 5)
         }
         
-        # Search Rules
+        # Search Rules (with 60s cache)
         if (Get-Command -Name 'Get-AllRules' -ErrorAction SilentlyContinue) {
-            $rulesResult = Get-AllRules -ErrorAction SilentlyContinue
-            if ($rulesResult.Success -and $rulesResult.Data) {
-                $results.Rules = @($rulesResult.Data | Where-Object {
+            $allRules = Get-CachedValue -Key 'GlobalSearch_AllRules' -MaxAgeSeconds 60 -Factory {
+                $result = Get-AllRules -ErrorAction SilentlyContinue
+                if ($result.Success -and $result.Data) { $result.Data } else { @() }
+            }
+            if ($allRules -and $allRules.Count -gt 0) {
+                $results.Rules = @($allRules.Where({
                     $_.Name -like "*$query*" -or
                     $_.Publisher -like "*$query*" -or
                     $_.ProductName -like "*$query*" -or
                     $_.FileName -like "*$query*" -or
                     $_.Description -like "*$query*"
-                } | Select-Object -First 5)
+                }) | Select-Object -First 5)
             }
         }
         
-        # Search Policies
+        # Search Policies (with 60s cache)
         if (Get-Command -Name 'Get-AllPolicies' -ErrorAction SilentlyContinue) {
-            $policiesResult = Get-AllPolicies -ErrorAction SilentlyContinue
-            if ($policiesResult.Success -and $policiesResult.Data) {
-                $results.Policies = @($policiesResult.Data | Where-Object {
+            $allPolicies = Get-CachedValue -Key 'GlobalSearch_AllPolicies' -MaxAgeSeconds 60 -Factory {
+                $result = Get-AllPolicies -ErrorAction SilentlyContinue
+                if ($result.Success -and $result.Data) { $result.Data } else { @() }
+            }
+            if ($allPolicies -and $allPolicies.Count -gt 0) {
+                $results.Policies = @($allPolicies.Where({
                     $_.Name -like "*$query*" -or
                     $_.Description -like "*$query*"
-                } | Select-Object -First 5)
+                }) | Select-Object -First 5)
             }
         }
     }
@@ -199,6 +358,18 @@ function Update-SearchResultsPopup {
     
     $resultsPanel = $Window.FindName('GlobalSearchResults')
     if (-not $resultsPanel) { return }
+    
+    # Clean up previous result item handlers to prevent memory leaks
+    foreach ($entry in $script:SearchResultHandlers) {
+        if ($entry.Element) {
+            try {
+                $entry.Element.Remove_MouseEnter($entry.Enter)
+                $entry.Element.Remove_MouseLeave($entry.Leave)
+                $entry.Element.Remove_MouseLeftButtonDown($entry.Click)
+            } catch { }
+        }
+    }
+    $script:SearchResultHandlers = @()
     
     $resultsPanel.Children.Clear()
     
@@ -310,18 +481,16 @@ function Add-SearchResultSection {
         
         $resultItem.Child = $stack
         
-        # Hover effect
-        $resultItem.Add_MouseEnter({
+        # Create handlers that can be removed later
+        $enterHandler = {
             param($sender, $e)
             $sender.Background = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#2D2D2D')
-        })
-        $resultItem.Add_MouseLeave({
+        }
+        $leaveHandler = {
             param($sender, $e)
             $sender.Background = [System.Windows.Media.Brushes]::Transparent
-        })
-        
-        # Click handler
-        $resultItem.Add_MouseLeftButtonDown({
+        }
+        $clickHandler = {
             param($sender, $e)
             $win = $script:MainWindow
             $popup = $win.FindName('GlobalSearchPopup')
@@ -342,7 +511,20 @@ function Add-SearchResultSection {
             } elseif ($item.PSObject.Properties['RuleCount']) {
                 Set-ActivePanel -PanelName 'PanelPolicy'
             }
-        })
+        }
+        
+        # Add handlers
+        $resultItem.Add_MouseEnter($enterHandler)
+        $resultItem.Add_MouseLeave($leaveHandler)
+        $resultItem.Add_MouseLeftButtonDown($clickHandler)
+        
+        # Store handlers for cleanup
+        $script:SearchResultHandlers += @{
+            Element = $resultItem
+            Enter = $enterHandler
+            Leave = $leaveHandler
+            Click = $clickHandler
+        }
         
         $Panel.Children.Add($resultItem) | Out-Null
     }

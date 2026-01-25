@@ -1,37 +1,48 @@
 #region Credentials Panel Functions
 # Credentials.ps1 - Credential profile management
 
+# Script-scoped handler storage for cleanup
+$script:Credentials_Handlers = @{}
+
 function Initialize-CredentialsPanel {
     param([System.Windows.Window]$Window)
+    
+    # Clean up any existing handlers first to prevent accumulation
+    Unregister-CredentialsPanelEvents -Window $Window
 
     # Wire up Save Credential button
     $btnSave = $Window.FindName('BtnSaveCredential')
     if ($btnSave) {
-        $btnSave.Add_Click({ Invoke-ButtonAction -Action 'SaveCredential' })
+        $script:Credentials_Handlers['btnSave'] = { Invoke-ButtonAction -Action 'SaveCredential' }
+        $btnSave.Add_Click($script:Credentials_Handlers['btnSave'])
     }
 
     # Wire up Refresh Credentials button
     $btnRefresh = $Window.FindName('BtnRefreshCredentials')
     if ($btnRefresh) {
-        $btnRefresh.Add_Click({ Invoke-ButtonAction -Action 'RefreshCredentials' })
+        $script:Credentials_Handlers['btnRefresh'] = { Invoke-ButtonAction -Action 'RefreshCredentials' }
+        $btnRefresh.Add_Click($script:Credentials_Handlers['btnRefresh'])
     }
 
     # Wire up Test Credential button
     $btnTest = $Window.FindName('BtnTestCredential')
     if ($btnTest) {
-        $btnTest.Add_Click({ Invoke-ButtonAction -Action 'TestCredential' })
+        $script:Credentials_Handlers['btnTest'] = { Invoke-ButtonAction -Action 'TestCredential' }
+        $btnTest.Add_Click($script:Credentials_Handlers['btnTest'])
     }
 
     # Wire up Delete Credential button
     $btnDelete = $Window.FindName('BtnDeleteCredential')
     if ($btnDelete) {
-        $btnDelete.Add_Click({ Invoke-ButtonAction -Action 'DeleteCredential' })
+        $script:Credentials_Handlers['btnDelete'] = { Invoke-ButtonAction -Action 'DeleteCredential' }
+        $btnDelete.Add_Click($script:Credentials_Handlers['btnDelete'])
     }
 
     # Wire up Set Default button
     $btnSetDefault = $Window.FindName('BtnSetDefaultCredential')
     if ($btnSetDefault) {
-        $btnSetDefault.Add_Click({ Invoke-ButtonAction -Action 'SetDefaultCredential' })
+        $script:Credentials_Handlers['btnSetDefault'] = { Invoke-ButtonAction -Action 'SetDefaultCredential' }
+        $btnSetDefault.Add_Click($script:Credentials_Handlers['btnSetDefault'])
     }
 
     # Load existing credentials
@@ -41,6 +52,40 @@ function Initialize-CredentialsPanel {
     catch {
         Write-Log -Level Error -Message "Failed to load credentials: $($_.Exception.Message)"
     }
+}
+
+function Unregister-CredentialsPanelEvents {
+    <#
+    .SYNOPSIS
+        Removes all registered event handlers from Credentials panel.
+    .DESCRIPTION
+        Called when switching away from the panel to prevent handler accumulation
+        and memory leaks.
+    #>
+    param([System.Windows.Window]$Window)
+    
+    if (-not $Window) { $Window = $script:MainWindow }
+    if (-not $Window) { return }
+    
+    $buttons = @(
+        @{ Key = 'btnSave'; Name = 'BtnSaveCredential' },
+        @{ Key = 'btnRefresh'; Name = 'BtnRefreshCredentials' },
+        @{ Key = 'btnTest'; Name = 'BtnTestCredential' },
+        @{ Key = 'btnDelete'; Name = 'BtnDeleteCredential' },
+        @{ Key = 'btnSetDefault'; Name = 'BtnSetDefaultCredential' }
+    )
+    
+    foreach ($btn in $buttons) {
+        if ($script:Credentials_Handlers[$btn.Key]) {
+            $control = $Window.FindName($btn.Name)
+            if ($control) {
+                try { $control.Remove_Click($script:Credentials_Handlers[$btn.Key]) } catch { }
+            }
+        }
+    }
+    
+    # Clear stored handlers
+    $script:Credentials_Handlers = @{}
 }
 
 function Invoke-SaveCredential {
