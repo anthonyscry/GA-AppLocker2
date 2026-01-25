@@ -1,6 +1,8 @@
 # GA-AppLocker Quick Start Guide
 
-Get AppLocker policies deployed to your enterprise in 5 steps.
+Get AppLocker policies deployed to your enterprise in 7 steps.
+
+**Version:** January 2026 | **Module Commands:** 182
 
 ---
 
@@ -24,7 +26,13 @@ cd C:\Path\To\GA-AppLocker2
 .\Run-Dashboard.ps1
 ```
 
-The dark-themed dashboard will appear with 7 navigation panels on the left.
+The dark-themed dashboard will appear with 8 navigation panels on the left.
+
+**Keyboard Shortcuts:**
+- `Ctrl+1-9`: Navigate to panels
+- `F5`: Refresh current panel
+- `Ctrl+F`: Focus search box
+- `Ctrl+S`: Save current state
 
 ---
 
@@ -71,15 +79,19 @@ The dark-themed dashboard will appear with 7 navigation panels on the left.
 
 ## Step 5: Generate Rules (Rules Panel)
 
-### Option A: Rule Generation Wizard (Recommended)
+### Option A: Rule Generation Wizard (Recommended - 10x Faster)
 
-1. Click **Rules** in the left navigation
-2. Click **Generate Rules** button
+1. Click **Rules** in the left navigation (or `Ctrl+4`)
+2. Click **Generate Rules from Current Scan** button
 3. Follow the 3-step wizard:
-   - **Step 1**: Select artifacts to include
-   - **Step 2**: Configure rule options (Publisher/Hash/Path)
-   - **Step 3**: Review and generate
+   - **Step 1 - Configure**: Set mode (Smart/Publisher/Hash), action, exclusions, deduplication
+   - **Step 2 - Preview**: See exactly what rules will be created before committing
+   - **Step 3 - Generate**: Execute batch generation with progress bar
 4. Click **Generate** to create rules
+
+**Performance:**
+- Old method: ~2 rules/second
+- Wizard: ~20 rules/second (10x faster)
 
 ### Option B: Manual Rule Creation
 
@@ -93,7 +105,21 @@ The dark-themed dashboard will appear with 7 navigation panels on the left.
 - **Approved**: Ready for policy
 - **Rejected**: Excluded from policies
 
-Use the context menu (right-click) to approve/reject rules in bulk.
+**Bulk Operations:**
+- Use the context menu (right-click) to approve/reject rules in bulk
+- Dashboard Quick Action: "Approve Trusted Vendors" (Microsoft, Adobe, Oracle, Google, etc.)
+- Dashboard Quick Action: "Remove Duplicate Rules"
+
+### Rule History
+
+Every rule change is versioned:
+```powershell
+# View history
+Get-RuleHistory -RuleId $ruleId
+
+# Rollback to previous version
+Restore-RuleVersion -RuleId $ruleId -Version 1
+```
 
 ---
 
@@ -170,9 +196,30 @@ GA-AppLocker uses a phased approach to minimize disruption:
 
 | Key | Action |
 |-----|--------|
-| F5 | Refresh current panel |
-| Ctrl+S | Save current state |
-| Escape | Cancel current operation |
+| Ctrl+1 | Dashboard |
+| Ctrl+2 | Discovery |
+| Ctrl+3 | Scanner |
+| Ctrl+4 | Rules |
+| Ctrl+5 | Policy |
+| Ctrl+6 | Deploy |
+| Ctrl+7 | Settings |
+| Ctrl+8 | Setup |
+| Ctrl+9 | About |
+| F5 / Ctrl+R | Refresh current panel |
+| Ctrl+F | Focus search box |
+| Ctrl+S | Save (context-dependent) |
+| Ctrl+E | Export (context-dependent) |
+| Ctrl+N | New item (context-dependent) |
+| Ctrl+A | Select all in data grid |
+| Delete | Delete selected items |
+| Escape | Cancel/Clear |
+| F1 | Help/About |
+
+## Drag-and-Drop
+
+- **Scanner Panel**: Drop executable files to scan them
+- **Rules Panel**: Drop files to create rules, drop XML to import rules
+- **Policy Panel**: Drop AppLocker XML files to import policies
 
 ---
 
@@ -193,6 +240,15 @@ GA-AppLocker uses a phased approach to minimize disruption:
 - The old method processes ~2 rules/second
 - The wizard processes 10-20 rules/second
 
+### "Rules not updating in index"
+- All rule operations (create, update, delete) now auto-sync to index
+- If index seems stale, manually rebuild: `Invoke-RuleIndexRebuild`
+- Check logs for sync errors
+
+### "Duplicate rules detected"
+- Use Dashboard Quick Action: "Remove Duplicate Rules"
+- Or run: `Remove-DuplicateRules -RuleType All -Strategy KeepOldest`
+
 ### Application Data Location
 
 All data is stored in:
@@ -200,10 +256,14 @@ All data is stored in:
 %LOCALAPPDATA%\GA-AppLocker\
 ├── config.json         # Application settings
 ├── session.json        # UI state (auto-saved)
+├── rules-index.json    # Fast rule index (O(1) lookups)
 ├── Credentials\        # Encrypted credentials
 ├── Scans\             # Scan results
-├── Rules\             # Generated rules
+├── Rules\             # Generated rules (JSON files)
+├── RuleHistory\       # Rule version history
 ├── Policies\          # Built policies
+├── PolicySnapshots\   # Policy version backups
+├── Deployments\       # Deployment job history
 └── Logs\              # Application logs
 ```
 
@@ -222,6 +282,37 @@ All data is stored in:
 After completing this quick start:
 
 1. Review the full specification for advanced features
-2. Set up automated scans on a schedule
-3. Create baseline policies for different machine types
+2. Set up scheduled scans for automated artifact collection
+3. Create baseline policies for different machine types (T0/T1/T2)
 4. Document your organization's AppLocker rule approval process
+5. Enable policy snapshots for rollback capability
+6. Configure theme preference (dark/light) in Settings
+7. Learn keyboard shortcuts for faster navigation
+
+## PowerShell Commands Reference
+
+```powershell
+# Quick module import
+Import-Module .\GA-AppLocker\GA-AppLocker.psd1
+
+# Check rule counts
+Get-RuleCounts
+
+# Bulk approve trusted vendors
+Set-BulkRuleStatus -PublisherPattern '*MICROSOFT*' -Status Approved
+
+# Find duplicates (preview only)
+Find-DuplicateRules -RuleType Hash
+
+# Remove duplicates
+Remove-DuplicateRules -RuleType All -Strategy KeepOldest
+
+# Create policy snapshot before changes
+New-PolicySnapshot -PolicyId $id -Description 'Before Chrome update'
+
+# Compare two policies
+Compare-Policies -SourcePolicyId $id1 -TargetPolicyId $id2
+
+# Export policy comparison report
+Get-PolicyDiffReport -SourcePolicyId $id1 -TargetPolicyId $id2 -Format Markdown
+```

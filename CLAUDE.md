@@ -912,16 +912,20 @@ Async runspace operations occasionally log warnings because isolated runspaces d
 
 These happen in background operations but don't affect app functionality. The main UI thread works correctly.
 
-## Current App Status (Jan 22, 2026)
+## Current App Status (Jan 24, 2026)
 
 **Working:**
 - All 8 panels initialize (Dashboard, Discovery, Credentials, Scanner, Rules, Policy, Deployment, Setup)
-- 8325 rules loaded from JSON index
+- 8,177 rules in index (6,097 approved, 2,080 pending)
 - Keyboard shortcuts registered (Ctrl+1-9 navigation, F5 refresh, etc.)
 - Drag-drop handlers registered
 - Session state save/restore
 - Navigation between panels
 - Toast notifications and loading overlays
+- Rule history and versioning
+- Global search functionality
+- Theme manager (dark/light mode)
+- All index sync operations wired (Set-RuleStatus, Remove-Rule, Restore-RuleVersion)
 
 **Startup Sequence (from logs):**
 ```
@@ -987,3 +991,116 @@ When working with WPF timer callbacks, async operations, or event handlers:
    - Or use `global:` scope (less reliable in true runspaces)
 3. **MainWindow reference** use `$script:MainWindow` in the main script scope
 4. **UI updates from background** use `Invoke-UIUpdate` which marshals to dispatcher
+
+## Recent Changes (Jan 24, 2026)
+
+### Code Review & Cleanup Session
+
+Comprehensive code review addressing module exports, index sync, and error handling.
+
+#### Module Export Fixes
+
+All modules now properly export their functions:
+
+| Module | Key Additions |
+|--------|---------------|
+| **Core** | Cache Manager (`Get-CachedValue`, `Set-CachedValue`), Event System (`Publish-AppLockerEvent`), Validation Helpers (`Test-Valid*`, `Assert-*`) |
+| **Storage** | Index Watcher (`Start-RuleIndexWatcher`), Repository Pattern (`Get-RuleFromRepository`), Bulk Operations (`Save-RulesBulk`, `Remove-RulesBulk`) |
+| **Rules** | Removed incorrect exports (`Get-ExistingRuleIndex` belongs to Storage), History functions (`Get-RuleHistory`, `Restore-RuleVersion`) |
+| **Main** | Re-exports all sub-module functions (182 total commands) |
+
+#### Index Sync Wiring
+
+All rule modification operations now properly update the JSON index:
+
+```powershell
+# These operations now sync to index automatically:
+Set-RuleStatus -Id $ruleId -Status Approved    # Updates index
+Remove-Rule -Id $ruleId                         # Removes from index
+Restore-RuleVersion -RuleId $id -Version 1      # Updates index
+New-HashRule -Hash $hash -Save                  # Adds to index
+```
+
+**Implementation:**
+- `Set-RuleStatus` → calls `Update-RuleStatusInIndex`
+- `Remove-Rule` → calls `Remove-RulesFromIndex`
+- `Restore-RuleVersion` → calls `Update-RuleStatusInIndex`
+- `Save-Rule` (in psm1) → calls `Add-RulesToIndex`
+
+#### Bug Fixes
+
+1. **Dashboard.ps1 Line 45** - Added null-safe check for `$script:DiscoveredMachines.Count`
+   ```powershell
+   # Before (could crash if null):
+   $statMachines.Text = $script:DiscoveredMachines.Count.ToString()
+   
+   # After (null-safe):
+   $machineCount = if ($script:DiscoveredMachines) { $script:DiscoveredMachines.Count } else { 0 }
+   ```
+
+2. **Scanner.ps1 Update-ArtifactDataGrid** - Wrapped in try/catch for error resilience
+
+3. **MainWindow.xaml.ps1** - Added `default` case to `Invoke-ButtonAction` switch statement to log unknown actions
+
+4. **Remove-RulesBulk Duplicate** - Removed duplicate from Rules module (consolidated to Storage module)
+
+#### Orphaned Functions Documented
+
+Two functions in Scanner.ps1 are implemented but not yet wired to UI:
+- `Invoke-DedupeArtifacts` - Deduplicate artifacts by hash/publisher/smart mode
+- `Invoke-ApplyArtifactExclusions` - Apply DLL/JS/Script/Unsigned exclusions
+
+Added documentation comments noting they're ready for future UI integration.
+
+#### E2E Test Results
+
+Full rule lifecycle test passing:
+```
+1. Create rule (New-HashRule -Save)     ✓ Index +1
+2. Verify saved (Get-Rule)              ✓ Status: Pending
+3. Approve (Set-RuleStatus)             ✓ Status: Approved
+4. Verify change (Get-Rule)             ✓ Index updated
+5. Check history (Get-RuleHistory)      ✓ Version 1 available
+6. Remove (Remove-Rule)                 ✓ Index -1
+7. Verify removed                       ✓ Rule not found
+```
+
+#### Current Rule Statistics
+
+```
+Total Rules:    8,177
+├── Approved:   6,097
+├── Pending:    2,080
+└── Duplicates: 0 (cleaned up)
+```
+
+### Files Modified (Jan 24, 2026)
+
+```
+GA-AppLocker/GUI/Panels/Dashboard.ps1           # Null-safe machine count
+GA-AppLocker/GUI/Panels/Scanner.ps1             # Error handling, orphaned function docs
+GA-AppLocker/GUI/MainWindow.xaml.ps1            # Default case in button dispatcher
+GA-AppLocker/Modules/GA-AppLocker.Rules/Functions/Get-Rule.ps1    # Index sync
+GA-AppLocker/Modules/GA-AppLocker.Rules/GA-AppLocker.Rules.psm1   # Index sync in Save-Rule
+GA-AppLocker/Modules/GA-AppLocker.Rules/GA-AppLocker.Rules.psd1   # Export fixes
+GA-AppLocker/Modules/GA-AppLocker.Storage/GA-AppLocker.Storage.psd1  # Export additions
+GA-AppLocker/Modules/GA-AppLocker.Core/GA-AppLocker.Core.psd1     # Export additions
+GA-AppLocker/GA-AppLocker.psd1                  # Re-export all functions
+GA-AppLocker/GA-AppLocker.psm1                  # Re-export all functions
+```
+
+### Verification Commands
+
+```powershell
+# Verify module loads correctly
+Import-Module '.\GA-AppLocker\GA-AppLocker.psd1' -Force
+(Get-Command -Module GA-AppLocker).Count  # Should be 182
+
+# Verify index sync
+$rule = New-HashRule -Hash ('A' * 64) -SourceFileName 'test.exe' -SourceFileLength 1000 -Save
+Get-RuleCounts  # Should show +1
+Set-RuleStatus -Id $rule.Data.Id -Status Approved
+(Get-Rule -Id $rule.Data.Id).Data.Status  # Should be 'Approved'
+Remove-Rule -Id $rule.Data.Id
+Get-RuleCounts  # Should show -1
+```
