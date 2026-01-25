@@ -429,7 +429,7 @@ Measurement Script:
     - Memory growth < 10MB
     - baselines/post-refactor.txt created
   Commit: chore(verify): integration testing complete
-- [ ] 5.2. Merge to Main
+- [x] 5.2. Merge to Main
   What: Create PR or merge directly
   Pre-merge Checklist:
     - All tests pass (verified in 5.1)
