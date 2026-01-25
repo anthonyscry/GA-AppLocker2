@@ -149,7 +149,7 @@ Measurement Script:
   Accept: Tests pass, repeat search < 50ms
   Commit: perf(search): integrate Cache-Manager
 
-- [ ] 1.4. Move GlobalSearch to Background Runspace
+- [x] 1.4. Move GlobalSearch to Background Runspace
   What: Use Invoke-AsyncOperation from AsyncHelpers.ps1
 
   AsyncHelpers Contract (splat at line 113):

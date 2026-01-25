@@ -1,20 +1,61 @@
 #region AD Discovery Panel Functions
 # ADDiscovery.ps1 - AD/OU discovery and machine selection
 
+# Script-scoped handler storage for cleanup
+$script:ADDiscovery_Handlers = @{}
+
 function Initialize-DiscoveryPanel {
     param([System.Windows.Window]$Window)
+    
+    # Clean up any existing handlers first to prevent accumulation
+    Unregister-DiscoveryPanelEvents -Window $Window
 
     # Wire up Refresh Domain button
     $btnRefresh = $Window.FindName('BtnRefreshDomain')
     if ($btnRefresh) {
-        $btnRefresh.Add_Click({ Invoke-ButtonAction -Action 'RefreshDomain' })
+        $script:ADDiscovery_Handlers['btnRefresh'] = { Invoke-ButtonAction -Action 'RefreshDomain' }
+        $btnRefresh.Add_Click($script:ADDiscovery_Handlers['btnRefresh'])
     }
 
     # Wire up Test Connectivity button
     $btnTest = $Window.FindName('BtnTestConnectivity')
     if ($btnTest) {
-        $btnTest.Add_Click({ Invoke-ButtonAction -Action 'TestConnectivity' })
+        $script:ADDiscovery_Handlers['btnTest'] = { Invoke-ButtonAction -Action 'TestConnectivity' }
+        $btnTest.Add_Click($script:ADDiscovery_Handlers['btnTest'])
     }
+}
+
+function Unregister-DiscoveryPanelEvents {
+    <#
+    .SYNOPSIS
+        Removes all registered event handlers from Discovery panel.
+    .DESCRIPTION
+        Called when switching away from the panel to prevent handler accumulation
+        and memory leaks.
+    #>
+    param([System.Windows.Window]$Window)
+    
+    if (-not $Window) { $Window = $script:MainWindow }
+    if (-not $Window) { return }
+    
+    # Remove Refresh button handler
+    if ($script:ADDiscovery_Handlers['btnRefresh']) {
+        $btnRefresh = $Window.FindName('BtnRefreshDomain')
+        if ($btnRefresh) {
+            try { $btnRefresh.Remove_Click($script:ADDiscovery_Handlers['btnRefresh']) } catch { }
+        }
+    }
+    
+    # Remove Test button handler
+    if ($script:ADDiscovery_Handlers['btnTest']) {
+        $btnTest = $Window.FindName('BtnTestConnectivity')
+        if ($btnTest) {
+            try { $btnTest.Remove_Click($script:ADDiscovery_Handlers['btnTest']) } catch { }
+        }
+    }
+    
+    # Clear stored handlers
+    $script:ADDiscovery_Handlers = @{}
 }
 
 function Invoke-DomainRefresh {

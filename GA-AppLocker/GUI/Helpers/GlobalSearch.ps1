@@ -12,6 +12,9 @@
 # Script-scoped debounce timer
 $script:SearchDebounceTimer = $null
 
+# Script-scoped handler storage for memory leak prevention
+$script:SearchResultHandlers = @()
+
 function Initialize-GlobalSearch {
     <#
     .SYNOPSIS
@@ -356,6 +359,18 @@ function Update-SearchResultsPopup {
     $resultsPanel = $Window.FindName('GlobalSearchResults')
     if (-not $resultsPanel) { return }
     
+    # Clean up previous result item handlers to prevent memory leaks
+    foreach ($entry in $script:SearchResultHandlers) {
+        if ($entry.Element) {
+            try {
+                $entry.Element.Remove_MouseEnter($entry.Enter)
+                $entry.Element.Remove_MouseLeave($entry.Leave)
+                $entry.Element.Remove_MouseLeftButtonDown($entry.Click)
+            } catch { }
+        }
+    }
+    $script:SearchResultHandlers = @()
+    
     $resultsPanel.Children.Clear()
     
     $totalResults = 0
@@ -466,18 +481,16 @@ function Add-SearchResultSection {
         
         $resultItem.Child = $stack
         
-        # Hover effect
-        $resultItem.Add_MouseEnter({
+        # Create handlers that can be removed later
+        $enterHandler = {
             param($sender, $e)
             $sender.Background = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#2D2D2D')
-        })
-        $resultItem.Add_MouseLeave({
+        }
+        $leaveHandler = {
             param($sender, $e)
             $sender.Background = [System.Windows.Media.Brushes]::Transparent
-        })
-        
-        # Click handler
-        $resultItem.Add_MouseLeftButtonDown({
+        }
+        $clickHandler = {
             param($sender, $e)
             $win = $script:MainWindow
             $popup = $win.FindName('GlobalSearchPopup')
@@ -498,7 +511,20 @@ function Add-SearchResultSection {
             } elseif ($item.PSObject.Properties['RuleCount']) {
                 Set-ActivePanel -PanelName 'PanelPolicy'
             }
-        })
+        }
+        
+        # Add handlers
+        $resultItem.Add_MouseEnter($enterHandler)
+        $resultItem.Add_MouseLeave($leaveHandler)
+        $resultItem.Add_MouseLeftButtonDown($clickHandler)
+        
+        # Store handlers for cleanup
+        $script:SearchResultHandlers += @{
+            Element = $resultItem
+            Enter = $enterHandler
+            Leave = $leaveHandler
+            Click = $clickHandler
+        }
         
         $Panel.Children.Add($resultItem) | Out-Null
     }
