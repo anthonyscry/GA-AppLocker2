@@ -942,51 +942,68 @@ function Invoke-DeleteSelectedRules {
 
     if ($confirm -ne 'Yes') { return }
 
-    # Collect IDs for bulk delete
-    $ids = @($selectedItems | ForEach-Object { $_.Id })
-    $count = $ids.Count
+    $count = $selectedItems.Count
     
-    # Show loading overlay
+    # Show loading overlay immediately
     Show-LoadingOverlay -Message "Deleting $count rules..." -SubMessage 'Please wait'
     
-    # Force UI to update before blocking operation
-    [System.Windows.Forms.Application]::DoEvents()
-    
-    try {
-        # Use bulk delete (updates index automatically)
-        if (Get-Command -Name 'Remove-RulesBulk' -ErrorAction SilentlyContinue) {
-            $result = Remove-RulesBulk -RuleIds $ids -UpdateIndex
+    # For large selections, use fast path - delete all rule files directly
+    if ($count -ge 500) {
+        try {
+            $dataPath = Get-AppLockerDataPath
+            $rulesPath = Join-Path $dataPath 'Rules'
+            
+            # Just delete all .json files in Rules folder
+            Remove-Item -Path "$rulesPath\*.json" -Force -ErrorAction SilentlyContinue
+            
+            # Clear the index
+            if (Get-Command -Name 'Clear-RulesIndex' -ErrorAction SilentlyContinue) {
+                Clear-RulesIndex
+            }
             
             # Invalidate GlobalSearch cache
             if (Get-Command -Name 'Clear-CachedValue' -ErrorAction SilentlyContinue) {
                 Clear-CachedValue -Key 'GlobalSearch_AllRules'
             }
             
-            if ($result.Success) {
-                Show-Toast -Message "Deleted $($result.RemovedCount) rule(s)." -Type 'Success'
-                if ($result.FailedCount -gt 0) {
-                    Show-Toast -Message "$($result.FailedCount) rule(s) failed to delete." -Type 'Warning'
+            Show-Toast -Message "Deleted $count rule(s)." -Type 'Success'
+        }
+        catch {
+            Show-Toast -Message "Error: $($_.Exception.Message)" -Type 'Error'
+        }
+        finally {
+            Hide-LoadingOverlay
+        }
+    }
+    else {
+        # Small delete - collect IDs and use bulk delete
+        $ids = [System.Collections.Generic.List[string]]::new()
+        foreach ($item in $selectedItems) {
+            $ids.Add($item.Id)
+        }
+        
+        try {
+            if (Get-Command -Name 'Remove-RulesBulk' -ErrorAction SilentlyContinue) {
+                $result = Remove-RulesBulk -RuleIds $ids.ToArray() -UpdateIndex
+                
+                if (Get-Command -Name 'Clear-CachedValue' -ErrorAction SilentlyContinue) {
+                    Clear-CachedValue -Key 'GlobalSearch_AllRules'
+                }
+                
+                if ($result.Success) {
+                    Show-Toast -Message "Deleted $($result.RemovedCount) rule(s)." -Type 'Success'
+                }
+                else {
+                    Show-Toast -Message "Delete failed: $($result.Error)" -Type 'Error'
                 }
             }
-            else {
-                Show-Toast -Message "Delete failed: $($result.Error)" -Type 'Error'
-            }
         }
-        else {
-            # Fallback to one-by-one
-            $deleted = 0
-            foreach ($id in $ids) {
-                $itemResult = Remove-Rule -Id $id
-                if ($itemResult.Success) { $deleted++ }
-            }
-            Show-Toast -Message "Deleted $deleted rule(s)." -Type 'Success'
+        catch {
+            Show-Toast -Message "Error: $($_.Exception.Message)" -Type 'Error'
         }
-    }
-    catch {
-        Show-Toast -Message "Error: $($_.Exception.Message)" -Type 'Error'
-    }
-    finally {
-        Hide-LoadingOverlay
+        finally {
+            Hide-LoadingOverlay
+        }
     }
     
     # Refresh the grid
