@@ -49,7 +49,11 @@
         'Find-RulesInRepository',
         'Get-RuleCountsFromRepository',
         'Invoke-RuleBatchOperation',
-        'Test-RuleExistsInRepository'
+        'Test-RuleExistsInRepository',
+        
+        # Cache Management
+        'Clear-RulesIndex',
+        'Reset-RulesIndexCache'
     )
     
     PrivateData = @{
