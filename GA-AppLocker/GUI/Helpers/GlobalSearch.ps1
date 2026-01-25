@@ -6,7 +6,11 @@
 .DESCRIPTION
     Provides search across all data types: machines, artifacts, rules, policies.
     Results are displayed in a popup with categorized sections.
+    Uses 300ms debouncing to prevent excessive searches during rapid typing.
 #>
+
+# Script-scoped debounce timer
+$script:SearchDebounceTimer = $null
 
 function Initialize-GlobalSearch {
     <#
@@ -22,7 +26,7 @@ function Initialize-GlobalSearch {
     
     if (-not $searchBox) { return }
     
-    # Text changed event - search as user types
+    # Text changed event - search as user types with 300ms debouncing
     $searchBox.Add_TextChanged({
         param($sender, $e)
         $win = $script:MainWindow
@@ -41,14 +45,44 @@ function Initialize-GlobalSearch {
             $clearBtn.Visibility = if ([string]::IsNullOrWhiteSpace($text)) { 'Collapsed' } else { 'Visible' }
         }
         
-        # Perform search if text length >= 2
-        if ($text.Length -ge 2) {
-            $results = Invoke-GlobalSearch -Query $text
-            Update-SearchResultsPopup -Window $win -Results $results
-            if ($popup) { $popup.IsOpen = $true }
-        } else {
-            if ($popup) { $popup.IsOpen = $false }
+        # Stop existing timer if running
+        if ($script:SearchDebounceTimer) {
+            $script:SearchDebounceTimer.Stop()
         }
+        
+        # If text too short, close popup and return
+        if ($text.Length -lt 2) {
+            if ($popup) { $popup.IsOpen = $false }
+            return
+        }
+        
+        # Create debounce timer if not exists
+        if (-not $script:SearchDebounceTimer) {
+            $script:SearchDebounceTimer = New-Object System.Windows.Threading.DispatcherTimer
+            $script:SearchDebounceTimer.Interval = [TimeSpan]::FromMilliseconds(300)
+        }
+        
+        # Store current search text for the timer callback
+        $script:PendingSearchQuery = $text
+        
+        # Set up timer tick handler (remove old one first to avoid accumulation)
+        $script:SearchDebounceTimer.Remove_Tick($script:SearchDebounceTickHandler)
+        $script:SearchDebounceTickHandler = {
+            $script:SearchDebounceTimer.Stop()
+            $win = $script:MainWindow
+            $popup = $win.FindName('GlobalSearchPopup')
+            $query = $script:PendingSearchQuery
+            
+            if ($query -and $query.Length -ge 2) {
+                $results = Invoke-GlobalSearch -Query $query
+                Update-SearchResultsPopup -Window $win -Results $results
+                if ($popup) { $popup.IsOpen = $true }
+            }
+        }
+        $script:SearchDebounceTimer.Add_Tick($script:SearchDebounceTickHandler)
+        
+        # Start the debounce timer
+        $script:SearchDebounceTimer.Start()
     })
     
     # Focus event - show results if text exists
