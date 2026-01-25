@@ -93,6 +93,8 @@ function global:Invoke-ButtonAction {
         'DeleteScan' { Invoke-DeleteSelectedScan -Window $win }
         'SelectMachines' { Invoke-SelectMachinesForScan -Window $win }
         'FilterArtifacts' { Update-ArtifactFilter -Window $win -Filter $args[0] }
+        'DedupeArtifacts' { Invoke-DedupeArtifacts -Window $win }
+        'ApplyExclusions' { Invoke-ApplyArtifactExclusions -Window $win }
         # Scheduled Scans
         'CreateScheduledScan' { Invoke-CreateScheduledScan -Window $win }
         'RunScheduledScanNow' { Invoke-RunScheduledScanNow -Window $win }

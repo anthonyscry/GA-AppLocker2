@@ -106,6 +106,13 @@ function Initialize-ScannerPanel {
     $btnDeleteScan = $Window.FindName('BtnDeleteScan')
     if ($btnDeleteScan) { $btnDeleteScan.Add_Click({ Invoke-ButtonAction -Action 'DeleteScan' }) }
 
+    # Wire up deduplication and exclusion buttons (Filters tab)
+    $btnDedupe = $Window.FindName('BtnDedupeArtifacts')
+    if ($btnDedupe) { $btnDedupe.Add_Click({ Invoke-ButtonAction -Action 'DedupeArtifacts' }) }
+
+    $btnExclusions = $Window.FindName('BtnApplyExclusions')
+    if ($btnExclusions) { $btnExclusions.Add_Click({ Invoke-ButtonAction -Action 'ApplyExclusions' }) }
+
     # Wire up filter buttons
     $filterButtons = @{
         'BtnFilterAllArtifacts' = 'All'
@@ -1079,8 +1086,8 @@ function global:Invoke-SelectMachinesForScan {
     Show-Toast -Message "Selected $($script:SelectedScanMachines.Count) machines for scanning" -Type 'Success'
 }
 
-# NOTE: This function is implemented but not yet wired to the UI.
-# To enable: Add button to Scanner panel XAML and wire via Invoke-ButtonAction in MainWindow.xaml.ps1
+# Deduplicates scan artifacts by selected mode (Smart, Publisher, PublisherProduct, Hash)
+# Wired to: BtnDedupeArtifacts in Scanner panel Filters tab
 function global:Invoke-DedupeArtifacts {
     param([System.Windows.Window]$Window)
 
@@ -1169,8 +1176,8 @@ function global:Invoke-DedupeArtifacts {
     }
 }
 
-# NOTE: This function is implemented but not yet wired to the UI.
-# To enable: Add exclusion checkboxes to Scanner panel XAML and wire via Invoke-ButtonAction in MainWindow.xaml.ps1
+# Applies exclusion filters to scan artifacts based on checkbox selections
+# Wired to: BtnApplyExclusions in Scanner panel Filters tab
 function global:Invoke-ApplyArtifactExclusions {
     param([System.Windows.Window]$Window)
 

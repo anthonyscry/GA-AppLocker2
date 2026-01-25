@@ -1172,12 +1172,48 @@
                                             <Button x:Name="BtnLoadScan" Content="Load" Background="Transparent" Foreground="{StaticResource PrimaryBrush}" BorderThickness="0" Padding="0" Cursor="Hand" Margin="0,0,15,0"/>
                                             <Button x:Name="BtnDeleteScan" Content="Delete" Background="Transparent" Foreground="{StaticResource ErrorBrush}" BorderThickness="0" Padding="0" Cursor="Hand"/>
                                         </StackPanel>
-                                    </StackPanel>
-                                </TabItem>
-                            </TabControl>
-                        </Border>
+                                        </StackPanel>
+                                                </TabItem>
+                                                
+                                                <!-- Tab 4: Filters -->
+                                                <TabItem Header="Filters">
+                                                    <StackPanel Margin="15">
+                                                        <!-- Deduplication Section -->
+                                                        <TextBlock Text="DEDUPLICATION" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
+                                                        <TextBlock Text="Mode:" Foreground="{StaticResource ForegroundBrush}" FontSize="11" Margin="0,0,0,4"/>
+                                                        <ComboBox x:Name="CboDedupeMode" Background="#1E1E1E" Foreground="{StaticResource ForegroundBrush}" BorderBrush="#3E3E42" Padding="6,4" Margin="0,0,0,8">
+                                                            <ComboBoxItem Content="Smart (Publisher+Hash)" Tag="Smart" IsSelected="True"/>
+                                                            <ComboBoxItem Content="Publisher Only" Tag="Publisher"/>
+                                                            <ComboBoxItem Content="Publisher+Product" Tag="PublisherProduct"/>
+                                                            <ComboBoxItem Content="Hash Only" Tag="Hash"/>
+                                                        </ComboBox>
+                                                        <Button x:Name="BtnDedupeArtifacts" 
+                                                                Content="Deduplicate Artifacts" 
+                                                                Style="{StaticResource ActionButtonStyle}" 
+                                                                Background="{StaticResource SecondaryBrush}" 
+                                                                Padding="10,6" 
+                                                                HorizontalAlignment="Stretch"
+                                                                Margin="0,0,0,20"/>
+                                                        
+                                                        <!-- Exclusions Section -->
+                                                        <TextBlock Text="EXCLUSIONS" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
+                                                        <CheckBox x:Name="ChkExcludeDll" Content="Exclude DLLs" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,6"/>
+                                                        <CheckBox x:Name="ChkExcludeJs" Content="Exclude JavaScript (.js)" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,6"/>
+                                                        <CheckBox x:Name="ChkExcludeScripts" Content="Exclude Scripts (.ps1, .bat, .vbs)" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,6"/>
+                                                        <CheckBox x:Name="ChkExcludeUnsigned" Content="Exclude Unsigned Files" Foreground="{StaticResource WarningBrush}" Margin="0,0,0,10"
+                                                                  ToolTip="Removes all unsigned files from artifacts"/>
+                                                        <Button x:Name="BtnApplyExclusions" 
+                                                                Content="Apply Exclusions" 
+                                                                Style="{StaticResource ActionButtonStyle}" 
+                                                                Background="{StaticResource SecondaryBrush}" 
+                                                                Padding="10,6" 
+                                                                HorizontalAlignment="Stretch"/>
+                                                    </StackPanel>
+                                                </TabItem>
+                                            </TabControl>
+                                        </Border>
 
-                        <!-- Right: Artifact Results -->
+                                        <!-- Right: Artifact Results -->
                         <Border Grid.Column="1" Background="{StaticResource SidebarBrush}" CornerRadius="8" Padding="15">
                             <DockPanel>
                                 <!-- Header with filters -->
