@@ -362,20 +362,50 @@ function Approve-TrustedVendorRules {
     }
 
     try {
-        Write-RuleLog -Message "Approving rules from $($trustedPatterns.Count) trusted vendors..."
+        Write-RuleLog -Message "Approving rules from $($trustedPatterns.Count) trusted vendors (optimized)..."
 
-        foreach ($vendor in $trustedPatterns) {
-            $vendorResult = Set-BulkRuleStatus `
-                -Status 'Approved' `
-                -PublisherPattern $vendor.Pattern `
-                -CurrentStatus 'Pending' `
-                -WhatIf:$WhatIfPreference
-
-            $result.ByVendor[$vendor.Name] = $vendorResult.UpdatedCount
-            $result.TotalUpdated += $vendorResult.UpdatedCount
-
-            if ($vendorResult.UpdatedCount -gt 0) {
-                Write-Host "  $($vendor.Name): $($vendorResult.UpdatedCount) rules" -ForegroundColor Green
+        # Load all pending rules ONCE instead of 22 times
+        $allRulesResult = Get-AllRules -Status 'Pending'
+        if (-not $allRulesResult.Success) {
+            throw "Failed to load rules: $($allRulesResult.Error)"
+        }
+        
+        $pendingRules = @($allRulesResult.Data)
+        Write-RuleLog -Message "Loaded $($pendingRules.Count) pending rules"
+        
+        # Single-pass matching against all vendor patterns
+        $rulesToApprove = [System.Collections.Generic.List[string]]::new()
+        
+        foreach ($rule in $pendingRules) {
+            $publisherUpper = if ($rule.PublisherName) { $rule.PublisherName.ToUpper() } else { '' }
+            
+            foreach ($vendor in $trustedPatterns) {
+                $pattern = $vendor.Pattern.Replace('*', '')
+                if ($publisherUpper.Contains($pattern)) {
+                    $rulesToApprove.Add($rule.Id)
+                    if (-not $result.ByVendor.ContainsKey($vendor.Name)) {
+                        $result.ByVendor[$vendor.Name] = 0
+                    }
+                    $result.ByVendor[$vendor.Name]++
+                    break
+                }
+            }
+        }
+        
+        Write-RuleLog -Message "Found $($rulesToApprove.Count) rules matching trusted vendors"
+        
+        if ($rulesToApprove.Count -gt 0 -and -not $WhatIfPreference) {
+            # Batch update
+            $batchResult = Set-BulkRuleStatus -RuleIds $rulesToApprove.ToArray() -Status 'Approved'
+            $result.TotalUpdated = $batchResult.UpdatedCount
+        } else {
+            $result.TotalUpdated = $rulesToApprove.Count
+        }
+        
+        foreach ($vendor in $result.ByVendor.Keys) {
+            $count = $result.ByVendor[$vendor]
+            if ($count -gt 0) {
+                Write-Host "  $vendor`: $count rules" -ForegroundColor Green
             }
         }
 

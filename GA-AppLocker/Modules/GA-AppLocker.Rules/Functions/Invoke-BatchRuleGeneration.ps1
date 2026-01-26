@@ -178,7 +178,7 @@ function Invoke-BatchRuleGeneration {
             $unique = if ($DedupeMode -eq 'None') {
                 $filtered
             } else {
-                Get-UniqueArtifactsForBatch -Artifacts $filtered -Mode $DedupeMode -RuleMode $Mode
+                Get-UniqueArtifactsForBatch -Artifacts $filtered -Mode $DedupeMode -RuleMode $Mode -PublisherLevel $PublisherLevel
             }
             
             $dedupedCount = $filtered.Count - $unique.Count
@@ -333,7 +333,8 @@ function script:Get-UniqueArtifactsForBatch {
     param(
         [System.Collections.Generic.List[PSCustomObject]]$Artifacts,
         [string]$Mode,
-        [string]$RuleMode
+        [string]$RuleMode,
+        [string]$PublisherLevel = 'PublisherProduct'
     )
     
     $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
