@@ -474,7 +474,8 @@ function Get-BatchPreview {
         [switch]$SkipDlls,
         [switch]$SkipUnsigned,
         [switch]$SkipScripts,
-        [string]$DedupeMode = 'Smart'
+        [string]$DedupeMode = 'Smart',
+        [string]$PublisherLevel = 'PublisherProduct'
     )
 
     $result = [PSCustomObject]@{
@@ -505,14 +506,24 @@ function Get-BatchPreview {
         $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
         $unique = [System.Collections.Generic.List[PSCustomObject]]::new()
         foreach ($art in $filtered) {
-            $key = if ($Mode -eq 'Smart') {
+        $key = if ($Mode -eq 'Smart') {
                 if ($art.IsSigned -and $art.SignerCertificate) {
-                    "$($art.SignerCertificate)|$($art.ProductName)"
+                    # Respect PublisherLevel for deduplication
+                    if ($PublisherLevel -eq 'PublisherOnly') {
+                        $art.SignerCertificate
+                    } else {
+                        "$($art.SignerCertificate)|$($art.ProductName)"
+                    }
                 } else {
                     $art.SHA256Hash
                 }
             } elseif ($Mode -eq 'Publisher') {
-                "$($art.SignerCertificate)|$($art.ProductName)"
+                # Respect PublisherLevel for deduplication
+                if ($PublisherLevel -eq 'PublisherOnly') {
+                    $art.SignerCertificate
+                } else {
+                    "$($art.SignerCertificate)|$($art.ProductName)"
+                }
             } else {
                 $art.SHA256Hash
             }
@@ -537,10 +548,20 @@ function Get-BatchPreview {
 
             $exists = $false
             if ($ruleType -eq 'Publisher') {
-                $key = "$($art.SignerCertificate)|$($art.ProductName)".ToLower()
-                $exists = $existingIndex.Publisher.ContainsKey($key)
+                # Respect PublisherLevel for existing rule check
+                $key = if ($PublisherLevel -eq 'PublisherOnly') {
+                    $art.SignerCertificate.ToLower()
+                } else {
+                    "$($art.SignerCertificate)|$($art.ProductName)".ToLower()
+                }
+                # Use correct index based on PublisherLevel
+                $exists = if ($PublisherLevel -eq 'PublisherOnly') {
+                    $existingIndex.PublishersOnly.Contains($key)
+                } else {
+                    $existingIndex.Publishers.Contains($key)
+                }
             } elseif ($ruleType -eq 'Hash' -and $art.SHA256Hash) {
-                $exists = $existingIndex.Hash.ContainsKey($art.SHA256Hash.ToUpper())
+                $exists = $existingIndex.Hashes.Contains($art.SHA256Hash.ToUpper())
             }
 
             if ($exists) {
