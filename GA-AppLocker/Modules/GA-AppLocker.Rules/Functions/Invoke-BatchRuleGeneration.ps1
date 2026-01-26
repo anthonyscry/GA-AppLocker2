@@ -346,13 +346,22 @@ function script:Get-UniqueArtifactsForBatch {
                 # Key based on what rule will be created
                 $ruleType = Get-RuleTypeForArtifact -Artifact $art -Mode $RuleMode
                 if ($ruleType -eq 'Publisher') {
-                    "$($art.SignerCertificate)|$($art.ProductName)"
+                    if ($PublisherLevel -eq 'PublisherOnly') {
+                        $art.SignerCertificate
+                    } else {
+                        "$($art.SignerCertificate)|$($art.ProductName)"
+                    }
                 } else {
                     $art.SHA256Hash
                 }
             }
             'Publisher' {
-                "$($art.SignerCertificate)|$($art.ProductName)"
+                # Respect PublisherLevel for deduplication
+                if ($PublisherLevel -eq 'PublisherOnly') {
+                    $art.SignerCertificate
+                } else {
+                    "$($art.SignerCertificate)|$($art.ProductName)"
+                }
             }
             'Hash' {
                 $art.SHA256Hash
