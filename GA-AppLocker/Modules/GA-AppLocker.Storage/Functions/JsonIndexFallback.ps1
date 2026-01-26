@@ -12,6 +12,7 @@ $script:JsonIndex = $null
 $script:JsonIndexLoaded = $false
 $script:HashIndex = @{}
 $script:PublisherIndex = @{}
+$script:PublisherOnlyIndex = @{}
 $script:RuleById = @{}
 
 function Reset-RulesIndexCache {
@@ -29,6 +30,7 @@ function Reset-RulesIndexCache {
     $script:JsonIndex = $null
     $script:HashIndex = @{}
     $script:PublisherIndex = @{}
+    $script:PublisherOnlyIndex = @{}
     $script:RuleById = @{}
     Write-Verbose "Rules index cache reset - will reload from disk on next access"
 }
@@ -58,10 +60,11 @@ function script:Initialize-JsonIndex {
             $content = [System.IO.File]::ReadAllText($indexPath)
             $script:JsonIndex = $content | ConvertFrom-Json
             
-            # Convert to hashtables for O(1) lookup
-            $script:HashIndex = @{}
-            $script:PublisherIndex = @{}
-            $script:RuleById = @{}
+             # Convert to hashtables for O(1) lookup
+             $script:HashIndex = @{}
+             $script:PublisherIndex = @{}
+             $script:PublisherOnlyIndex = @{}
+             $script:RuleById = @{}
             
             foreach ($rule in $script:JsonIndex.Rules) {
                 $script:RuleById[$rule.Id] = $rule
@@ -69,11 +72,14 @@ function script:Initialize-JsonIndex {
                 if ($rule.Hash) {
                     $script:HashIndex[$rule.Hash.ToUpper()] = $rule.Id
                 }
-                if ($rule.PublisherName) {
-                    $key = "$($rule.PublisherName)|$($rule.ProductName)".ToLower()
-                    $script:PublisherIndex[$key] = $rule.Id
-                }
+            if ($rule.PublisherName) {
+                $key = "$($rule.PublisherName)|$($rule.ProductName)".ToLower()
+                $script:PublisherIndex[$key] = $rule.Id
+                # Also add to publisher-only index
+                $pubOnlyKey = $rule.PublisherName.ToLower()
+                $script:PublisherOnlyIndex[$pubOnlyKey] = $rule.Id
             }
+        }
             
             $script:JsonIndexLoaded = $true
             Write-StorageLog -Message "Loaded JSON index with $($script:JsonIndex.Rules.Count) rules"
@@ -109,6 +115,7 @@ function script:Initialize-JsonIndex {
         $script:JsonIndex = [PSCustomObject]@{ Rules = @(); LastUpdated = (Get-Date -Format 'o') }
         $script:HashIndex = @{}
         $script:PublisherIndex = @{}
+        $script:PublisherOnlyIndex = @{}
         $script:RuleById = @{}
         $script:JsonIndexLoaded = $true
     }
@@ -250,6 +257,11 @@ function Remove-RulesFromIndex {
                     $key = "$($rule.PublisherName)|$($rule.ProductName)".ToLower()
                     $script:PublisherIndex.Remove($key)
                 }
+                # Also remove from publisher-only index
+                $pubOnlyKey = $rule.PublisherName.ToLower()
+                if ($script:PublisherOnlyIndex.ContainsKey($pubOnlyKey)) {
+                    $script:PublisherOnlyIndex.Remove($pubOnlyKey)
+                }
             }
         }
 
@@ -350,10 +362,11 @@ function script:Build-JsonIndexFromFiles {
             SourcePath = $RulesPath
         }
         
-        # Rebuild hashtables
-        $script:HashIndex = @{}
-        $script:PublisherIndex = @{}
-        $script:RuleById = @{}
+         # Rebuild hashtables
+         $script:HashIndex = @{}
+         $script:PublisherIndex = @{}
+         $script:PublisherOnlyIndex = @{}
+         $script:RuleById = @{}
         
         foreach ($rule in $rules) {
             $script:RuleById[$rule.Id] = $rule
@@ -363,6 +376,9 @@ function script:Build-JsonIndexFromFiles {
             if ($rule.PublisherName) {
                 $key = "$($rule.PublisherName)|$($rule.ProductName)".ToLower()
                 $script:PublisherIndex[$key] = $rule.Id
+                # Also add to publisher-only index
+                $pubOnlyKey = $rule.PublisherName.ToLower()
+                $script:PublisherOnlyIndex[$pubOnlyKey] = $rule.Id
             }
         }
         

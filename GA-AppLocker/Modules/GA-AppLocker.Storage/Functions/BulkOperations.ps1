@@ -195,6 +195,9 @@ function Add-RulesToIndex {
             if ($rule.PublisherName) {
                 $key = "$($rule.PublisherName)|$($rule.ProductName)".ToLower()
                 $script:PublisherIndex[$key] = $rule.Id
+                # Also add to publisher-only index for PublisherOnly lookups
+                $pubOnlyKey = $rule.PublisherName.ToLower()
+                $script:PublisherOnlyIndex[$pubOnlyKey] = $rule.Id
             }
 
             $result.AddedCount++
@@ -244,9 +247,15 @@ function Get-ExistingRuleIndex {
         [void]$publishers.Add($key)
     }
 
+    $publishersOnly = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($key in $script:PublisherOnlyIndex.Keys) {
+        [void]$publishersOnly.Add($key)
+    }
+
     return [PSCustomObject]@{
         Hashes = $hashes
         Publishers = $publishers
+        PublishersOnly = $publishersOnly
         HashCount = $hashes.Count
         PublisherCount = $publishers.Count
     }
