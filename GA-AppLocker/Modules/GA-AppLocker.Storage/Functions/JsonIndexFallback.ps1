@@ -256,11 +256,11 @@ function Remove-RulesFromIndex {
                 if ($rule.PublisherName) {
                     $key = "$($rule.PublisherName)|$($rule.ProductName)".ToLower()
                     $script:PublisherIndex.Remove($key)
-                }
-                # Also remove from publisher-only index
-                $pubOnlyKey = $rule.PublisherName.ToLower()
-                if ($script:PublisherOnlyIndex.ContainsKey($pubOnlyKey)) {
-                    $script:PublisherOnlyIndex.Remove($pubOnlyKey)
+                    # Also remove from publisher-only index
+                    $pubOnlyKey = $rule.PublisherName.ToLower()
+                    if ($script:PublisherOnlyIndex.ContainsKey($pubOnlyKey)) {
+                        $script:PublisherOnlyIndex.Remove($pubOnlyKey)
+                    }
                 }
             }
         }
