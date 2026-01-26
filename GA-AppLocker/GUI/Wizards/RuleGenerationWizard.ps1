@@ -539,11 +539,20 @@ function global:Close-RuleGenerationWizard {
     
     # Refresh rules panel if rules were created
     if ($script:WizardState.GenerationResult -and $script:WizardState.GenerationResult.Success) {
-        # Reset cache and refresh rules grid
+        # Reset cache to force reload from disk on next query
         if (Get-Command -Name 'Reset-RulesIndexCache' -ErrorAction SilentlyContinue) {
             Reset-RulesIndexCache
         }
-        Invoke-ButtonAction -Action 'RefreshRules'
+        
+        # Invalidate any cached queries
+        if (Get-Command -Name 'Clear-AppLockerCache' -ErrorAction SilentlyContinue) {
+            Clear-AppLockerCache -Pattern 'GlobalSearch_*' | Out-Null
+            Clear-AppLockerCache -Pattern 'RuleCounts*' | Out-Null
+            Clear-AppLockerCache -Pattern 'RuleQuery*' | Out-Null
+        }
+        
+        # Refresh the rules grid directly
+        Update-RulesDataGrid -Window $script:MainWindow
     }
     
     global:Write-Log "Wizard closed"

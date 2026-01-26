@@ -323,32 +323,26 @@ function Remove-RulesBulk {
             }
         }
         else {
-            # Fallback: Legacy JSON file deletion
-            $dataPath = if (Get-Command -Name 'Get-AppLockerDataPath' -ErrorAction SilentlyContinue) {
-                Get-AppLockerDataPath
-            } else {
-                Join-Path $env:LOCALAPPDATA 'GA-AppLocker'
-            }
-            $rulesPath = Join-Path $dataPath 'Rules'
-
-            foreach ($id in $RuleIds) {
-                try {
-                    $rulePath = Join-Path $rulesPath "$id.json"
-                    if (Test-Path $rulePath) {
-                        Remove-Item -Path $rulePath -Force
-                        $result.RemovedCount++
+            # Fallback: Use JSON index
+            if (Get-Command -Name 'Remove-RulesFromIndex' -ErrorAction SilentlyContinue) {
+                $indexResult = Remove-RulesFromIndex -RuleIds $RuleIds
+                $result.Success = $indexResult.Success
+                $result.RemovedCount = $indexResult.RemovedCount
+                $result.Error = $indexResult.Error
+                
+                # Invalidate caches
+                if ($result.Success -and $result.RemovedCount -gt 0) {
+                    if (Get-Command -Name 'Clear-AppLockerCache' -ErrorAction SilentlyContinue) {
+                        Clear-AppLockerCache -Pattern 'GlobalSearch_*' | Out-Null
+                        Clear-AppLockerCache -Pattern 'RuleCounts*' | Out-Null
+                        Clear-AppLockerCache -Pattern 'RuleQuery*' | Out-Null
                     }
-                }
-                catch {
-                    $result.FailedCount++
+                    Write-StorageLog -Message "Bulk deleted $($result.RemovedCount) rules from JSON index"
                 }
             }
-
-            if ($UpdateIndex -and $result.RemovedCount -gt 0) {
-                Remove-RulesFromIndex -RuleIds $RuleIds
+            else {
+                $result.Error = "Remove-RulesFromIndex function not available"
             }
-
-            $result.Success = $true
         }
     }
     catch {

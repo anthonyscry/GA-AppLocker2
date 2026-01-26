@@ -97,7 +97,7 @@ function Initialize-RulesPanel {
     Update-RulesDataGrid -Window $Window -Async
 }
 
-function script:Update-RulesDataGrid {
+function global:Update-RulesDataGrid {
     param(
         [System.Windows.Window]$Window,
         [switch]$Async
@@ -950,8 +950,21 @@ function Invoke-DeleteSelectedRules {
         # Collect IDs to delete
         $idsToDelete = @($selectedItems | ForEach-Object { $_.Id })
         
-        # Use SQLite database deletion
-        if (Get-Command -Name 'Remove-RuleFromDatabase' -ErrorAction SilentlyContinue) {
+        # Use bulk delete for efficiency (uses transaction)
+        if (Get-Command -Name 'Remove-RulesBulk' -ErrorAction SilentlyContinue) {
+            $deleteResult = Remove-RulesBulk -RuleIds $idsToDelete
+            
+            if ($deleteResult.Success) {
+                $deleted = $deleteResult.RemovedCount
+                Show-Toast -Message "Deleted $deleted rule(s)." -Type 'Success'
+                # Caches already invalidated by Remove-RulesBulk
+            }
+            else {
+                Show-Toast -Message "Delete failed: $($deleteResult.Error)" -Type 'Error'
+            }
+        }
+        elseif (Get-Command -Name 'Remove-RuleFromDatabase' -ErrorAction SilentlyContinue) {
+            # Fallback to single-rule deletion
             $deleteResult = Remove-RuleFromDatabase -Id $idsToDelete
             
             if ($deleteResult.Success) {
@@ -970,7 +983,7 @@ function Invoke-DeleteSelectedRules {
             }
         }
         else {
-            Show-Toast -Message "Remove-RuleFromDatabase not available. Please update GA-AppLocker.Storage module." -Type 'Error'
+            Show-Toast -Message "Remove-RulesBulk not available. Please update GA-AppLocker.Storage module." -Type 'Error'
         }
     }
     catch {
