@@ -223,7 +223,8 @@ function global:Show-WizardStep2 {
                 -SkipDlls:$Settings.SkipDlls `
                 -SkipUnsigned:$Settings.SkipUnsigned `
                 -SkipScripts:$Settings.SkipScripts `
-                -DedupeMode $Settings.DedupeMode
+                -DedupeMode $Settings.DedupeMode `
+                -PublisherLevel $Settings.PublisherLevel
         } -ArgumentList @($artifacts, $settings) -OnComplete {
             param($Result)
             $script:WizardState.Preview = $Result
@@ -237,7 +238,8 @@ function global:Show-WizardStep2 {
             -SkipDlls:$settings.SkipDlls `
             -SkipUnsigned:$settings.SkipUnsigned `
             -SkipScripts:$settings.SkipScripts `
-            -DedupeMode $settings.DedupeMode
+            -DedupeMode $settings.DedupeMode `
+            -PublisherLevel $settings.PublisherLevel
         
         $script:WizardState.Preview = $preview
         Update-WizardPreviewUI -Preview $preview
