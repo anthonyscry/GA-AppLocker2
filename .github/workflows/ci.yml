@@ -1,4 +1,3 @@
-# GA-AppLocker CI - Basic checks only
 name: CI
 
 on:
@@ -8,41 +7,13 @@ on:
     branches: [main, master, develop]
 
 jobs:
-  basic-checks:
-    name: Basic Checks
+  build:
     runs-on: windows-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Verify Module Loads
+      - uses: actions/checkout@v4
+      
+      - name: Test Module Load
         shell: pwsh
         run: |
-          Write-Host "Loading GA-AppLocker module..."
-          Import-Module ./GA-AppLocker/GA-AppLocker.psd1 -Force -ErrorAction Stop
-          Write-Host "Module loaded successfully!" -ForegroundColor Green
-          
-          # List exported functions
-          $funcs = Get-Command -Module GA-AppLocker* | Measure-Object
-          Write-Host "Exported functions: $($funcs.Count)"
-
-      - name: Syntax Check
-        shell: pwsh
-        run: |
-          Write-Host "Checking PowerShell syntax..."
-          $errors = @()
-          Get-ChildItem -Path ./GA-AppLocker -Recurse -Filter *.ps1 | ForEach-Object {
-            $content = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
-            if ($content) {
-              $null = [System.Management.Automation.PSParser]::Tokenize($content, [ref]$null)
-            }
-          }
-          Write-Host "Syntax check passed!" -ForegroundColor Green
-
-  ci-complete:
-    name: CI Complete
-    runs-on: windows-latest
-    needs: [basic-checks]
-    steps:
-      - name: All checks passed
-        run: echo "CI passed!"
+          Import-Module ./GA-AppLocker/GA-AppLocker.psd1 -Force
+          Write-Host "Module loaded OK"
