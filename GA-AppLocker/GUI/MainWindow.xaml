@@ -1181,7 +1181,7 @@
                                                         <!-- Deduplication Section -->
                                                         <TextBlock Text="DEDUPLICATION" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
                                                         <TextBlock Text="Mode:" Foreground="{StaticResource ForegroundBrush}" FontSize="11" Margin="0,0,0,4"/>
-                                                        <ComboBox x:Name="CboDedupeMode" Background="#1E1E1E" Foreground="{StaticResource ForegroundBrush}" BorderBrush="#3E3E42" Padding="6,4" Margin="0,0,0,8">
+                                                        <ComboBox x:Name="CboDedupeMode" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,8">
                                                             <ComboBoxItem Content="Smart (Publisher+Hash)" Tag="Smart" IsSelected="True"/>
                                                             <ComboBoxItem Content="Publisher Only" Tag="Publisher"/>
                                                             <ComboBoxItem Content="Publisher+Product" Tag="PublisherProduct"/>
@@ -1410,6 +1410,14 @@
                                             <ComboBoxItem Content="Publisher + Product (any version)" IsSelected="True" Tag="PublisherProduct"/>
                                             <ComboBoxItem Content="Publisher + Product + File (specific file)" Tag="PublisherProductFile"/>
                                             <ComboBoxItem Content="Exact (specific version required)" Tag="Exact"/>
+                                        </ComboBox>
+
+                                        <TextBlock Text="Unsigned File Handling:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                        <ComboBox x:Name="CboUnsignedMode" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,10"
+                                                  ToolTip="How to handle files without a digital signature. Hash=secure but many rules, Path=fewer rules but less secure.">
+                                            <ComboBoxItem Content="Hash (per file - most secure)" IsSelected="True" Tag="Hash"/>
+                                            <ComboBoxItem Content="Path (per folder - fewer rules)" Tag="Path"/>
+                                            <ComboBoxItem Content="Skip (block unsigned files)" Tag="Skip"/>
                                         </ComboBox>
 
                                         <TextBlock Text="Rule Action:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>

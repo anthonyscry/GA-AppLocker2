@@ -97,6 +97,10 @@ function Invoke-BatchRuleGeneration {
         [string]$DedupeMode = 'Smart',
 
         [Parameter()]
+        [ValidateSet('Hash', 'Path', 'Skip')]
+        [string]$UnsignedMode = 'Hash',
+
+        [Parameter()]
         [string]$CollectionName,
 
         [Parameter()]
@@ -178,12 +182,12 @@ function Invoke-BatchRuleGeneration {
             $unique = if ($DedupeMode -eq 'None') {
                 $filtered
             } else {
-                Get-UniqueArtifactsForBatch -Artifacts $filtered -Mode $DedupeMode -RuleMode $Mode -PublisherLevel $PublisherLevel
+                Get-UniqueArtifactsForBatch -Artifacts $filtered -Mode $DedupeMode -RuleMode $Mode -PublisherLevel $PublisherLevel -UnsignedMode $UnsignedMode
             }
             
             $dedupedCount = $filtered.Count - $unique.Count
-            Write-RuleLog -Message "DEBUG Invoke-BatchRuleGeneration received PublisherLevel=$PublisherLevel (Type=$($PublisherLevel.GetType().Name))"
-            Write-RuleLog -Message "Deduped: $dedupedCount duplicates removed, $($unique.Count) unique (Mode=$Mode, DedupeMode=$DedupeMode, PublisherLevel=$PublisherLevel)"
+            Write-RuleLog -Message "DEBUG Invoke-BatchRuleGeneration received PublisherLevel=$PublisherLevel, UnsignedMode=$UnsignedMode"
+            Write-RuleLog -Message "Deduped: $dedupedCount duplicates removed, $($unique.Count) unique (Mode=$Mode, DedupeMode=$DedupeMode, PublisherLevel=$PublisherLevel, UnsignedMode=$UnsignedMode)"
             if ($OnProgress) { & $OnProgress 30 "Unique: $($unique.Count) artifacts" }
 
             # ========================================
@@ -197,7 +201,8 @@ function Invoke-BatchRuleGeneration {
             $existingCount = 0
             
             foreach ($art in $unique) {
-                $ruleType = Get-RuleTypeForArtifact -Artifact $art -Mode $Mode
+                $ruleType = Get-RuleTypeForArtifact -Artifact $art -Mode $Mode -UnsignedMode $UnsignedMode
+                if ($ruleType -eq 'Skip') { continue }  # Skip unsigned files if UnsignedMode is 'Skip'
                 $exists = Test-RuleExistsInIndex -Artifact $art -Index $existingIndex -RuleType $ruleType -PublisherLevel $PublisherLevel
                 
                 if ($exists) {
@@ -240,7 +245,8 @@ function Invoke-BatchRuleGeneration {
                         -Status $Status `
                         -PublisherLevel $PublisherLevel `
                         -UserOrGroupSid $UserOrGroupSid `
-                        -CollectionName $CollectionName
+                        -CollectionName $CollectionName `
+                        -UnsignedMode $UnsignedMode
                     
                     if ($rule) {
                         $rules.Add($rule)
@@ -305,11 +311,12 @@ function Invoke-BatchRuleGeneration {
 function script:Get-RuleTypeForArtifact {
     <#
     .SYNOPSIS
-        Determines the rule type for an artifact based on mode.
+        Determines the rule type for an artifact based on mode and unsigned handling.
     #>
     param(
         [PSCustomObject]$Artifact,
-        [string]$Mode
+        [string]$Mode,
+        [string]$UnsignedMode = 'Hash'
     )
     
     switch ($Mode) {
@@ -317,7 +324,12 @@ function script:Get-RuleTypeForArtifact {
             if ($Artifact.IsSigned -and -not [string]::IsNullOrWhiteSpace($Artifact.SignerCertificate)) {
                 return 'Publisher'
             }
-            return 'Hash'
+            # Unsigned file - check UnsignedMode
+            switch ($UnsignedMode) {
+                'Path' { return 'Path' }
+                'Skip' { return 'Skip' }
+                default { return 'Hash' }
+            }
         }
         'Publisher' { return 'Publisher' }
         'Hash' { return 'Hash' }
@@ -335,25 +347,41 @@ function script:Get-UniqueArtifactsForBatch {
         [System.Collections.Generic.List[PSCustomObject]]$Artifacts,
         [string]$Mode,
         [string]$RuleMode,
-        [string]$PublisherLevel = 'PublisherProduct'
+        [string]$PublisherLevel = 'PublisherProduct',
+        [string]$UnsignedMode = 'Hash'
     )
     
     $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
     $unique = [System.Collections.Generic.List[PSCustomObject]]::new()
     
     foreach ($art in $Artifacts) {
+        # Determine what rule type this artifact will create
+        $ruleType = Get-RuleTypeForArtifact -Artifact $art -Mode $RuleMode -UnsignedMode $UnsignedMode
+        
+        # Skip artifacts marked for skipping
+        if ($ruleType -eq 'Skip') { continue }
+        
         $key = switch ($Mode) {
             'Smart' {
                 # Key based on what rule will be created
-                $ruleType = Get-RuleTypeForArtifact -Artifact $art -Mode $RuleMode
-                if ($ruleType -eq 'Publisher') {
-                    if ($PublisherLevel -eq 'PublisherOnly') {
-                        $art.SignerCertificate
-                    } else {
-                        "$($art.SignerCertificate)|$($art.ProductName)"
+                switch ($ruleType) {
+                    'Publisher' {
+                        if ($PublisherLevel -eq 'PublisherOnly') {
+                            $art.SignerCertificate
+                        } else {
+                            "$($art.SignerCertificate)|$($art.ProductName)"
+                        }
                     }
-                } else {
-                    $art.SHA256Hash
+                    'Path' {
+                        # Dedupe by folder + collection type for path rules
+                        $folder = Split-Path $art.FilePath -Parent
+                        $ext = if ($art.Extension) { $art.Extension } else { [System.IO.Path]::GetExtension($art.FileName) }
+                        $collection = Get-CollectionType -Extension $ext
+                        "$collection|$folder"
+                    }
+                    default {
+                        $art.SHA256Hash
+                    }
                 }
             }
             'Publisher' {
@@ -443,10 +471,12 @@ function script:New-RuleObjectFromArtifact {
         [string]$Status,
         [string]$PublisherLevel,
         [string]$UserOrGroupSid,
-        [string]$CollectionName
+        [string]$CollectionName,
+        [string]$UnsignedMode = 'Hash'
     )
     
-    $ruleType = Get-RuleTypeForArtifact -Artifact $Artifact -Mode $Mode
+    $ruleType = Get-RuleTypeForArtifact -Artifact $Artifact -Mode $Mode -UnsignedMode $UnsignedMode
+    if ($ruleType -eq 'Skip') { return $null }
     
     # Get collection type from extension
     $extension = $Artifact.Extension
@@ -538,15 +568,20 @@ function script:New-RuleObjectFromArtifact {
             }
         }
         'Path' {
+            # For path rules from unsigned files, use folder path with wildcard
+            $folderPath = Split-Path $Artifact.FilePath -Parent
+            $pathRule = "$folderPath\*"
+            $folderName = Split-Path $folderPath -Leaf
+            
             return [PSCustomObject]@{
                 Id              = $ruleId
                 RuleType        = 'Path'
                 CollectionType  = $collectionType
                 Status          = $Status
                 Action          = $Action
-                Name            = "Path: $($Artifact.FilePath)"
-                Description     = "Auto-generated path rule"
-                Path            = $Artifact.FilePath
+                Name            = "Path: $folderName\*"
+                Description     = "Auto-generated path rule for folder: $folderPath"
+                Path            = $pathRule
                 UserOrGroupSid  = $UserOrGroupSid
                 SourceArtifactId = $Artifact.SHA256Hash
                 SourceFile      = $Artifact.FileName

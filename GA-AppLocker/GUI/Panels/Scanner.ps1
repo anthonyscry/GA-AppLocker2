@@ -1596,6 +1596,17 @@ function global:Invoke-LaunchRuleWizard {
         }
         Write-Log -Message "Target Group SID: $targetSid"
         
+        # Read Unsigned File Handling mode
+        $unsignedCombo = $Window.FindName('CboUnsignedMode')
+        $unsignedMode = if ($unsignedCombo -and $unsignedCombo.SelectedItem -and $unsignedCombo.SelectedItem.Tag) {
+            $tag = $unsignedCombo.SelectedItem.Tag
+            Write-Log -Message "Unsigned File Handling: $tag (from $($unsignedCombo.SelectedItem.Content))"
+            $tag
+        } else {
+            Write-Log -Message "Unsigned File Handling: Hash (default)"
+            'Hash'
+        }
+        
         # Use batch generation with user's settings
         $result = Invoke-BatchRuleGeneration -Artifacts $script:CurrentScanArtifacts `
             -Mode 'Smart' `
@@ -1603,7 +1614,8 @@ function global:Invoke-LaunchRuleWizard {
             -Status 'Pending' `
             -DedupeMode 'Smart' `
             -PublisherLevel $publisherLevel `
-            -UserOrGroupSid $targetSid
+            -UserOrGroupSid $targetSid `
+            -UnsignedMode $unsignedMode
         
         # Hide loading overlay
         if (Get-Command -Name 'Hide-LoadingOverlay' -ErrorAction SilentlyContinue) {
