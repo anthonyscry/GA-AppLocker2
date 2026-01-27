@@ -876,6 +876,7 @@ function Invoke-GenerateRulesFromArtifacts {
 
             # Update UI
             Update-RulesDataGrid -Window $win
+            Update-DashboardStats -Window $win
             Update-WorkflowBreadcrumb -Window $win
 
             if ($syncHash.Error) {
@@ -959,6 +960,9 @@ function Invoke-CreateManualRule {
             $Window.FindName('TxtManualRuleValue').Text = ''
             $Window.FindName('TxtManualRuleDesc').Text = ''
             Update-RulesDataGrid -Window $Window
+            # Refresh dashboard stats and sidebar counts
+            Update-DashboardStats -Window $Window
+            Update-WorkflowBreadcrumb -Window $Window
             Show-Toast -Message "$ruleType rule created successfully." -Type 'Success'
         }
         else {
@@ -1057,6 +1061,10 @@ function Set-SelectedRuleStatus {
     Update-RulesDataGrid -Window $Window
     Update-RulesSelectionCount -Window $Window
     
+    # Refresh dashboard stats and sidebar counts
+    Update-DashboardStats -Window $Window
+    Update-WorkflowBreadcrumb -Window $Window
+    
     if ($updated -gt 0) {
         Show-Toast -Message "Updated $updated rule(s) to '$Status'." -Type 'Success'
     }
@@ -1142,6 +1150,10 @@ function Invoke-DeleteSelectedRules {
     # Refresh the grid
     Update-RulesDataGrid -Window $Window
     Update-RulesSelectionCount -Window $Window
+    
+    # Refresh dashboard stats and sidebar counts
+    Update-DashboardStats -Window $Window
+    Update-WorkflowBreadcrumb -Window $Window
 }
 
 function Invoke-ApproveTrustedVendors {
@@ -1172,14 +1184,13 @@ function Invoke-ApproveTrustedVendors {
             Show-Toast -Message $message -Type 'Success'
             Write-Log -Message $message
             Update-RulesDataGrid -Window $Window -Async
+            # Refresh dashboard stats and sidebar counts
+            Update-DashboardStats -Window $Window
+            Update-WorkflowBreadcrumb -Window $Window
         }
         else {
             Show-Toast -Message "Failed to approve rules: $($Result.Error)" -Type 'Error'
         }
-    }.GetNewClosure() -OnError {
-        param($ErrorMessage)
-        Show-Toast -Message "Error: $ErrorMessage" -Type 'Error'
-        Write-Log -Level Error -Message "Approve trusted vendors failed: $ErrorMessage"
     }.GetNewClosure()
 }
 
@@ -1223,6 +1234,9 @@ function Invoke-RemoveDuplicateRules {
             Show-Toast -Message $msg -Type 'Success'
             Write-Log -Message $msg
             Update-RulesDataGrid -Window $Window
+            # Refresh dashboard stats and sidebar counts
+            Update-DashboardStats -Window $Window
+            Update-WorkflowBreadcrumb -Window $Window
         }
         else {
             Show-Toast -Message "Failed to remove duplicates: $($Result.Error)" -Type 'Error'

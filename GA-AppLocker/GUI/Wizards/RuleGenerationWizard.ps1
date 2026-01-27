@@ -555,6 +555,10 @@ function global:Close-RuleGenerationWizard {
         
         # Refresh the rules grid directly
         Update-RulesDataGrid -Window $global:GA_MainWindow
+        
+        # Refresh dashboard stats and sidebar counts
+        Update-DashboardStats -Window $global:GA_MainWindow
+        Update-WorkflowBreadcrumb -Window $global:GA_MainWindow
     }
     
     global:Write-Log "Wizard closed"

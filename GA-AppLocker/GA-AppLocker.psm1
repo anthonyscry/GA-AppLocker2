@@ -97,10 +97,10 @@ try {
         Import-Module $deployModulePath -ErrorAction Stop
     }
     
-    # Setup module - loads functions directly (no manifest)
+    # Setup module - import as module (not dot-source, which can cause issues)
     $setupModulePath = Join-Path $modulePath 'Modules\GA-AppLocker.Setup\GA-AppLocker.Setup.psm1'
     if (Test-Path $setupModulePath) {
-        . $setupModulePath
+        Import-Module $setupModulePath -ErrorAction Stop
     }
     
     Write-AppLockerLog -Message 'All nested modules loaded successfully' -NoConsole
