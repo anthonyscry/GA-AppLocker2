@@ -481,7 +481,7 @@ function Invoke-CreateManualRule {
     $typeCombo = $Window.FindName('CboManualRuleType')
     $value = $Window.FindName('TxtManualRuleValue').Text
     $desc = $Window.FindName('TxtManualRuleDesc').Text
-    $action = if ($Window.FindName('RbRuleAllow').IsChecked) { 'Allow' } else { 'Deny' }
+    $action = if ($Window.FindName('RbManualRuleAllow').IsChecked) { 'Allow' } else { 'Deny' }
 
     # Get target group SID
     $targetGroupCombo = $Window.FindName('CboManualRuleTargetGroup')

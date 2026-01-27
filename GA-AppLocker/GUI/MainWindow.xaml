@@ -1469,7 +1469,7 @@
                                                  Style="{StaticResource TextBoxStyle}" Margin="0,0,0,10"/>
 
                                         <TextBlock Text="Apply To:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <ComboBox x:Name="CboManualRuleTargetGroup" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,15">
+                                        <ComboBox x:Name="CboManualRuleTargetGroup" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,10">
                                             <ComboBoxItem Content="Everyone" IsSelected="True" Tag="S-1-1-0"/>
                                             <ComboBoxItem Content="Administrators" Tag="S-1-5-32-544"/>
                                             <ComboBoxItem Content="Users" Tag="S-1-5-32-545"/>
@@ -1477,6 +1477,14 @@
                                             <ComboBoxItem Content="Domain Users" Tag="S-1-5-21-*-513"/>
                                             <ComboBoxItem Content="Domain Admins" Tag="S-1-5-21-*-512"/>
                                         </ComboBox>
+
+                                        <TextBlock Text="Action:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
+                                            <RadioButton x:Name="RbManualRuleAllow" Content="Allow" IsChecked="True"
+                                                         Foreground="{StaticResource ForegroundBrush}" Margin="0,0,15,0"/>
+                                            <RadioButton x:Name="RbManualRuleDeny" Content="Deny"
+                                                         Foreground="{StaticResource ForegroundBrush}"/>
+                                        </StackPanel>
 
                                         <Button x:Name="BtnCreateManualRule" 
                                                 Content="Create Rule"
