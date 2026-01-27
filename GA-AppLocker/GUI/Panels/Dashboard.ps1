@@ -47,23 +47,17 @@ function Update-DashboardStats {
             $statMachines.Text = $machineCount.ToString()
         }
 
-        # Artifacts count - sum from all saved scans + current session
+        # Artifacts count - use cached count or current session only (skip slow file reads on startup)
         $statArtifacts = $Window.FindName('StatArtifacts')
         if ($statArtifacts) { 
             $totalArtifacts = 0
-            # Count current session artifacts
+            # Count current session artifacts only (fast)
             if ($script:CurrentScanArtifacts) {
                 $totalArtifacts += $script:CurrentScanArtifacts.Count
             }
-            # Also count from saved scans
-            $scansResult = Get-ScanResults
-            if ($scansResult.Success -and $scansResult.Data) {
-                $scanData = @($scansResult.Data)
-                foreach ($scan in $scanData) {
-                    if ($scan.Artifacts) {
-                        $totalArtifacts += [int]$scan.Artifacts
-                    }
-                }
+            # Use cached artifact count if available (set when user visits Scanner panel)
+            if ($script:CachedTotalArtifacts) {
+                $totalArtifacts = $script:CachedTotalArtifacts
             }
             $statArtifacts.Text = $totalArtifacts.ToString()
         }
