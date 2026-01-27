@@ -1565,9 +1565,9 @@ function global:Show-RuleGenerationConfigDialog {
             <ComboBox x:Name="CboPublisherLevel" Background="{StaticResource ControlBg}" Foreground="{StaticResource FgBrush}" 
                       BorderBrush="{StaticResource BorderBrush}" Padding="8,6" Margin="0,0,0,15">
                 <ComboBoxItem Content="Publisher + Product (Recommended)" Tag="PublisherProduct" IsSelected="True"/>
-                <ComboBoxItem Content="Publisher + Product + Version" Tag="PublisherProductVersion"/>
-                <ComboBoxItem Content="Publisher Only" Tag="Publisher"/>
-                <ComboBoxItem Content="Publisher + Product + Version + FileName" Tag="PublisherProductVersionFileName"/>
+                <ComboBoxItem Content="Publisher + Product + File" Tag="PublisherProductFile"/>
+                <ComboBoxItem Content="Publisher Only" Tag="PublisherOnly"/>
+                <ComboBoxItem Content="Exact (All fields)" Tag="Exact"/>
             </ComboBox>
             
             <!-- Rule Action -->
