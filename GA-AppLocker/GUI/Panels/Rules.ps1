@@ -28,7 +28,7 @@ function Initialize-RulesPanel {
 
     # Wire up action buttons
     $actionButtons = @(
-        'BtnGenerateFromArtifacts', 'BtnCreateManualRule', 'BtnExportRulesXml', 'BtnExportRulesCsv',
+        'BtnLaunchRuleWizard', 'BtnCreateManualRule', 'BtnExportRulesXml', 'BtnExportRulesCsv',
         'BtnImportRulesXml', 'BtnRefreshRules', 'BtnApproveRule', 'BtnRejectRule', 'BtnReviewRule',
         'BtnDeleteRule', 'BtnViewRuleDetails', 'BtnViewRuleHistory', 'BtnAddRuleToPolicy',
         'BtnApproveTrustedRules', 'BtnRemoveDuplicateRules'
@@ -479,105 +479,13 @@ function global:Update-RulesFilter {
     Update-RulesDataGrid -Window $Window
 }
 
+# Legacy function - redirects to the Rule Generation Wizard
+# The wizard provides a better UX with preview, progress, and all options in one place
 function Invoke-GenerateRulesFromArtifacts {
     param([System.Windows.Window]$Window)
 
-    if (-not $script:CurrentScanArtifacts -or $script:CurrentScanArtifacts.Count -eq 0) {
-        Show-Toast -Message 'No artifacts loaded. Please run a scan or load saved scan results first.' -Type 'Warning'
-        return
-    }
-
-    if (-not (Get-Command -Name 'ConvertFrom-Artifact' -ErrorAction SilentlyContinue)) {
-        Show-Toast -Message 'Rules module not loaded.' -Type 'Error'
-        return
-    }
-
-    # Get options from UI (using RulesUILogic helper)
-    $modeCombo = $Window.FindName('CboRuleGenMode')
-    $rbAllow = $Window.FindName('RbRuleAllow')
-    $targetGroupCombo = $Window.FindName('CboRuleTargetGroup')
-    $pubLevelCombo = $Window.FindName('CboPublisherLevel')
-    
-    $options = Get-RuleGenerationOptions `
-        -ModeIndex $(if ($modeCombo) { $modeCombo.SelectedIndex } else { 0 }) `
-        -IsAllow $(if ($rbAllow) { $rbAllow.IsChecked } else { $true }) `
-        -TargetGroupSid $(if ($targetGroupCombo -and $targetGroupCombo.SelectedItem) { $targetGroupCombo.SelectedItem.Tag } else { 'S-1-1-0' }) `
-        -PublisherLevel $(if ($pubLevelCombo -and $pubLevelCombo.SelectedItem) { $pubLevelCombo.SelectedItem.Tag } else { 'PublisherProduct' })
-
-    # Disable generate button during processing
-    $btnGenerate = $Window.FindName('BtnGenerateFromArtifacts')
-    if ($btnGenerate) { $btnGenerate.IsEnabled = $false }
-
-    # Filter and dedupe artifacts (using extracted helpers from RuleGenerationAsync.ps1)
-    Show-LoadingOverlay -Message "Checking existing rules..." -SubMessage "Building rule index..."
-    
-    $filterResult = Get-FilteredArtifactsForRuleGeneration -Artifacts $script:CurrentScanArtifacts -PublisherLevel $options.PublisherLevel
-    $dedupeResult = Get-DeduplicatedArtifacts -Artifacts $filterResult.Artifacts -Mode $options.Mode -PublisherLevel $options.PublisherLevel
-    
-    $artifactsToProcess = $dedupeResult.Artifacts
-    $originalCount = $filterResult.OriginalCount
-    $skippedCount = $filterResult.SkippedCount
-    $dedupedCount = $dedupeResult.DedupedCount
-
-    if ($artifactsToProcess.Count -eq 0) {
-        Hide-LoadingOverlay
-        if ($btnGenerate) { $btnGenerate.IsEnabled = $true }
-        Show-Toast -Message "All $originalCount artifacts already have rules. Nothing to generate." -Type 'Info'
-        return
-    }
-
-    # Show loading overlay with deduplication info
-    $filterParts = @()
-    if ($skippedCount -gt 0) { $filterParts += "$skippedCount already have rules" }
-    if ($dedupedCount -gt 0) { $filterParts += "$dedupedCount duplicates" }
-    $filterMsg = if ($filterParts.Count -gt 0) { " (skipped: $($filterParts -join ', '))" } else { "" }
-    
-    Show-LoadingOverlay -Message "Generating Rules..." -SubMessage "Processing $($artifactsToProcess.Count) unique artifacts...$filterMsg"
-    Show-Toast -Message "Generating rules from $($artifactsToProcess.Count) unique artifacts (of $originalCount total)$filterMsg..." -Type 'Info'
-
-    # Start async generation (using extracted helper from RuleGenerationAsync.ps1)
-    Start-RuleGenerationAsync -Window $Window `
-        -Artifacts $artifactsToProcess `
-        -Mode $options.Mode `
-        -Action $options.Action `
-        -TargetGroupSid $options.TargetGroupSid `
-        -PublisherLevel $options.PublisherLevel `
-        -OnComplete {
-            param($syncHash)
-            
-            # Re-enable button
-            $win = $syncHash.Window
-            $btnGenerate = $win.FindName('BtnGenerateFromArtifacts')
-            if ($btnGenerate) { $btnGenerate.IsEnabled = $true }
-
-            # Update UI
-            Update-RulesDataGrid -Window $win
-            Update-DashboardStats -Window $win
-            Update-WorkflowBreadcrumb -Window $win
-
-            if ($syncHash.Error) {
-                Show-Toast -Message "Error: $($syncHash.Error)" -Type 'Error'
-            }
-            elseif ($syncHash.Generated -gt 0) {
-                $summary = $syncHash.Summary
-                if ($summary) {
-                    $msg = "Created $($syncHash.Generated) rules"
-                    $details = @()
-                    if ($summary.AlreadyExisted -gt 0) { $details += "$($summary.AlreadyExisted) existed" }
-                    if ($summary.Deduplicated -gt 0) { $details += "$($summary.Deduplicated) deduped" }
-                    if ($details.Count -gt 0) { $msg += " ($($details -join ', '))" }
-                    Show-Toast -Message $msg -Type 'Success'
-                } else {
-                    Show-Toast -Message "Generated $($syncHash.Generated) rule(s) from $($syncHash.Artifacts.Count) artifacts." -Type 'Success'
-                }
-            }
-            elseif ($syncHash.Summary -and $syncHash.Summary.AlreadyExisted -gt 0) {
-                Show-Toast -Message "All $($syncHash.Summary.AlreadyExisted) artifacts already have rules." -Type 'Info'
-            }
-            if ($syncHash.Failed -gt 0) {
-                Show-Toast -Message "$($syncHash.Failed) artifact(s) failed to generate rules." -Type 'Warning'
-            }
-        }.GetNewClosure()
+    # Redirect to the wizard - it handles everything including validation
+    Invoke-LaunchRuleWizard -Window $Window
 }
 
 function Invoke-CreateManualRule {

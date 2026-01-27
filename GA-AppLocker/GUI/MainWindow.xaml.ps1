@@ -108,7 +108,8 @@ function global:Invoke-ButtonAction {
         'RunScheduledScanNow' { Invoke-RunScheduledScanNow -Window $win }
         'DeleteScheduledScan' { Invoke-DeleteScheduledScan -Window $win }
         # Rules panel
-        'GenerateFromArtifacts' { Invoke-LaunchRuleWizard -Window $win }  # New 3-step wizard (10x faster)
+        'LaunchRuleWizard' { Invoke-LaunchRuleWizard -Window $win }
+        'GenerateFromArtifacts' { Invoke-LaunchRuleWizard -Window $win }  # Legacy - redirects to wizard
         'CreateManualRule' { Invoke-CreateManualRule -Window $win }
         'ExportRulesXml' { Invoke-ExportRulesToXml -Window $win }
         'ExportRulesCsv' { Invoke-ExportRulesToCsv -Window $win }

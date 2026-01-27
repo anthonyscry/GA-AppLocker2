@@ -106,12 +106,9 @@ function Initialize-ScannerPanel {
     $btnDeleteScan = $Window.FindName('BtnDeleteScan')
     if ($btnDeleteScan) { $btnDeleteScan.Add_Click({ Invoke-ButtonAction -Action 'DeleteScan' }) }
 
-    # Wire up deduplication and exclusion buttons (Filters tab)
-    $btnDedupe = $Window.FindName('BtnDedupeArtifacts')
-    if ($btnDedupe) { $btnDedupe.Add_Click({ Invoke-ButtonAction -Action 'DedupeArtifacts' }) }
-
-    $btnExclusions = $Window.FindName('BtnApplyExclusions')
-    if ($btnExclusions) { $btnExclusions.Add_Click({ Invoke-ButtonAction -Action 'ApplyExclusions' }) }
+    # Wire up wizard launch button (Generate tab - replaces old dedupe/exclusion controls)
+    $btnWizard = $Window.FindName('BtnLaunchRuleWizardFromScanner')
+    if ($btnWizard) { $btnWizard.Add_Click({ Invoke-ButtonAction -Action 'LaunchRuleWizard' }) }
 
     # Wire up filter buttons
     $filterButtons = @{
@@ -952,7 +949,8 @@ function global:Invoke-SelectMachinesForScan {
 }
 
 # Deduplicates scan artifacts by selected mode (Smart, Publisher, PublisherProduct, Hash)
-# Wired to: BtnDedupeArtifacts in Scanner panel Filters tab
+# Programmatic use only - UI moved to Rule Generation Wizard
+# Kept for backward compatibility and scripting scenarios
 function global:Invoke-DedupeArtifacts {
     param([System.Windows.Window]$Window)
 
@@ -1042,7 +1040,8 @@ function global:Invoke-DedupeArtifacts {
 }
 
 # Applies exclusion filters to scan artifacts based on checkbox selections
-# Wired to: BtnApplyExclusions in Scanner panel Filters tab
+# Programmatic use only - UI moved to Rule Generation Wizard
+# Kept for backward compatibility and scripting scenarios
 function global:Invoke-ApplyArtifactExclusions {
     param([System.Windows.Window]$Window)
 

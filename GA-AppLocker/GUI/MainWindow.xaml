@@ -1205,39 +1205,34 @@
                                         </StackPanel>
                                                 </TabItem>
                                                 
-                                                <!-- Tab 4: Filters -->
-                                                <TabItem Header="Filters">
+                                                <!-- Tab 4: Generate Rules -->
+                                                <TabItem Header="Generate">
                                                     <StackPanel Margin="15">
-                                                        <!-- Deduplication Section -->
-                                                        <TextBlock Text="DEDUPLICATION" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
-                                                        <TextBlock Text="Mode:" Foreground="{StaticResource ForegroundBrush}" FontSize="11" Margin="0,0,0,4"/>
-                                                        <ComboBox x:Name="CboDedupeMode" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,8">
-                                                            <ComboBoxItem Content="Smart (Publisher+Hash)" Tag="Smart" IsSelected="True"/>
-                                                            <ComboBoxItem Content="Publisher Only" Tag="Publisher"/>
-                                                            <ComboBoxItem Content="Publisher+Product" Tag="PublisherProduct"/>
-                                                            <ComboBoxItem Content="Hash Only" Tag="Hash"/>
-                                                        </ComboBox>
-                                                        <Button x:Name="BtnDedupeArtifacts" 
-                                                                Content="Deduplicate Artifacts" 
-                                                                Style="{StaticResource ActionButtonStyle}" 
-                                                                Background="{StaticResource SecondaryBrush}" 
-                                                                Padding="10,6" 
-                                                                HorizontalAlignment="Stretch"
-                                                                Margin="0,0,0,20"/>
+                                                        <TextBlock Text="RULE GENERATION" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,15"/>
                                                         
-                                                        <!-- Exclusions Section -->
-                                                        <TextBlock Text="EXCLUSIONS" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
-                                                        <CheckBox x:Name="ChkExcludeDll" Content="Exclude DLLs" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,6"/>
-                                                        <CheckBox x:Name="ChkExcludeJs" Content="Exclude JavaScript (.js)" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,6"/>
-                                                        <CheckBox x:Name="ChkExcludeScripts" Content="Exclude Scripts (.ps1, .bat, .vbs)" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,6"/>
-                                                        <CheckBox x:Name="ChkExcludeUnsigned" Content="Exclude Unsigned Files" Foreground="{StaticResource WarningBrush}" Margin="0,0,0,10"
-                                                                  ToolTip="Removes all unsigned files from artifacts"/>
-                                                        <Button x:Name="BtnApplyExclusions" 
-                                                                Content="Apply Exclusions" 
-                                                                Style="{StaticResource ActionButtonStyle}" 
-                                                                Background="{StaticResource SecondaryBrush}" 
-                                                                Padding="10,6" 
-                                                                HorizontalAlignment="Stretch"/>
+                                                        <TextBlock Text="Use the Rule Generation Wizard to:" 
+                                                                   Foreground="{StaticResource ForegroundBrush}" 
+                                                                   TextWrapping="Wrap" Margin="0,0,0,10"/>
+                                                        
+                                                        <StackPanel Margin="10,0,0,15">
+                                                            <TextBlock Text="• Configure generation mode and options" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,4"/>
+                                                            <TextBlock Text="• Set exclusions (DLLs, scripts, unsigned)" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,4"/>
+                                                            <TextBlock Text="• Preview rules before creating" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,4"/>
+                                                            <TextBlock Text="• Batch generate with progress tracking" Foreground="{StaticResource MutedBrush}"/>
+                                                        </StackPanel>
+                                                        
+                                                        <Button x:Name="BtnLaunchRuleWizardFromScanner" 
+                                                                Content="Launch Rule Generation Wizard"
+                                                                Style="{StaticResource PrimaryButtonStyle}"
+                                                                Padding="15,10"
+                                                                Tag="LaunchRuleWizard"/>
+                                                        
+                                                        <TextBlock x:Name="TxtArtifactCountPreGen" 
+                                                                   Text="0 artifacts available" 
+                                                                   Foreground="{StaticResource MutedBrush}" 
+                                                                   FontSize="11" 
+                                                                   HorizontalAlignment="Center"
+                                                                   Margin="0,10,0,0"/>
                                                     </StackPanel>
                                                 </TabItem>
                                             </TabControl>
@@ -1419,60 +1414,35 @@
                                 <!-- Tab 1: Generate from Artifacts -->
                                 <TabItem Header="Generate">
                                     <StackPanel Margin="15">
-                                        <TextBlock Text="GENERATE FROM ARTIFACTS" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
+                                        <TextBlock Text="GENERATE FROM ARTIFACTS" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,15"/>
                                         
-                                        <TextBlock Text="Collection Name:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <TextBox x:Name="TxtRuleCollectionName" 
-                                                 Style="{StaticResource TextBoxStyle}"
-                                                 Text="Default" Margin="0,0,0,10"/>
-
-                                        <TextBlock Text="Generation Mode:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <ComboBox x:Name="CboRuleGenMode" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,10">
-                                            <ComboBoxItem Content="Smart (Publisher if signed, Hash if not)" IsSelected="True"/>
-                                            <ComboBoxItem Content="Publisher Only (signed files only)"/>
-                                            <ComboBoxItem Content="Hash Only (all files)"/>
-                                            <ComboBoxItem Content="Path Only (folder-based)"/>
-                                        </ComboBox>
-
-                                        <TextBlock Text="Publisher Granularity:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <ComboBox x:Name="CboPublisherLevel" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,10"
-                                                  ToolTip="Controls how specific publisher rules are. More permissive = fewer rules but broader access.">
-                                            <ComboBoxItem Content="Publisher Only (any product from vendor)" Tag="PublisherOnly"/>
-                                            <ComboBoxItem Content="Publisher + Product (any version)" IsSelected="True" Tag="PublisherProduct"/>
-                                            <ComboBoxItem Content="Publisher + Product + File (specific file)" Tag="PublisherProductFile"/>
-                                            <ComboBoxItem Content="Exact (specific version required)" Tag="Exact"/>
-                                        </ComboBox>
-
-                                        <TextBlock Text="Unsigned File Handling:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <ComboBox x:Name="CboUnsignedMode" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,10"
-                                                  ToolTip="How to handle files without a digital signature. Hash=secure but many rules, Path=fewer rules but less secure.">
-                                            <ComboBoxItem Content="Hash (per file - most secure)" IsSelected="True" Tag="Hash"/>
-                                            <ComboBoxItem Content="Path (per folder - fewer rules)" Tag="Path"/>
-                                            <ComboBoxItem Content="Skip (block unsigned files)" Tag="Skip"/>
-                                        </ComboBox>
-
-                                        <TextBlock Text="Rule Action:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                                            <RadioButton x:Name="RbRuleAllow" Content="Allow" IsChecked="True"
-                                                         Foreground="{StaticResource ForegroundBrush}" Margin="0,0,15,0"/>
-                                            <RadioButton x:Name="RbRuleDeny" Content="Deny"
-                                                         Foreground="{StaticResource ForegroundBrush}"/>
-                                        </StackPanel>
-
-                                        <TextBlock Text="Apply To:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <ComboBox x:Name="CboRuleTargetGroup" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,15">
-                                            <ComboBoxItem Content="Everyone" IsSelected="True" Tag="S-1-1-0"/>
-                                            <ComboBoxItem Content="Administrators" Tag="S-1-5-32-544"/>
-                                            <ComboBoxItem Content="Users" Tag="S-1-5-32-545"/>
-                                            <ComboBoxItem Content="Authenticated Users" Tag="S-1-5-11"/>
-                                            <ComboBoxItem Content="Domain Users" Tag="S-1-5-21-*-513"/>
-                                            <ComboBoxItem Content="Domain Admins" Tag="S-1-5-21-*-512"/>
-                                        </ComboBox>
-
-                                        <Button x:Name="BtnGenerateFromArtifacts" 
-                                                Content="Generate Rules from Current Scan"
+                                        <TextBlock Text="Use the Rule Generation Wizard to create rules from scanned artifacts." 
+                                                   Foreground="{StaticResource ForegroundBrush}" 
+                                                   TextWrapping="Wrap" Margin="0,0,0,15"/>
+                                        
+                                        <Border Background="#252526" CornerRadius="4" Padding="12" Margin="0,0,0,15">
+                                            <StackPanel>
+                                                <TextBlock Text="The wizard provides:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,8"/>
+                                                <TextBlock Text="• Smart, Publisher, Hash, or Path modes" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,3"/>
+                                                <TextBlock Text="• Exclusions (DLLs, scripts, unsigned)" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,3"/>
+                                                <TextBlock Text="• Deduplication options" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,3"/>
+                                                <TextBlock Text="• Preview before generation" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,3"/>
+                                                <TextBlock Text="• Progress tracking" Foreground="{StaticResource MutedBrush}"/>
+                                            </StackPanel>
+                                        </Border>
+                                        
+                                        <Button x:Name="BtnLaunchRuleWizard" 
+                                                Content="Launch Rule Generation Wizard"
                                                 Style="{StaticResource PrimaryButtonStyle}"
-                                                Tag="GenerateFromArtifacts"/>
+                                                Padding="15,10"
+                                                Tag="LaunchRuleWizard"/>
+                                        
+                                        <TextBlock Text="Or scan artifacts first from the Scanner panel." 
+                                                   Foreground="{StaticResource MutedBrush}" 
+                                                   FontSize="11" 
+                                                   HorizontalAlignment="Center"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,15,0,0"/>
                                     </StackPanel>
                                 </TabItem>
                                 
