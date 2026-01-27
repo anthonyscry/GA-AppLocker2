@@ -353,7 +353,6 @@ function Get-SelectedRules {
 function Invoke-AddSelectedRulesToPolicy {
     param([System.Windows.Window]$Window)
 
-    $dataGrid = $Window.FindName('RulesDataGrid')
     $selectedItems = Get-SelectedRules -Window $Window
 
     if ($selectedItems.Count -eq 0) {
@@ -373,129 +372,39 @@ function Invoke-AddSelectedRulesToPolicy {
         return
     }
 
-    # Create selection dialog
-    $dialog = [System.Windows.Window]::new()
-    $dialog.Title = "Add $($selectedItems.Count) Rule(s) to Policy"
-    $dialog.Width = 420
-    $dialog.Height = 340
-    $dialog.WindowStartupLocation = 'CenterOwner'
-    $dialog.Owner = $Window
-    $dialog.Background = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#1E1E1E')
-    $dialog.ResizeMode = 'NoResize'
-
-    $stack = [System.Windows.Controls.StackPanel]::new()
-    $stack.Margin = [System.Windows.Thickness]::new(20)
-
-    # Label
-    $label = [System.Windows.Controls.TextBlock]::new()
-    $label.Text = "Select a policy to add $($selectedItems.Count) rule(s):"
-    $label.Foreground = [System.Windows.Media.Brushes]::White
-    $label.FontSize = 14
-    $label.Margin = [System.Windows.Thickness]::new(0, 0, 0, 15)
-    $stack.Children.Add($label)
-
-    # Policy ListBox
-    $listBox = [System.Windows.Controls.ListBox]::new()
-    $listBox.Height = 160
-    $listBox.Background = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#2D2D30')
-    $listBox.Foreground = [System.Windows.Media.Brushes]::White
-    $listBox.BorderThickness = [System.Windows.Thickness]::new(1)
-    $listBox.BorderBrush = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#3E3E42')
-
-    foreach ($policy in $policiesResult.Data) {
-        $item = [System.Windows.Controls.ListBoxItem]::new()
-        $item.Content = "$($policy.Name) (Phase $($policy.Phase)) - $($policy.Status)"
-        $item.Tag = $policy.PolicyId  # PolicyId is the correct property name
-        $item.Foreground = [System.Windows.Media.Brushes]::White
-        $item.Padding = [System.Windows.Thickness]::new(5, 3, 5, 3)
-        $listBox.Items.Add($item)
+    # Show dialog and get selected policy ID (dialog is in RulesDialogs.ps1)
+    $policyId = Show-AddRulesToPolicyDialog -Window $Window -SelectedRules $selectedItems -Policies $policiesResult.Data
+    
+    if (-not $policyId) { return }  # User cancelled
+    
+    # Collect all rule IDs and call Add-RuleToPolicy
+    $ruleIds = @($selectedItems | ForEach-Object { $_.Id } | Where-Object { $_ })
+    
+    if ($ruleIds.Count -eq 0) {
+        Show-Toast -Message 'No valid rule IDs found.' -Type 'Warning'
+        return
     }
-    $stack.Children.Add($listBox)
-
-    # Buttons
-    $btnPanel = [System.Windows.Controls.StackPanel]::new()
-    $btnPanel.Orientation = 'Horizontal'
-    $btnPanel.HorizontalAlignment = 'Right'
-    $btnPanel.Margin = [System.Windows.Thickness]::new(0, 20, 0, 0)
-
-    $btnAdd = [System.Windows.Controls.Button]::new()
-    $btnAdd.Content = "Add Rules"
-    $btnAdd.Width = 100
-    $btnAdd.Height = 32
-    $btnAdd.Margin = [System.Windows.Thickness]::new(0, 0, 10, 0)
-    $btnAdd.Background = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#0078D4')
-    $btnAdd.Foreground = [System.Windows.Media.Brushes]::White
-    $btnAdd.BorderThickness = [System.Windows.Thickness]::new(0)
-
-    $btnCancel = [System.Windows.Controls.Button]::new()
-    $btnCancel.Content = "Cancel"
-    $btnCancel.Width = 80
-    $btnCancel.Height = 32
-    $btnCancel.Background = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#3E3E42')
-    $btnCancel.Foreground = [System.Windows.Media.Brushes]::White
-    $btnCancel.BorderThickness = [System.Windows.Thickness]::new(0)
-
-    $btnPanel.Children.Add($btnAdd)
-    $btnPanel.Children.Add($btnCancel)
-    $stack.Children.Add($btnPanel)
-
-    $dialog.Content = $stack
-
-    # Store references for closures
-    $listBoxRef = $listBox
-    $selectedRules = $selectedItems
-    $dialogRef = $dialog
-    $windowRef = $Window
-
-    $btnAdd.Add_Click({
-        if ($listBoxRef.SelectedItem) {
-            $policyId = $listBoxRef.SelectedItem.Tag
-            
-            # Collect all rule IDs and call Add-RuleToPolicy ONCE (it accepts arrays)
-            $ruleIds = @($selectedRules | ForEach-Object { $_.Id } | Where-Object { $_ })
-            
-            if ($ruleIds.Count -eq 0) {
-                Show-Toast -Message 'No valid rule IDs found.' -Type 'Warning'
-                return
-            }
-            
-            try {
-                Write-Log -Level Info -Message "Adding $($ruleIds.Count) rules to policy $policyId"
-                $result = Add-RuleToPolicy -PolicyId $policyId -RuleId $ruleIds
-                
-                $dialogRef.DialogResult = $true
-                $dialogRef.Close()
-                
-                if ($result.Success) {
-                    $msg = if ($result.Message) { $result.Message } else { "Added $($ruleIds.Count) rule(s) to policy" }
-                    Show-Toast -Message $msg -Type 'Success'
-                    # Reset virtual selection after successful operation
-                    $script:AllRulesSelected = $false
-                }
-                else {
-                    $errMsg = if ($result.Error) { $result.Error } else { "Unknown error" }
-                    Show-Toast -Message "Failed to add rules: $errMsg" -Type 'Error'
-                    Write-Log -Level Error -Message "Add to policy failed: $errMsg"
-                }
-            }
-            catch {
-                $dialogRef.DialogResult = $false
-                $dialogRef.Close()
-                Show-Toast -Message "Error adding rules: $($_.Exception.Message)" -Type 'Error'
-                Write-Log -Level Error -Message "Add to policy exception: $($_.Exception.Message)"
-            }
+    
+    try {
+        Write-Log -Level Info -Message "Adding $($ruleIds.Count) rules to policy $policyId"
+        $result = Add-RuleToPolicy -PolicyId $policyId -RuleId $ruleIds
+        
+        if ($result.Success) {
+            $msg = if ($result.Message) { $result.Message } else { "Added $($ruleIds.Count) rule(s) to policy" }
+            Show-Toast -Message $msg -Type 'Success'
+            # Reset virtual selection after successful operation
+            $script:AllRulesSelected = $false
         }
         else {
-            Show-Toast -Message 'Please select a policy.' -Type 'Warning'
+            $errMsg = if ($result.Error) { $result.Error } else { "Unknown error" }
+            Show-Toast -Message "Failed to add rules: $errMsg" -Type 'Error'
+            Write-Log -Level Error -Message "Add to policy failed: $errMsg"
         }
-    }.GetNewClosure())
-
-    $btnCancel.Add_Click({
-        $dialogRef.DialogResult = $false
-        $dialogRef.Close()
-    }.GetNewClosure())
-
-    $dialog.ShowDialog()
+    }
+    catch {
+        Show-Toast -Message "Error adding rules: $($_.Exception.Message)" -Type 'Error'
+        Write-Log -Level Error -Message "Add to policy exception: $($_.Exception.Message)"
+    }
 }
 
 function global:Update-RulesFilter {
@@ -583,145 +492,32 @@ function Invoke-GenerateRulesFromArtifacts {
         return
     }
 
-    # Get options from UI before async
-    $collection = $Window.FindName('TxtRuleCollectionName').Text
-    if ([string]::IsNullOrWhiteSpace($collection)) { $collection = 'Default' }
-
+    # Get options from UI (using RulesUILogic helper)
     $modeCombo = $Window.FindName('CboRuleGenMode')
-    $modeIndex = if ($modeCombo) { $modeCombo.SelectedIndex } else { 0 }
-
-    $mode = switch ($modeIndex) {
-        0 { 'Smart' }
-        1 { 'Publisher' }
-        2 { 'Hash' }
-        3 { 'Path' }
-        default { 'Smart' }
-    }
-
     $rbAllow = $Window.FindName('RbRuleAllow')
-    $action = if ($rbAllow -and $rbAllow.IsChecked) { 'Allow' } else { 'Deny' }
-
-    # Get target group SID
     $targetGroupCombo = $Window.FindName('CboRuleTargetGroup')
-    $targetGroupSid = if ($targetGroupCombo -and $targetGroupCombo.SelectedItem) {
-        $targetGroupCombo.SelectedItem.Tag
-    }
-    else {
-        'S-1-1-0'  # Everyone
-    }
-
-    # Get publisher granularity level
     $pubLevelCombo = $Window.FindName('CboPublisherLevel')
-    # DEBUG: Log ComboBox state
-    Write-RuleLog -Message "DEBUG CboPublisherLevel: Found=$($null -ne $pubLevelCombo), SelectedItem=$($pubLevelCombo.SelectedItem), SelectedIndex=$($pubLevelCombo.SelectedIndex)"
-    if ($pubLevelCombo -and $pubLevelCombo.SelectedItem) {
-        Write-RuleLog -Message "DEBUG SelectedItem: Type=$($pubLevelCombo.SelectedItem.GetType().Name), Content=$($pubLevelCombo.SelectedItem.Content), Tag=$($pubLevelCombo.SelectedItem.Tag)"
-    }
-    $publisherLevel = if ($pubLevelCombo -and $pubLevelCombo.SelectedItem) {
-        $pubLevelCombo.SelectedItem.Tag
-    }
-    else {
-        'PublisherProduct'  # Default
-    }
-    Write-RuleLog -Message "DEBUG Final publisherLevel=$publisherLevel"
+    
+    $options = Get-RuleGenerationOptions `
+        -ModeIndex $(if ($modeCombo) { $modeCombo.SelectedIndex } else { 0 }) `
+        -IsAllow $(if ($rbAllow) { $rbAllow.IsChecked } else { $true }) `
+        -TargetGroupSid $(if ($targetGroupCombo -and $targetGroupCombo.SelectedItem) { $targetGroupCombo.SelectedItem.Tag } else { 'S-1-1-0' }) `
+        -PublisherLevel $(if ($pubLevelCombo -and $pubLevelCombo.SelectedItem) { $pubLevelCombo.SelectedItem.Tag } else { 'PublisherProduct' })
 
     # Disable generate button during processing
     $btnGenerate = $Window.FindName('BtnGenerateFromArtifacts')
     if ($btnGenerate) { $btnGenerate.IsEnabled = $false }
 
-    # Filter out artifacts that already have rules (performance optimization)
+    # Filter and dedupe artifacts (using extracted helpers from RuleGenerationAsync.ps1)
     Show-LoadingOverlay -Message "Checking existing rules..." -SubMessage "Building rule index..."
     
-    $originalCount = $script:CurrentScanArtifacts.Count
-    $artifactsToProcess = @($script:CurrentScanArtifacts)
+    $filterResult = Get-FilteredArtifactsForRuleGeneration -Artifacts $script:CurrentScanArtifacts -PublisherLevel $options.PublisherLevel
+    $dedupeResult = Get-DeduplicatedArtifacts -Artifacts $filterResult.Artifacts -Mode $options.Mode -PublisherLevel $options.PublisherLevel
     
-    try {
-        $ruleIndex = Get-ExistingRuleIndex
-        if ($ruleIndex.HashCount -gt 0 -or $ruleIndex.PublisherCount -gt 0) {
-            $artifactsToProcess = @($script:CurrentScanArtifacts | Where-Object {
-                $dominated = $false
-                # Check hash rules
-                if ($_.SHA256Hash -and $ruleIndex.Hashes.Contains($_.SHA256Hash)) {
-                    $dominated = $true
-                }
-                # Check publisher rules (for signed files)
-                if (-not $dominated -and $_.IsSigned -and $_.Publisher) {
-                    # Respect PublisherLevel when checking existing rules
-                    $pubKey = if ($publisherLevel -eq 'PublisherOnly') {
-                        $_.Publisher.ToLower()
-                    } else {
-                        "$($_.Publisher)|$($_.ProductName)".ToLower()
-                    }
-                    # Use correct index based on PublisherLevel
-                    $indexToCheck = if ($publisherLevel -eq 'PublisherOnly') {
-                        $ruleIndex.PublishersOnly
-                    } else {
-                        $ruleIndex.Publishers
-                    }
-                    if ($indexToCheck -and $indexToCheck.Contains($pubKey)) {
-                        $dominated = $true
-                    }
-                }
-                -not $dominated
-            })
-            
-            $skipped = $originalCount - $artifactsToProcess.Count
-            if ($skipped -gt 0) {
-                Write-Log -Message "Filtered $skipped artifacts that already have rules"
-            }
-        }
-    }
-    catch {
-        Write-Log -Level Warning -Message "Could not filter existing rules: $($_.Exception.Message)"
-    }
-
-    # Deduplicate artifacts by hash (same file in multiple locations = one rule needed)
-    $beforeDedupeCount = $artifactsToProcess.Count
-    $seenHashes = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-    $seenPublishers = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-    $dedupedArtifacts = [System.Collections.Generic.List[PSCustomObject]]::new()
-    
-    foreach ($artifact in $artifactsToProcess) {
-        $dominated = $false
-        
-        # For Publisher mode or Smart mode with signed files, dedupe by publisher+product
-        if ($mode -in @('Publisher', 'Smart') -and $artifact.IsSigned -and $artifact.Publisher) {
-            # Respect PublisherLevel when deduplicating
-            $pubKey = if ($publisherLevel -eq 'PublisherOnly') {
-                $artifact.Publisher.ToLower()
-            } else {
-                "$($artifact.Publisher)|$($artifact.ProductName)".ToLower()
-            }
-            if ($seenPublishers.Contains($pubKey)) {
-                $dominated = $true
-            }
-            else {
-                [void]$seenPublishers.Add($pubKey)
-            }
-        }
-        
-        # For Hash mode or unsigned files in Smart mode, dedupe by hash
-        if (-not $dominated -and $artifact.SHA256Hash) {
-            if ($mode -eq 'Hash' -or ($mode -eq 'Smart' -and -not $artifact.IsSigned)) {
-                if ($seenHashes.Contains($artifact.SHA256Hash)) {
-                    $dominated = $true
-                }
-                else {
-                    [void]$seenHashes.Add($artifact.SHA256Hash)
-                }
-            }
-        }
-        
-        if (-not $dominated) {
-            $dedupedArtifacts.Add($artifact)
-        }
-    }
-    
-    $artifactsToProcess = $dedupedArtifacts.ToArray()
-    $dedupedCount = $beforeDedupeCount - $artifactsToProcess.Count
-    if ($dedupedCount -gt 0) {
-        Write-Log -Message "Deduplicated $dedupedCount artifacts (same hash/publisher) - processing $($artifactsToProcess.Count) unique"
-    }
+    $artifactsToProcess = $dedupeResult.Artifacts
+    $originalCount = $filterResult.OriginalCount
+    $skippedCount = $filterResult.SkippedCount
+    $dedupedCount = $dedupeResult.DedupedCount
 
     if ($artifactsToProcess.Count -eq 0) {
         Hide-LoadingOverlay
@@ -731,144 +527,24 @@ function Invoke-GenerateRulesFromArtifacts {
     }
 
     # Show loading overlay with deduplication info
-    $skippedCount = $originalCount - $beforeDedupeCount  # Already have rules
     $filterParts = @()
     if ($skippedCount -gt 0) { $filterParts += "$skippedCount already have rules" }
     if ($dedupedCount -gt 0) { $filterParts += "$dedupedCount duplicates" }
     $filterMsg = if ($filterParts.Count -gt 0) { " (skipped: $($filterParts -join ', '))" } else { "" }
     
     Show-LoadingOverlay -Message "Generating Rules..." -SubMessage "Processing $($artifactsToProcess.Count) unique artifacts...$filterMsg"
-    
     Show-Toast -Message "Generating rules from $($artifactsToProcess.Count) unique artifacts (of $originalCount total)$filterMsg..." -Type 'Info'
 
-    # Create sync hashtable for async communication
-    Write-RuleLog -Message "DEBUG Creating SyncHash with PublisherLevel=$publisherLevel"
-    $script:RuleGenSyncHash = [hashtable]::Synchronized(@{
-        Window = $Window
-        Artifacts = @($artifactsToProcess)
-        Mode = $mode
-        Action = $action
-        TargetGroupSid = $targetGroupSid
-        PublisherLevel = $publisherLevel
-        Generated = 0
-        Failed = 0
-        Progress = 0
-        ProgressMessage = ''
-        Summary = $null
-        IsComplete = $false
-        Error = $null
-    })
-
-    # Create runspace for background processing
-    $script:RuleGenRunspace = [runspacefactory]::CreateRunspace()
-    $script:RuleGenRunspace.ApartmentState = 'STA'
-    $script:RuleGenRunspace.ThreadOptions = 'ReuseThread'
-    $script:RuleGenRunspace.Open()
-    $script:RuleGenRunspace.SessionStateProxy.SetVariable('SyncHash', $script:RuleGenSyncHash)
-
-    # Get module path - try multiple methods
-    $modulePath = $null
-    $gaModule = Get-Module GA-AppLocker -ErrorAction SilentlyContinue
-    if ($gaModule) {
-        $modulePath = $gaModule.ModuleBase
-    }
-    if (-not $modulePath) {
-        # Fallback: look relative to GUI folder
-        $modulePath = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-        if (-not (Test-Path (Join-Path $modulePath "GA-AppLocker.psd1"))) {
-            $modulePath = Join-Path $PSScriptRoot "..\..\"
-        }
-    }
-    $script:RuleGenRunspace.SessionStateProxy.SetVariable('ModulePath', $modulePath)
-
-    $script:RuleGenPowerShell = [powershell]::Create()
-    $script:RuleGenPowerShell.Runspace = $script:RuleGenRunspace
-
-    [void]$script:RuleGenPowerShell.AddScript({
-        param($SyncHash, $ModulePath)
-        
-        try {
-            # Import module in runspace
-            $manifestPath = Join-Path $ModulePath "GA-AppLocker.psd1"
-            if (-not (Test-Path $manifestPath)) {
-                throw "Module not found at: $manifestPath"
-            }
-            Import-Module $manifestPath -Force -ErrorAction Stop
-
-            # DEBUG: Log what we received in the runspace
-            Write-RuleLog -Message "DEBUG Runspace: SyncHash.PublisherLevel = '$($SyncHash.PublisherLevel)'"
-
-            # Use batch generation for 10x+ performance improvement
-            $batchParams = @{
-                Artifacts = $SyncHash.Artifacts
-                Mode = $SyncHash.Mode
-                Action = $SyncHash.Action
-                UserOrGroupSid = $SyncHash.TargetGroupSid
-                Status = 'Pending'
-                DedupeMode = 'Smart'
-            }
+    # Start async generation (using extracted helper from RuleGenerationAsync.ps1)
+    Start-RuleGenerationAsync -Window $Window `
+        -Artifacts $artifactsToProcess `
+        -Mode $options.Mode `
+        -Action $options.Action `
+        -TargetGroupSid $options.TargetGroupSid `
+        -PublisherLevel $options.PublisherLevel `
+        -OnComplete {
+            param($syncHash)
             
-            # Add publisher level if specified
-            if ($SyncHash.PublisherLevel) {
-                $batchParams['PublisherLevel'] = $SyncHash.PublisherLevel
-                Write-RuleLog -Message "DEBUG Runspace: Added PublisherLevel='$($SyncHash.PublisherLevel)' to batchParams"
-            } else {
-                Write-RuleLog -Message "DEBUG Runspace: PublisherLevel was NULL/EMPTY - using default!"
-            }
-            
-            # Progress callback to update sync hash
-            $batchParams['OnProgress'] = {
-                param($pct, $msg)
-                $SyncHash.Progress = $pct
-                $SyncHash.ProgressMessage = $msg
-            }.GetNewClosure()
-            
-            $result = Invoke-BatchRuleGeneration @batchParams
-            
-            $SyncHash.Generated = $result.RulesCreated
-            $SyncHash.Failed = $result.Errors.Count
-            $SyncHash.Summary = $result.Summary
-        }
-        catch {
-            $SyncHash.Error = $_.Exception.Message
-        }
-        finally {
-            $SyncHash.IsComplete = $true
-        }
-    })
-
-    [void]$script:RuleGenPowerShell.AddArgument($script:RuleGenSyncHash)
-    [void]$script:RuleGenPowerShell.AddArgument($modulePath)
-
-    # Start async
-    $script:RuleGenAsyncResult = $script:RuleGenPowerShell.BeginInvoke()
-
-    # Timer to check completion
-    $script:RuleGenTimer = New-Object System.Windows.Threading.DispatcherTimer
-    $script:RuleGenTimer.Interval = [TimeSpan]::FromMilliseconds(200)
-    $script:RuleGenTimer.Add_Tick({
-        $syncHash = $script:RuleGenSyncHash
-        
-        # Update progress display from batch operation
-        if ($syncHash.Progress -gt 0 -and -not $syncHash.IsComplete) {
-            $msg = if ($syncHash.ProgressMessage) { $syncHash.ProgressMessage } else { "$($syncHash.Progress)% complete" }
-            Update-LoadingText -Message "Generating Rules..." -SubMessage $msg
-        }
-        
-        if ($syncHash.IsComplete) {
-            $script:RuleGenTimer.Stop()
-            
-            # Hide loading overlay
-            Hide-LoadingOverlay
-            
-            # Cleanup
-            try { $script:RuleGenPowerShell.EndInvoke($script:RuleGenAsyncResult) } catch {}
-            if ($script:RuleGenPowerShell) { $script:RuleGenPowerShell.Dispose() }
-            if ($script:RuleGenRunspace) { 
-                $script:RuleGenRunspace.Close()
-                $script:RuleGenRunspace.Dispose()
-            }
-
             # Re-enable button
             $win = $syncHash.Window
             $btnGenerate = $win.FindName('BtnGenerateFromArtifacts')
@@ -883,7 +559,6 @@ function Invoke-GenerateRulesFromArtifacts {
                 Show-Toast -Message "Error: $($syncHash.Error)" -Type 'Error'
             }
             elseif ($syncHash.Generated -gt 0) {
-                # Show summary from batch operation
                 $summary = $syncHash.Summary
                 if ($summary) {
                     $msg = "Created $($syncHash.Generated) rules"
@@ -902,10 +577,7 @@ function Invoke-GenerateRulesFromArtifacts {
             if ($syncHash.Failed -gt 0) {
                 Show-Toast -Message "$($syncHash.Failed) artifact(s) failed to generate rules." -Type 'Warning'
             }
-        }
-    })
-
-    $script:RuleGenTimer.Start()
+        }.GetNewClosure()
 }
 
 function Invoke-CreateManualRule {
@@ -1426,36 +1098,8 @@ function Show-RuleDetails {
     param([System.Windows.Window]$Window)
 
     $dataGrid = $Window.FindName('RulesDataGrid')
-    $selectedItem = $dataGrid.SelectedItem
-
-    if (-not $selectedItem) {
-        Show-Toast -Message 'Please select a rule to view details.' -Type 'Warning'
-        return
-    }
-
-    $details = @"
-Rule Details
-============
-
-ID: $($selectedItem.RuleId)
-Name: $($selectedItem.Name)
-Type: $($selectedItem.RuleType)
-Action: $($selectedItem.Action)
-Status: $($selectedItem.Status)
-Collection: $($selectedItem.Collection)
-Rule Collection: $($selectedItem.RuleCollection)
-
-Description:
-$($selectedItem.Description)
-
-Created: $($selectedItem.CreatedAt)
-Modified: $($selectedItem.ModifiedAt)
-
-Condition Data:
-$($selectedItem | Select-Object -Property Publisher*, Hash*, Path* | Format-List | Out-String)
-"@
-
-    [System.Windows.MessageBox]::Show($details.Trim(), 'Rule Details', 'OK', 'Information')
+    # Use extracted dialog function from RulesDialogs.ps1
+    Show-RuleDetailsDialog -Window $Window -Rule $dataGrid.SelectedItem
 }
 
 function Invoke-RulesContextAction {
@@ -1567,247 +1211,6 @@ function Invoke-RulesContextAction {
     }
 }
 
-function global:Invoke-ViewRuleHistory {
-    <#
-    .SYNOPSIS
-        Shows the version history for the selected rule.
-    #>
-    param([System.Windows.Window]$Window)
-    
-    $dataGrid = $Window.FindName('RulesDataGrid')
-    if (-not $dataGrid -or -not $dataGrid.SelectedItem) {
-        Show-Toast -Message 'Please select a rule to view history.' -Type 'Warning'
-        return
-    }
-    
-    $selectedItem = $dataGrid.SelectedItem
-    $ruleId = $selectedItem.RuleId
-    $ruleName = $selectedItem.Name
-    
-    if (-not (Get-Command -Name 'Get-RuleHistory' -ErrorAction SilentlyContinue)) {
-        Show-Toast -Message 'Rule history function not available.' -Type 'Error'
-        return
-    }
-    
-    try {
-        Show-LoadingOverlay -Message "Loading history for $ruleName..."
-        
-        $result = Get-RuleHistory -RuleId $ruleId -IncludeContent
-        
-        Hide-LoadingOverlay
-        
-        if (-not $result.Success) {
-            Show-Toast -Message "Failed to load history: $($result.Error)" -Type 'Error'
-            return
-        }
-        
-        if ($result.Data.Count -eq 0) {
-            Show-Toast -Message "No version history found for this rule." -Type 'Info'
-            return
-        }
-        
-        # Show history dialog
-        Show-RuleHistoryDialog -Window $Window -RuleName $ruleName -RuleId $ruleId -Versions $result.Data
-    }
-    catch {
-        Hide-LoadingOverlay
-        Show-Toast -Message "Error loading history: $($_.Exception.Message)" -Type 'Error'
-    }
-}
-
-function global:Show-RuleHistoryDialog {
-    <#
-    .SYNOPSIS
-        Shows a dialog with rule version history.
-    #>
-    param(
-        [System.Windows.Window]$Window,
-        [string]$RuleName,
-        [string]$RuleId,
-        [array]$Versions
-    )
-    
-    $dialogXaml = @"
-<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Rule History: $([System.Security.SecurityElement]::Escape($RuleName))"
-        Width="700" Height="500"
-        WindowStartupLocation="CenterOwner"
-        Background="#1E1E1E"
-        ResizeMode="CanResize">
-    <Window.Resources>
-        <Style TargetType="Button">
-            <Setter Property="Background" Value="#3C3C3C"/>
-            <Setter Property="Foreground" Value="#E0E0E0"/>
-            <Setter Property="Padding" Value="15,8"/>
-            <Setter Property="Margin" Value="5"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-        </Style>
-        <Style TargetType="ListBoxItem">
-            <Setter Property="Foreground" Value="#E0E0E0"/>
-            <Setter Property="Padding" Value="8,6"/>
-        </Style>
-    </Window.Resources>
-    <Grid Margin="15">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
-        
-        <TextBlock Grid.Row="0" Text="VERSION HISTORY" FontSize="12" FontWeight="SemiBold" 
-                   Foreground="#888888" Margin="0,0,0,10"/>
-        
-        <Border Grid.Row="1" Background="#2D2D2D" CornerRadius="4" Margin="0,0,0,10">
-            <ListBox x:Name="VersionsList" Background="Transparent" BorderThickness="0" 
-                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-            </ListBox>
-        </Border>
-        
-        <Border Grid.Row="2" Background="#252526" CornerRadius="4" Padding="10" Margin="0,0,0,10">
-            <StackPanel>
-                <TextBlock Text="SELECTED VERSION DETAILS" FontSize="10" FontWeight="SemiBold" 
-                           Foreground="#888888" Margin="0,0,0,8"/>
-                <TextBlock x:Name="TxtVersionDetails" Text="Select a version to view details"
-                           Foreground="#E0E0E0" FontSize="12" TextWrapping="Wrap"/>
-            </StackPanel>
-        </Border>
-        
-        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button x:Name="BtnRestoreVersion" Content="Restore This Version" Width="150"/>
-            <Button x:Name="BtnCompareVersions" Content="Compare Versions" Width="130"/>
-            <Button x:Name="BtnClose" Content="Close" Width="80" IsCancel="True"/>
-        </StackPanel>
-    </Grid>
-</Window>
-"@
-    
-    $reader = [System.Xml.XmlReader]::Create([System.IO.StringReader]::new($dialogXaml))
-    $dialog = [System.Windows.Markup.XamlReader]::Load($reader)
-    $dialog.Owner = $Window
-    
-    $versionsList = $dialog.FindName('VersionsList')
-    $txtDetails = $dialog.FindName('TxtVersionDetails')
-    $btnRestore = $dialog.FindName('BtnRestoreVersion')
-    $btnCompare = $dialog.FindName('BtnCompareVersions')
-    $btnClose = $dialog.FindName('BtnClose')
-    
-    # Populate versions list
-    foreach ($version in $Versions) {
-        $item = [System.Windows.Controls.ListBoxItem]::new()
-        $modifiedDate = if ($version.ModifiedAt) {
-            try { [datetime]::Parse($version.ModifiedAt).ToString('yyyy-MM-dd HH:mm') } catch { $version.ModifiedAt }
-        } else { 'Unknown' }
-        
-        $item.Content = "v$($version.Version) | $($version.ChangeType) | $modifiedDate | $($version.ModifiedBy)"
-        $item.Tag = $version
-        $versionsList.Items.Add($item)
-    }
-    
-    # Selection changed handler
-    $versionsList.Add_SelectionChanged({
-        $selectedItem = $versionsList.SelectedItem
-        if ($selectedItem -and $selectedItem.Tag) {
-            $ver = $selectedItem.Tag
-            $details = @(
-                "Version: $($ver.Version)",
-                "Modified: $(if ($ver.ModifiedAt) { try { [datetime]::Parse($ver.ModifiedAt).ToString('yyyy-MM-dd HH:mm:ss') } catch { $ver.ModifiedAt } } else { 'Unknown' })",
-                "Modified By: $($ver.ModifiedBy)",
-                "Change Type: $($ver.ChangeType)",
-                "Summary: $($ver.ChangeSummary)"
-            )
-            
-            if ($ver.RuleContent) {
-                $details += ""
-                $details += "--- Rule Details ---"
-                $details += "Status: $($ver.RuleContent.Status)"
-                $details += "Action: $($ver.RuleContent.Action)"
-                if ($ver.RuleContent.PublisherName) {
-                    $details += "Publisher: $($ver.RuleContent.PublisherName)"
-                }
-                if ($ver.RuleContent.ProductName) {
-                    $details += "Product: $($ver.RuleContent.ProductName)"
-                }
-            }
-            
-            $txtDetails.Text = $details -join "`n"
-        }
-    }.GetNewClosure())
-    
-    # Restore button handler
-    $script:HistoryRuleId = $RuleId
-    $btnRestore.Add_Click({
-        $selectedItem = $versionsList.SelectedItem
-        if (-not $selectedItem -or -not $selectedItem.Tag) {
-            [System.Windows.MessageBox]::Show('Please select a version to restore.', 'No Selection', 'OK', 'Warning')
-            return
-        }
-        
-        $ver = $selectedItem.Tag
-        $confirm = [System.Windows.MessageBox]::Show(
-            "Restore rule to version $($ver.Version)?`n`nThis will revert the rule to its state at that version.",
-            'Confirm Restore',
-            'YesNo',
-            'Question'
-        )
-        
-        if ($confirm -eq 'Yes') {
-            $restoreResult = Restore-RuleVersion -RuleId $script:HistoryRuleId -Version $ver.Version
-            if ($restoreResult.Success) {
-                [System.Windows.MessageBox]::Show('Rule restored successfully.', 'Restored', 'OK', 'Information')
-                $dialog.Close()
-                # Refresh rules grid
-                Update-RulesDataGrid -Window $global:GA_MainWindow -Async
-            }
-            else {
-                [System.Windows.MessageBox]::Show("Restore failed: $($restoreResult.Error)", 'Error', 'OK', 'Error')
-            }
-        }
-    }.GetNewClosure())
-    
-    # Compare button handler
-    $btnCompare.Add_Click({
-        if ($versionsList.Items.Count -lt 2) {
-            [System.Windows.MessageBox]::Show('Need at least 2 versions to compare.', 'Cannot Compare', 'OK', 'Information')
-            return
-        }
-        
-        $selectedItem = $versionsList.SelectedItem
-        if (-not $selectedItem -or -not $selectedItem.Tag) {
-            [System.Windows.MessageBox]::Show('Select a version to compare with the current rule.', 'No Selection', 'OK', 'Warning')
-            return
-        }
-        
-        $ver = $selectedItem.Tag
-        $compareResult = Compare-RuleVersions -RuleId $script:HistoryRuleId -Version1 $ver.Version
-        
-        if ($compareResult.Success) {
-            if ($compareResult.Differences.Count -eq 0) {
-                [System.Windows.MessageBox]::Show("No differences between version $($ver.Version) and current rule.", 'No Differences', 'OK', 'Information')
-            }
-            else {
-                $diffText = "Differences between v$($ver.Version) and Current:`n`n"
-                foreach ($diff in $compareResult.Differences) {
-                    $diffText += "$($diff.Property):`n"
-                    $diffText += "  v$($ver.Version): $($diff.Version1Value)`n"
-                    $diffText += "  Current: $($diff.Version2Value)`n`n"
-                }
-                [System.Windows.MessageBox]::Show($diffText, 'Version Comparison', 'OK', 'Information')
-            }
-        }
-        else {
-            [System.Windows.MessageBox]::Show("Compare failed: $($compareResult.Error)", 'Error', 'OK', 'Error')
-        }
-    }.GetNewClosure())
-    
-    # Close button
-    $btnClose.Add_Click({
-        $dialog.Close()
-    }.GetNewClosure())
-    
-    [void]$dialog.ShowDialog()
-}
+# Note: Invoke-ViewRuleHistory and Show-RuleHistoryDialog are now in GUI/Dialogs/RulesDialogs.ps1
 
 #endregion

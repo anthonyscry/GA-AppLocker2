@@ -21,6 +21,14 @@ $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
 . "$scriptPath\Helpers\DragDropHelpers.ps1"
 . "$scriptPath\Helpers\ThemeManager.ps1"
 . "$scriptPath\Helpers\GlobalSearch.ps1"
+. "$scriptPath\Helpers\RuleGenerationAsync.ps1"
+
+# Load dialogs
+if (Test-Path "$scriptPath\Dialogs") {
+    Get-ChildItem -Path "$scriptPath\Dialogs" -Filter "*.ps1" | ForEach-Object {
+        . $_.FullName
+    }
+}
 
 # Load wizards
 if (Test-Path "$scriptPath\Wizards\SetupWizard.ps1") {

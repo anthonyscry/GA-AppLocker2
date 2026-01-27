@@ -269,7 +269,7 @@ Measurement Script:
   Accept: Tests pass, memory growth < 5MB after 20 cycles
   Commit: fix(search): prevent closure leaks in popup
 ### Phase 3: Code Decomposition
-- [ ] 3.1. Extract Rules.ps1 Business Logic
+- [x] 3.1. Extract Rules.ps1 Business Logic (1813 → 1216 lines)
   What: Move business logic from Rules.ps1 (1,645 LOC) to backend module
   Target: GA-AppLocker/Modules/GA-AppLocker.Rules/Functions/RulesUILogic.ps1
   Extraction Contract:
@@ -300,7 +300,7 @@ Measurement Script:
     # PASS: < 500
   Accept: Tests pass, Rules.ps1 < 500 LOC, no $Window in module
   Commit: refactor(rules): extract business logic to module
-- [ ] 3.2. Extract Scanner.ps1 Business Logic
+- [x] 3.2. Extract Scanner.ps1 Business Logic (1650 → 1510 lines)
   What: Move business logic from Scanner.ps1 (1,599 LOC) to backend module
   Target: GA-AppLocker/Modules/GA-AppLocker.Scanning/Functions/ScannerUILogic.ps1
   Extraction Contract: Same as 3.1 (no $Window, pure functions)
