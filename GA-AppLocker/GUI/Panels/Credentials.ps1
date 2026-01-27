@@ -172,8 +172,11 @@ function Update-CredentialsDataGrid {
     $result = Get-AllCredentialProfiles
 
     if ($result.Success -and $result.Data) {
-        # Add display properties
-        $displayData = $result.Data | ForEach-Object {
+        # Ensure Data is always an array (PS 5.1 compatible)
+        $profileList = @($result.Data)
+        
+        # Add display properties - wrap result in @() to ensure array for DataGrid ItemsSource
+        $displayData = @($profileList | ForEach-Object {
             $_ | Add-Member -NotePropertyName 'IsDefaultDisplay' -NotePropertyValue $(if ($_.IsDefault) { 'Yes' } else { '' }) -PassThru -Force |
             Add-Member -NotePropertyName 'LastTestDisplay' -NotePropertyValue $(
                 if ($_.LastTestResult) {
@@ -182,7 +185,7 @@ function Update-CredentialsDataGrid {
                 }
                 else { 'Not tested' }
             ) -PassThru -Force
-        }
+        })
         $dataGrid.ItemsSource = $displayData
     }
     else {

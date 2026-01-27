@@ -213,14 +213,15 @@ function Update-MachineDataGrid {
     $dataGrid = $Window.FindName('MachineDataGrid')
     if ($dataGrid) {
         # Add status icon property
-        $machinesWithIcon = $Machines | ForEach-Object {
+        # Wrap in @() to ensure array for DataGrid ItemsSource (PS 5.1 compatible)
+        $machinesWithIcon = @($Machines | ForEach-Object {
             $statusIcon = switch ($_.IsOnline) {
                 $true { '&#x1F7E2;' }
                 $false { '&#x1F534;' }
                 default { '&#x26AA;' }
             }
             $_ | Add-Member -NotePropertyName 'StatusIcon' -NotePropertyValue $statusIcon -PassThru -Force
-        }
+        })
 
         $dataGrid.ItemsSource = $machinesWithIcon
     }
