@@ -120,6 +120,7 @@ function Initialize-ScannerPanel {
         'BtnFilterDll'          = 'DLL'
         'BtnFilterMsi'          = 'MSI'
         'BtnFilterScript'       = 'Script'
+        'BtnFilterAppx'         = 'Appx'
         'BtnFilterSigned'       = 'Signed'
         'BtnFilterUnsigned'     = 'Unsigned'
     }
@@ -521,6 +522,7 @@ function script:Update-ArtifactDataGrid {
                 'DLL' { @($artifacts | Where-Object { $_.ArtifactType -eq 'DLL' }) }
                 'MSI' { @($artifacts | Where-Object { $_.ArtifactType -eq 'MSI' }) }
                 'Script' { @($artifacts | Where-Object { $_.ArtifactType -in @('PS1', 'BAT', 'CMD', 'VBS', 'JS') }) }
+                'Appx' { @($artifacts | Where-Object { $_.CollectionType -eq 'Appx' }) }
                 'Signed' { @($artifacts | Where-Object { $_.IsSigned }) }
                 'Unsigned' { @($artifacts | Where-Object { -not $_.IsSigned }) }
                 default { $artifacts }
@@ -573,7 +575,7 @@ function global:Update-ArtifactFilter {
     )
 
     # Reset button styles
-    $allButtons = @('BtnFilterAllArtifacts', 'BtnFilterExe', 'BtnFilterDll', 'BtnFilterMsi', 'BtnFilterScript', 'BtnFilterSigned', 'BtnFilterUnsigned')
+    $allButtons = @('BtnFilterAllArtifacts', 'BtnFilterExe', 'BtnFilterDll', 'BtnFilterMsi', 'BtnFilterScript', 'BtnFilterAppx', 'BtnFilterSigned', 'BtnFilterUnsigned')
     foreach ($btnName in $allButtons) {
         $btn = $Window.FindName($btnName)
         if ($btn) {
@@ -588,6 +590,7 @@ function global:Update-ArtifactFilter {
         'DLL' { 'BtnFilterDll' }
         'MSI' { 'BtnFilterMsi' }
         'Script' { 'BtnFilterScript' }
+        'Appx' { 'BtnFilterAppx' }
         'Signed' { 'BtnFilterSigned' }
         'Unsigned' { 'BtnFilterUnsigned' }
     }

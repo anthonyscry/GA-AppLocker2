@@ -319,9 +319,16 @@ function script:Get-RuleTypeForArtifact {
         [string]$UnsignedMode = 'Hash'
     )
     
+    # For Appx packages, use PublisherName instead of SignerCertificate
+    $publisherString = if ($Artifact.CollectionType -eq 'Appx' -and $Artifact.PublisherName) {
+        $Artifact.PublisherName
+    } else {
+        $Artifact.SignerCertificate
+    }
+    
     switch ($Mode) {
         'Smart' {
-            if ($Artifact.IsSigned -and -not [string]::IsNullOrWhiteSpace($Artifact.SignerCertificate)) {
+            if ($Artifact.IsSigned -and -not [string]::IsNullOrWhiteSpace($publisherString)) {
                 return 'Publisher'
             }
             # Unsigned file - check UnsignedMode
@@ -361,15 +368,22 @@ function script:Get-UniqueArtifactsForBatch {
         # Skip artifacts marked for skipping
         if ($ruleType -eq 'Skip') { continue }
         
+        # Get publisher string (Appx uses PublisherName, others use SignerCertificate)
+        $pubStr = if ($art.CollectionType -eq 'Appx' -and $art.PublisherName) {
+            $art.PublisherName
+        } else {
+            $art.SignerCertificate
+        }
+        
         $key = switch ($Mode) {
             'Smart' {
                 # Key based on what rule will be created
                 switch ($ruleType) {
                     'Publisher' {
                         if ($PublisherLevel -eq 'PublisherOnly') {
-                            $art.SignerCertificate
+                            $pubStr
                         } else {
-                            "$($art.SignerCertificate)|$($art.ProductName)"
+                            "$pubStr|$($art.ProductName)"
                         }
                     }
                     'Path' {
@@ -387,9 +401,9 @@ function script:Get-UniqueArtifactsForBatch {
             'Publisher' {
                 # Respect PublisherLevel for deduplication
                 if ($PublisherLevel -eq 'PublisherOnly') {
-                    $art.SignerCertificate
+                    $pubStr
                 } else {
-                    "$($art.SignerCertificate)|$($art.ProductName)"
+                    "$pubStr|$($art.ProductName)"
                 }
             }
             'Hash' {
@@ -423,13 +437,20 @@ function script:Test-RuleExistsInIndex {
     
     if (-not $Index) { return $false }
     
+    # Get publisher string (Appx uses PublisherName, others use SignerCertificate)
+    $pubStr = if ($Artifact.CollectionType -eq 'Appx' -and $Artifact.PublisherName) {
+        $Artifact.PublisherName
+    } else {
+        $Artifact.SignerCertificate
+    }
+    
     switch ($RuleType) {
         'Publisher' {
             # Respect PublisherLevel for existing rule check
             $key = if ($PublisherLevel -eq 'PublisherOnly') {
-                $Artifact.SignerCertificate.ToLower()
+                $pubStr.ToLower()
             } else {
-                "$($Artifact.SignerCertificate)|$($Artifact.ProductName)".ToLower()
+                "$pubStr|$($Artifact.ProductName)".ToLower()
             }
             # Use correct index based on PublisherLevel
             if ($PublisherLevel -eq 'PublisherOnly') {
@@ -485,9 +506,16 @@ function script:New-RuleObjectFromArtifact {
     }
     $collectionType = Get-CollectionType -Extension $extension
     
+    # Get publisher string (Appx uses PublisherName, others use SignerCertificate)
+    $pubStr = if ($Artifact.CollectionType -eq 'Appx' -and $Artifact.PublisherName) {
+        $Artifact.PublisherName
+    } else {
+        $Artifact.SignerCertificate
+    }
+    
     # Get group suggestion
     $groupSuggestion = Get-SuggestedGroup `
-        -PublisherName $Artifact.SignerCertificate `
+        -PublisherName $pubStr `
         -ProductName $Artifact.ProductName `
         -FilePath $Artifact.FilePath `
         -IsSigned $Artifact.IsSigned
@@ -515,7 +543,7 @@ function script:New-RuleObjectFromArtifact {
                 default { '*' }
             }
             
-            $pubName = Format-PublisherString -CertSubject $Artifact.SignerCertificate
+            $pubName = Format-PublisherString -CertSubject $pubStr
             
             return [PSCustomObject]@{
                 Id              = $ruleId
@@ -525,7 +553,7 @@ function script:New-RuleObjectFromArtifact {
                 Action          = $Action
                 Name            = "Publisher: $pubName - $productName"
                 Description     = "Auto-generated publisher rule"
-                PublisherName   = $Artifact.SignerCertificate
+                PublisherName   = $pubStr
                 ProductName     = $productName
                 BinaryName      = $binaryName
                 MinVersion      = $minVer

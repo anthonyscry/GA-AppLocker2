@@ -116,8 +116,15 @@ function ConvertFrom-Artifact {
                 $ruleType = $PreferredRuleType
 
                 # Auto-detect rule type
+                # For Appx packages, PublisherName is used instead of SignerCertificate
+                $publisherString = if ($art.CollectionType -eq 'Appx' -and $art.PublisherName) {
+                    $art.PublisherName
+                } else {
+                    $art.SignerCertificate
+                }
+                
                 if ($ruleType -eq 'Auto') {
-                    if ($art.IsSigned -and -not [string]::IsNullOrWhiteSpace($art.SignerCertificate)) {
+                    if ($art.IsSigned -and -not [string]::IsNullOrWhiteSpace($publisherString)) {
                         $ruleType = 'Publisher'
                     }
                     else {
@@ -127,7 +134,7 @@ function ConvertFrom-Artifact {
 
                 # Get smart group suggestion for this artifact
                 $groupSuggestion = Get-SuggestedGroup `
-                    -PublisherName $art.SignerCertificate `
+                    -PublisherName $publisherString `
                     -ProductName $art.ProductName `
                     -FilePath $art.FilePath `
                     -IsSigned $art.IsSigned
@@ -144,11 +151,11 @@ function ConvertFrom-Artifact {
                 switch ($ruleType) {
                     'Publisher' {
                         if ($GroupByPublisher) {
-                            # Group by publisher certificate
-                            $pubKey = $art.SignerCertificate
+                            # Group by publisher certificate (or PublisherName for Appx)
+                            $pubKey = $publisherString
                             if (-not $publisherGroups.ContainsKey($pubKey)) {
                                 $publisherGroups[$pubKey] = @{
-                                    Publisher  = $art.SignerCertificate
+                                    Publisher  = $publisherString
                                     Company    = $art.Publisher
                                     Products   = @{}
                                     Artifacts  = @()
@@ -200,7 +207,7 @@ function ConvertFrom-Artifact {
                             }
                             
                             $pubResult = New-PublisherRule `
-                                -PublisherName $art.SignerCertificate `
+                                -PublisherName $publisherString `
                                 -ProductName $productName `
                                 -BinaryName $binaryName `
                                 -MinVersion $minVer `

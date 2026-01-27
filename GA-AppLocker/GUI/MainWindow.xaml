@@ -1262,7 +1262,8 @@
                                         <Button x:Name="BtnFilterExe" Content="EXE" Background="Transparent" Foreground="{StaticResource MutedBrush}" Padding="10,4" BorderThickness="0" Margin="0,0,4,0" FontSize="11"/>
                                         <Button x:Name="BtnFilterDll" Content="DLL" Background="Transparent" Foreground="{StaticResource MutedBrush}" Padding="10,4" BorderThickness="0" Margin="0,0,4,0" FontSize="11"/>
                                         <Button x:Name="BtnFilterMsi" Content="MSI" Background="Transparent" Foreground="{StaticResource MutedBrush}" Padding="10,4" BorderThickness="0" Margin="0,0,4,0" FontSize="11"/>
-                                        <Button x:Name="BtnFilterScript" Content="Script" Background="Transparent" Foreground="{StaticResource MutedBrush}" Padding="10,4" BorderThickness="0" Margin="0,0,8,0" FontSize="11"/>
+                                        <Button x:Name="BtnFilterScript" Content="Script" Background="Transparent" Foreground="{StaticResource MutedBrush}" Padding="10,4" BorderThickness="0" Margin="0,0,4,0" FontSize="11"/>
+                                        <Button x:Name="BtnFilterAppx" Content="Appx" Background="Transparent" Foreground="{StaticResource PrimaryBrush}" Padding="10,4" BorderThickness="0" Margin="0,0,8,0" FontSize="11"/>
                                         <Rectangle Width="1" Fill="#3E3E42" Margin="0,2"/>
                                         <Button x:Name="BtnFilterSigned" Content="Signed" Background="Transparent" Foreground="{StaticResource SuccessBrush}" Padding="10,4" BorderThickness="0" Margin="8,0,4,0" FontSize="11"/>
                                         <Button x:Name="BtnFilterUnsigned" Content="Unsigned" Background="Transparent" Foreground="{StaticResource WarningBrush}" Padding="10,4" BorderThickness="0" FontSize="11"/>
