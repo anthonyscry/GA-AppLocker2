@@ -604,18 +604,30 @@ Get-RemoteArtifacts -ComputerName 'Server01' -SkipDllScanning
 
 ### UI Cleanup - Wizard Consolidation
 
-The Rule Generation Wizard now handles all configuration that was previously scattered in the Rules panel:
+The Rule Generation Wizard is now the **primary UI** for generating rules from artifacts. Duplicate controls have been removed from both Scanner and Rules panels.
+
+**Removed from Scanner Panel (formerly "Filters" tab, now "Generate" tab):**
+- `CboDedupeMode` dropdown and `BtnDedupeArtifacts` button
+- `ChkExcludeDll`, `ChkExcludeJs`, `ChkExcludeScripts`, `ChkExcludeUnsigned` checkboxes
+- `BtnApplyExclusions` button
+- **Replaced with:** Single "Launch Rule Generation Wizard" button
 
 **Removed from Rules Panel "Generate" Tab:**
-- "Exclude from Generation" section (DLLs, JS, Scripts, Unsigned checkboxes)
-- "Dedupe Mode" dropdown and button
-- These features are now in the wizard's Step 1: Configure
+- `CboRuleGenMode` (generation mode dropdown)
+- `CboPublisherLevel` (publisher granularity dropdown)
+- `CboUnsignedMode` (unsigned file handling dropdown)
+- `RbRuleAllow` / `RbRuleDeny` (action radio buttons)
+- `CboRuleTargetGroup` (apply-to dropdown)
+- `TxtRuleCollectionName` (collection name textbox)
+- **Replaced with:** Single "Launch Rule Generation Wizard" button
 
 **Simplified UI Flow:**
 ```
-OLD: Scan → Go to Rules → Configure exclusions → Configure dedupe → Click Generate → Wait
-NEW: Scan → Click "Generate Rules" → Wizard opens → Configure all in one place → Preview → Generate
+OLD: Scan → Go to Rules → Configure 6+ dropdowns → Configure exclusions → Click Generate → Wait
+NEW: Scan → Click "Launch Wizard" → 3-step wizard (Configure → Preview → Generate)
 ```
+
+**Note:** `Invoke-DedupeArtifacts` and `Invoke-ApplyArtifactExclusions` functions are still available for programmatic/scripting use.
 
 ### Bug Fix: Get-Rule in JSON Fallback Mode (Jan 23, 2026)
 
