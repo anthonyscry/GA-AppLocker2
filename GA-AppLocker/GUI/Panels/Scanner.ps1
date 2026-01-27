@@ -1416,7 +1416,8 @@ function global:Invoke-ToggleScheduledScan {
 function global:Invoke-LaunchRuleWizard {
     <#
     .SYNOPSIS
-        Generates rules directly from current scan artifacts using batch generation.
+        Launches the Rule Generation Wizard with current scan artifacts.
+        The wizard shows a 3-step UI: Configure -> Preview -> Generate
     #>
     param([System.Windows.Window]$Window)
     
@@ -1424,6 +1425,39 @@ function global:Invoke-LaunchRuleWizard {
         Show-Toast -Message "No artifacts available. Run a scan first." -Type 'Warning'
         return
     }
+    
+    $artifactCount = $script:CurrentScanArtifacts.Count
+    Write-Log -Message "Launching Rule Generation Wizard with $artifactCount artifacts"
+    
+    # Check if wizard is available (RuleGenerationWizard.ps1 loaded)
+    if (Get-Command -Name 'Initialize-RuleGenerationWizard' -ErrorAction SilentlyContinue) {
+        # Launch the 3-step wizard UI
+        Initialize-RuleGenerationWizard -Artifacts $script:CurrentScanArtifacts
+    } else {
+        # Fallback: Show confirmation dialog before generating
+        $confirmResult = [System.Windows.MessageBox]::Show(
+            "Generate rules from $artifactCount artifacts?`n`nMode: Smart (Publisher for signed, Hash for unsigned)`nAction: Pending (requires approval)`n`nThis may take a minute for large artifact sets.",
+            "Confirm Rule Generation",
+            [System.Windows.MessageBoxButton]::YesNo,
+            [System.Windows.MessageBoxImage]::Question
+        )
+        
+        if ($confirmResult -ne [System.Windows.MessageBoxResult]::Yes) {
+            Write-Log -Message "Rule generation cancelled by user"
+            return
+        }
+        
+        # User confirmed - proceed with generation
+        Invoke-DirectRuleGeneration -Window $Window
+    }
+}
+
+function global:Invoke-DirectRuleGeneration {
+    <#
+    .SYNOPSIS
+        Generates rules directly without wizard UI. Called after user confirmation.
+    #>
+    param([System.Windows.Window]$Window)
     
     $artifactCount = $script:CurrentScanArtifacts.Count
     Show-Toast -Message "Generating rules from $artifactCount artifacts (Smart mode)..." -Type 'Info'
@@ -1495,6 +1529,11 @@ function global:Invoke-LaunchRuleWizard {
         # Navigate to Rules panel to see results
         if (Get-Command -Name 'Set-ActivePanel' -ErrorAction SilentlyContinue) {
             Set-ActivePanel -PanelName 'PanelRules'
+        }
+        
+        # Auto-refresh the Rules DataGrid to show newly created rules
+        if (Get-Command -Name 'Update-RulesDataGrid' -ErrorAction SilentlyContinue) {
+            Update-RulesDataGrid -Window $Window
         }
     }
     catch {
