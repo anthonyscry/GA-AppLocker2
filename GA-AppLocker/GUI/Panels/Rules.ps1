@@ -269,8 +269,14 @@ function Update-RulesSelectionCount {
     
     if (-not $dataGrid -or -not $countText) { return }
     
-    $selectedCount = $dataGrid.SelectedItems.Count
     $totalCount = if ($dataGrid.ItemsSource) { @($dataGrid.ItemsSource).Count } else { 0 }
+    
+    # Respect virtual "all selected" flag for large datasets
+    $selectedCount = if ($script:AllRulesSelected) { 
+        $totalCount 
+    } else { 
+        $dataGrid.SelectedItems.Count 
+    }
     
     $countText.Text = "$selectedCount"
     
@@ -289,7 +295,27 @@ function Invoke-SelectAllRules {
     $dataGrid = $Window.FindName('RulesDataGrid')
     if (-not $dataGrid) { return }
     
-    # Suppress selection events during bulk operation
+    $itemCount = $dataGrid.Items.Count
+    if ($itemCount -eq 0) { return }
+    
+    # For large datasets, use virtual selection (track state without actually selecting in DataGrid)
+    if ($itemCount -gt 500) {
+        # Set virtual selection flag
+        $script:AllRulesSelected = $SelectAll
+        
+        # Update the count display directly without actual DataGrid selection
+        $countLabel = $Window.FindName('SelectedRulesCount')
+        if ($countLabel) {
+            $countLabel.Text = if ($SelectAll) { "$itemCount selected" } else { "0 selected" }
+        }
+        
+        # Visual feedback - highlight the checkbox but skip slow DataGrid.SelectAll()
+        Write-RuleLog -Message "Virtual select all: $SelectAll for $itemCount items"
+        return
+    }
+    
+    # For smaller datasets, use normal selection
+    $script:AllRulesSelected = $false
     $script:SuppressRulesSelectionChanged = $true
     
     try {
@@ -301,18 +327,33 @@ function Invoke-SelectAllRules {
         }
     }
     finally {
-        # Re-enable selection events
         $script:SuppressRulesSelectionChanged = $false
     }
     
     Update-RulesSelectionCount -Window $Window
 }
 
+# Helper to get selected rules (respects virtual selection)
+function Get-SelectedRules {
+    param([System.Windows.Window]$Window)
+    
+    $dataGrid = $Window.FindName('RulesDataGrid')
+    if (-not $dataGrid) { return @() }
+    
+    # If virtual "all selected" is active, return all items
+    if ($script:AllRulesSelected) {
+        return @($dataGrid.ItemsSource)
+    }
+    
+    # Otherwise return actual selection
+    return @($dataGrid.SelectedItems)
+}
+
 function Invoke-AddSelectedRulesToPolicy {
     param([System.Windows.Window]$Window)
 
     $dataGrid = $Window.FindName('RulesDataGrid')
-    $selectedItems = @($dataGrid.SelectedItems)
+    $selectedItems = Get-SelectedRules -Window $Window
 
     if ($selectedItems.Count -eq 0) {
         Show-Toast -Message 'Please select one or more rules to add to a policy.' -Type 'Warning'
@@ -425,6 +466,8 @@ function Invoke-AddSelectedRulesToPolicy {
             
             if ($addedCount -gt 0) {
                 Show-Toast -Message "Added $addedCount rule(s) to policy." -Type 'Success'
+                # Reset virtual selection after successful operation
+                $script:AllRulesSelected = $false
             }
             if ($errors.Count -gt 0) {
                 Show-Toast -Message "Some rules could not be added: $($errors.Count) error(s)" -Type 'Warning'
@@ -922,13 +965,15 @@ function Set-SelectedRuleStatus {
         [string]$Status
     )
 
-    $dataGrid = $Window.FindName('RulesDataGrid')
-    $selectedItems = $dataGrid.SelectedItems
+    $selectedItems = Get-SelectedRules -Window $Window
 
     if ($selectedItems.Count -eq 0) {
         Show-Toast -Message 'Please select one or more rules.' -Type 'Warning'
         return
     }
+    
+    # Reset virtual selection after operation
+    $script:AllRulesSelected = $false
 
     if (-not (Get-Command -Name 'Set-RuleStatus' -ErrorAction SilentlyContinue)) {
         Show-Toast -Message 'Set-RuleStatus function not available.' -Type 'Error'
@@ -966,13 +1011,15 @@ function Set-SelectedRuleStatus {
 function Invoke-DeleteSelectedRules {
     param([System.Windows.Window]$Window)
 
-    $dataGrid = $Window.FindName('RulesDataGrid')
-    $selectedItems = $dataGrid.SelectedItems
+    $selectedItems = Get-SelectedRules -Window $Window
 
     if ($selectedItems.Count -eq 0) {
         Show-Toast -Message 'Please select one or more rules to delete.' -Type 'Warning'
         return
     }
+    
+    # Reset virtual selection after operation
+    $script:AllRulesSelected = $false
 
     $count = $selectedItems.Count
     
