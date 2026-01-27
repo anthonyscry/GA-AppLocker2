@@ -405,7 +405,7 @@ function Invoke-AddSelectedRulesToPolicy {
     foreach ($policy in $policiesResult.Data) {
         $item = [System.Windows.Controls.ListBoxItem]::new()
         $item.Content = "$($policy.Name) (Phase $($policy.Phase)) - $($policy.Status)"
-        $item.Tag = $policy.Id
+        $item.Tag = $policy.PolicyId  # PolicyId is the correct property name
         $item.Foreground = [System.Windows.Media.Brushes]::White
         $item.Padding = [System.Windows.Thickness]::new(5, 3, 5, 3)
         $listBox.Items.Add($item)
