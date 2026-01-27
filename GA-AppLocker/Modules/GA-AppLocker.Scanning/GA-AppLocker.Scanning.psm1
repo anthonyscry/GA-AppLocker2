@@ -28,7 +28,8 @@ $script:ArtifactExtensions = @(
     '.exe', '.dll', '.msi', '.msp',      # Executables and installers
     '.ps1', '.psm1', '.psd1',            # PowerShell
     '.bat', '.cmd',                       # Batch files
-    '.vbs', '.js', '.wsf'                # Scripts
+    '.vbs', '.js', '.wsf',               # Scripts
+    '.appx', '.msix'                     # Packaged apps (UWP/MSIX)
 )
 
 # Default paths loaded from config; fallback if config unavailable

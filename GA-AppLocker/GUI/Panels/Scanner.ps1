@@ -233,6 +233,7 @@ function global:Invoke-StartArtifactScan {
     $includeEvents = $Window.FindName('ChkIncludeEventLogs').IsChecked
     $includeHighRisk = $Window.FindName('ChkIncludeHighRisk').IsChecked
     $skipDllScanning = $Window.FindName('ChkSkipDllScanning').IsChecked
+    $includeAppx = $Window.FindName('ChkIncludeAppx').IsChecked
     $saveResults = $Window.FindName('ChkSaveResults').IsChecked
     $scanName = $Window.FindName('TxtScanName').Text
     $pathsText = $Window.FindName('TxtScanPaths').Text
@@ -287,6 +288,7 @@ function global:Invoke-StartArtifactScan {
     if ($scanLocal) { $scanParams.ScanLocal = $true }
     if ($includeEvents) { $scanParams.IncludeEventLogs = $true }
     if ($skipDllScanning) { $scanParams.SkipDllScanning = $true }
+    if ($includeAppx) { $scanParams.IncludeAppx = $true }
     if ($paths.Count -gt 0) { $scanParams.Paths = $paths }
     if ($scanRemote -and $script:SelectedScanMachines.Count -gt 0) {
         $scanParams.Machines = $script:SelectedScanMachines

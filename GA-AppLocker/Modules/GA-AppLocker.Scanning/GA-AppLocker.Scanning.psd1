@@ -20,6 +20,7 @@
     FunctionsToExport = @(
         'Get-LocalArtifacts',
         'Get-RemoteArtifacts',
+        'Get-AppxArtifacts',
         'Get-AppLockerEventLogs',
         'Start-ArtifactScan',
         'Get-ScanResults',

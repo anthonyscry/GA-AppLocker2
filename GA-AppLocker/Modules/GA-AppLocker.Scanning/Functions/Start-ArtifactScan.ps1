@@ -79,6 +79,9 @@ function Start-ArtifactScan {
         [switch]$SkipDllScanning,
 
         [Parameter()]
+        [switch]$IncludeAppx,
+
+        [Parameter()]
         [hashtable]$SyncHash = $null
     )
 
@@ -126,6 +129,23 @@ function Start-ArtifactScan {
                 $eventResult = Get-AppLockerEventLogs
                 if ($eventResult.Success) {
                     $allEvents += $eventResult.Data
+                }
+            }
+
+            # Scan Appx/MSIX packages if requested
+            if ($IncludeAppx) {
+                Write-ScanLog -Message "Scanning Appx/MSIX packages..."
+                if ($SyncHash) { 
+                    $SyncHash.StatusText = "Scanning Appx/MSIX packages..."
+                }
+
+                $appxParams = @{}
+                if ($SyncHash) { $appxParams.SyncHash = $SyncHash }
+
+                $appxResult = Get-AppxArtifacts @appxParams
+                if ($appxResult.Success) {
+                    $allArtifacts += $appxResult.Data
+                    Write-ScanLog -Message "Found $($appxResult.Data.Count) Appx packages"
                 }
             }
         }
@@ -239,6 +259,7 @@ function Start-ArtifactScan {
             UniquePublishers    = ($allArtifacts | Where-Object { $_.Publisher } | Select-Object -Unique Publisher).Count
             SignedArtifacts     = ($allArtifacts | Where-Object { $_.IsSigned }).Count
             UnsignedArtifacts   = ($allArtifacts | Where-Object { -not $_.IsSigned }).Count
+            AppxArtifacts       = ($allArtifacts | Where-Object { $_.CollectionType -eq 'Appx' }).Count
             MachineResults      = $machineResults
             ArtifactsByType     = $allArtifacts | Group-Object ArtifactType | Select-Object Name, Count
         }

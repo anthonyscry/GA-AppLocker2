@@ -1135,6 +1135,9 @@
                                         <CheckBox x:Name="ChkIncludeHighRisk" Content="Include High Risk Paths" 
                                                   Foreground="{StaticResource WarningBrush}" Margin="0,0,0,6"
                                                   ToolTip="Adds Downloads, Desktop, Temp folders to scan"/>
+                                        <CheckBox x:Name="ChkIncludeAppx" Content="Include Appx/MSIX Packages" 
+                                                  Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,6"
+                                                  ToolTip="Enumerate installed Windows App packages (UWP/MSIX)"/>
                                         <CheckBox x:Name="ChkSaveResults" Content="Auto-Save Results" Foreground="{StaticResource ForegroundBrush}" IsChecked="True" Margin="0,0,0,15"/>
                                         
                                         <!-- Scan Name -->
