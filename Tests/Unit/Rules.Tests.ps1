@@ -35,7 +35,7 @@ Describe 'Rules Module - Core Functions' {
 
         It 'Should create a hash rule' {
             $hash = 'A' * 64
-            $result = New-HashRule -Hash $hash -FileName 'test.exe' -FileSize 1024 -Name 'Test Hash Rule' -Action 'Allow' -CollectionType 'Exe'
+            $result = New-HashRule -Hash $hash -SourceFileName 'test.exe' -SourceFileLength 1024 -Name 'Test Hash Rule' -Action 'Allow' -CollectionType 'Exe'
             
             $result.Success | Should -BeTrue
             $result.Data.RuleType | Should -Be 'Hash'
@@ -43,7 +43,7 @@ Describe 'Rules Module - Core Functions' {
         }
 
         It 'Should validate hash format' {
-            $result = New-HashRule -Hash 'invalid' -FileName 'test.exe' -FileSize 1024 -Name 'Test' -Action 'Allow' -CollectionType 'Exe'
+            $result = New-HashRule -Hash 'invalid' -SourceFileName 'test.exe' -SourceFileLength 1024 -Name 'Test' -Action 'Allow' -CollectionType 'Exe'
             
             # Should either fail validation or accept (depending on implementation)
             $result | Should -Not -BeNullOrEmpty
@@ -51,7 +51,7 @@ Describe 'Rules Module - Core Functions' {
 
         It 'Should set default status to Pending' {
             $hash = 'B' * 64
-            $result = New-HashRule -Hash $hash -FileName 'test.exe' -FileSize 1024 -Name 'Test Hash Rule' -Action 'Allow' -CollectionType 'Exe'
+            $result = New-HashRule -Hash $hash -SourceFileName 'test.exe' -SourceFileLength 1024 -Name 'Test Hash Rule' -Action 'Allow' -CollectionType 'Exe'
             
             $result.Data.Status | Should -Be 'Pending'
         }
@@ -107,17 +107,17 @@ Describe 'Rules Module - Core Functions' {
 
         It 'Should retrieve rule by ID' {
             $hash = 'C' * 64
-            $created = New-HashRule -Hash $hash -FileName 'test.exe' -FileSize 1024 -Name 'Retrievable Rule' -Action 'Allow' -CollectionType 'Exe' -Save
+            $created = New-HashRule -Hash $hash -SourceFileName 'test.exe' -SourceFileLength 1024 -Name 'Retrievable Rule' -Action 'Allow' -CollectionType 'Exe' -Save
             
             if ($created.Success) {
-                $result = Get-Rule -RuleId $created.Data.Id
+                $result = Get-Rule -Id $created.Data.Id
                 $result.Success | Should -BeTrue
                 $result.Data.Id | Should -Be $created.Data.Id
             }
         }
 
         It 'Should return error for non-existent rule' {
-            $result = Get-Rule -RuleId 'non-existent-rule-id-12345'
+            $result = Get-Rule -Id 'non-existent-rule-id-12345'
             $result.Success | Should -BeFalse
         }
     }
@@ -217,7 +217,7 @@ Describe 'Rules Module - Bulk Operations' {
             # Create test rules first
             1..3 | ForEach-Object {
                 $hash = ('D' * 62) + ('{0:D2}' -f $_)
-                New-HashRule -Hash $hash -FileName "test$_.exe" -FileSize 1024 -Name "Bulk Test $_" -Action 'Allow' -CollectionType 'Exe' -Status 'Pending' -Save | Out-Null
+                New-HashRule -Hash $hash -SourceFileName "test$_.exe" -SourceFileLength 1024 -Name "Bulk Test $_" -Action 'Allow' -CollectionType 'Exe' -Status 'Pending' -Save | Out-Null
             }
 
             $result = Set-BulkRuleStatus -Status 'Approved' -CurrentStatus 'Pending' -WhatIf
@@ -249,7 +249,7 @@ Describe 'Rules Module - Deduplication' {
             # Create duplicate rules
             $dupHash = 'E' * 64
             1..3 | ForEach-Object {
-                New-HashRule -Hash $dupHash -FileName "dup$_.exe" -FileSize 1024 -Name "Dup Rule $_" -Action 'Allow' -CollectionType 'Exe' -Save | Out-Null
+                New-HashRule -Hash $dupHash -SourceFileName "dup$_.exe" -SourceFileLength 1024 -Name "Dup Rule $_" -Action 'Allow' -CollectionType 'Exe' -Save | Out-Null
             }
 
             $result = Find-DuplicateRules -RuleType 'Hash'
@@ -277,7 +277,7 @@ Describe 'Rules Module - Deduplication' {
 
         It 'Should find existing rule by hash' {
             $testHash = 'F' * 64
-            New-HashRule -Hash $testHash -FileName 'existing.exe' -FileSize 1024 -Name 'Existing Rule' -Action 'Allow' -CollectionType 'Exe' -Save | Out-Null
+            New-HashRule -Hash $testHash -SourceFileName 'existing.exe' -SourceFileLength 1024 -Name 'Existing Rule' -Action 'Allow' -CollectionType 'Exe' -Save | Out-Null
 
             $found = Find-ExistingHashRule -Hash $testHash -CollectionType 'Exe'
             $found | Should -Not -BeNullOrEmpty
@@ -313,7 +313,7 @@ Describe 'Rules Module - XML Export' {
         It 'Should export rules to valid XML' {
             # Create rules to export
             $hash = 'AA' * 32
-            New-HashRule -Hash $hash -FileName 'export.exe' -FileSize 1024 -Name 'Export Test Rule' -Action 'Allow' -CollectionType 'Exe' -Status 'Approved' -Save | Out-Null
+            New-HashRule -Hash $hash -SourceFileName 'export.exe' -SourceFileLength 1024 -Name 'Export Test Rule' -Action 'Allow' -CollectionType 'Exe' -Status 'Approved' -Save | Out-Null
 
             $exportPath = Join-Path $script:TestDataPath 'export-test.xml'
             $result = Export-RulesToXml -Path $exportPath -Status 'Approved'
@@ -348,7 +348,7 @@ Describe 'Rules Module - Artifact Conversion' {
                 Version       = $null
             }
 
-            $result = ConvertFrom-Artifact -Artifact $artifact -RuleType 'Hash'
+            $result = ConvertFrom-Artifact -Artifact $artifact -PreferredRuleType 'Hash'
             $result.Success | Should -BeTrue
             $result.Data.RuleType | Should -Be 'Hash'
         }
@@ -366,7 +366,7 @@ Describe 'Rules Module - Artifact Conversion' {
                 Version       = '1.0.0.0'
             }
 
-            $result = ConvertFrom-Artifact -Artifact $artifact -RuleType 'Publisher'
+            $result = ConvertFrom-Artifact -Artifact $artifact -PreferredRuleType 'Publisher'
             $result.Success | Should -BeTrue
             $result.Data.RuleType | Should -Be 'Publisher'
             $result.Data.PublisherName | Should -Be 'O=SIGNED PUBLISHER'
@@ -381,25 +381,15 @@ Describe 'Rules Module - Smart Group Assignment' {
         }
 
         It 'Should suggest group for Microsoft product' {
-            $artifact = [PSCustomObject]@{
-                Publisher   = 'O=MICROSOFT CORPORATION'
-                ProductName = 'Windows PowerShell'
-                FilePath    = 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
-            }
-
-            $result = Get-SuggestedGroup -Artifact $artifact
+            $result = Get-SuggestedGroup -PublisherName 'O=MICROSOFT CORPORATION' -ProductName 'Windows PowerShell' -FilePath 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
             $result | Should -Not -BeNullOrEmpty
+            $result.Success | Should -BeTrue
         }
 
         It 'Should suggest group based on path' {
-            $artifact = [PSCustomObject]@{
-                Publisher   = $null
-                ProductName = $null
-                FilePath    = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
-            }
-
-            $result = Get-SuggestedGroup -Artifact $artifact
+            $result = Get-SuggestedGroup -FilePath 'C:\Program Files\Google\Chrome\Application\chrome.exe'
             $result | Should -Not -BeNullOrEmpty
+            $result.Success | Should -BeTrue
         }
     }
 }
@@ -407,17 +397,17 @@ Describe 'Rules Module - Smart Group Assignment' {
 Describe 'Rules Module - Error Handling' {
     Context 'Invalid Inputs' {
         It 'Should handle empty name gracefully' {
-            $result = New-HashRule -Hash ('DD' * 32) -FileName 'test.exe' -FileSize 1024 -Name '' -Action 'Allow' -CollectionType 'Exe'
+            $result = New-HashRule -Hash ('DD' * 32) -SourceFileName 'test.exe' -SourceFileLength 1024 -Name '' -Action 'Allow' -CollectionType 'Exe'
             # Should either fail gracefully or use default name
             $result | Should -Not -BeNull
         }
 
         It 'Should handle invalid action' {
-            { New-HashRule -Hash ('EE' * 32) -FileName 'test.exe' -FileSize 1024 -Name 'Test' -Action 'InvalidAction' -CollectionType 'Exe' } | Should -Throw
+            { New-HashRule -Hash ('EE' * 32) -SourceFileName 'test.exe' -SourceFileLength 1024 -Name 'Test' -Action 'InvalidAction' -CollectionType 'Exe' } | Should -Throw
         }
 
         It 'Should handle invalid collection type' {
-            { New-HashRule -Hash ('FF' * 32) -FileName 'test.exe' -FileSize 1024 -Name 'Test' -Action 'Allow' -CollectionType 'InvalidType' } | Should -Throw
+            { New-HashRule -Hash ('FF' * 32) -SourceFileName 'test.exe' -SourceFileLength 1024 -Name 'Test' -Action 'Allow' -CollectionType 'InvalidType' } | Should -Throw
         }
     }
 }

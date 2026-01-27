@@ -22,7 +22,7 @@ AfterAll {
     # Cleanup test rules
     $testRules = Get-RulesFromDatabase | Where-Object { $_.Name -like 'TestRule*' }
     foreach ($rule in $testRules) {
-        Remove-RuleFromDatabase -RuleId $rule.RuleId -ErrorAction SilentlyContinue | Out-Null
+        Remove-RuleFromDatabase -RuleId @($rule.RuleId) -ErrorAction SilentlyContinue | Out-Null
     }
 }
 
@@ -61,7 +61,7 @@ Describe 'Rule Repository' -Tag 'Unit', 'Repository' {
             $result.Name | Should -Be 'TestRuleRepoGet'
 
             # Cleanup
-            Remove-RuleFromDatabase -RuleId $testRule.RuleId | Out-Null
+            Remove-RuleFromDatabase -RuleId @($testRule.RuleId) | Out-Null
         }
 
         It 'Uses cache for repeated requests' {
@@ -88,7 +88,7 @@ Describe 'Rule Repository' -Tag 'Unit', 'Repository' {
             $stats.Hits | Should -BeGreaterOrEqual 1
 
             # Cleanup
-            Remove-RuleFromDatabase -RuleId $testRule.RuleId | Out-Null
+            Remove-RuleFromDatabase -RuleId @($testRule.RuleId) | Out-Null
         }
 
         It 'BypassCache ignores cached value' {
@@ -119,7 +119,7 @@ Describe 'Rule Repository' -Tag 'Unit', 'Repository' {
             $fresh.Name | Should -Be 'UpdatedName'
 
             # Cleanup
-            Remove-RuleFromDatabase -RuleId $testRule.RuleId | Out-Null
+            Remove-RuleFromDatabase -RuleId @($testRule.RuleId) | Out-Null
         }
     }
 
@@ -146,7 +146,7 @@ Describe 'Rule Repository' -Tag 'Unit', 'Repository' {
             $saved | Should -Not -BeNullOrEmpty
 
             # Cleanup
-            Remove-RuleFromDatabase -RuleId $newRule.RuleId | Out-Null
+            Remove-RuleFromDatabase -RuleId @($newRule.RuleId) | Out-Null
         }
 
         It 'Updates existing rule' {
@@ -173,7 +173,7 @@ Describe 'Rule Repository' -Tag 'Unit', 'Repository' {
             $updated.Status | Should -Be 'Approved'
 
             # Cleanup
-            Remove-RuleFromDatabase -RuleId $rule.RuleId | Out-Null
+            Remove-RuleFromDatabase -RuleId @($rule.RuleId) | Out-Null
         }
 
         It 'Invalidates cache on save' {
@@ -201,7 +201,7 @@ Describe 'Rule Repository' -Tag 'Unit', 'Repository' {
             $result.Status | Should -Be 'Approved'
 
             # Cleanup
-            Remove-RuleFromDatabase -RuleId $rule.RuleId | Out-Null
+            Remove-RuleFromDatabase -RuleId @($rule.RuleId) | Out-Null
         }
 
         It 'Returns error for rule without RuleId' {
@@ -284,7 +284,7 @@ Describe 'Rule Repository' -Tag 'Unit', 'Repository' {
 
         AfterAll {
             foreach ($id in $script:TestRuleIds) {
-                Remove-RuleFromDatabase -RuleId $id -ErrorAction SilentlyContinue | Out-Null
+                Remove-RuleFromDatabase -RuleId @($id) -ErrorAction SilentlyContinue | Out-Null
             }
         }
 
@@ -348,7 +348,7 @@ Describe 'Rule Repository' -Tag 'Unit', 'Repository' {
             $result | Should -BeTrue
 
             # Cleanup
-            Remove-RuleFromDatabase -RuleId $rule.RuleId | Out-Null
+            Remove-RuleFromDatabase -RuleId @($rule.RuleId) | Out-Null
         }
 
         It 'Returns false for non-existent rule' {
@@ -386,7 +386,7 @@ Describe 'Rule Repository' -Tag 'Unit', 'Repository' {
             foreach ($id in $ruleIds) {
                 $rule = Get-RuleFromDatabase -RuleId $id
                 $rule.Status | Should -Be 'Approved'
-                Remove-RuleFromDatabase -RuleId $id | Out-Null
+                Remove-RuleFromDatabase -RuleId @($id) | Out-Null
             }
         }
 

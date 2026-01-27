@@ -166,7 +166,14 @@ function Add-RulesToIndex {
         }
         $rulesPath = Join-Path $dataPath 'Rules'
 
+        $skipped = 0
         foreach ($rule in $Rules) {
+            # Skip if rule already exists in index (prevents duplicates when index was rebuilt from files)
+            if ($script:RuleById.ContainsKey($rule.Id)) {
+                $skipped++
+                continue
+            }
+
             # Create index entry
             $indexEntry = [PSCustomObject]@{
                 Id             = $rule.Id
@@ -201,6 +208,10 @@ function Add-RulesToIndex {
             }
 
             $result.AddedCount++
+        }
+        
+        if ($skipped -gt 0) {
+            Write-StorageLog -Message "Skipped $skipped rules already in index"
         }
 
         # Save updated index to disk
@@ -336,6 +347,7 @@ function Clear-RulesIndex {
     $script:JsonIndex = [PSCustomObject]@{ Rules = @(); LastUpdated = (Get-Date -Format 'o') }
     $script:HashIndex = @{}
     $script:PublisherIndex = @{}
+    $script:PublisherOnlyIndex = @{}  # BUGFIX: Was missing, causing stale Publisher rules to be marked as "existing"
     $script:RuleById = @{}
     $script:JsonIndexLoaded = $true
     
@@ -383,6 +395,11 @@ function Remove-RulesFromIndex {
                     $key = "$($rule.PublisherName)|$($rule.ProductName)".ToLower()
                     if ($script:PublisherIndex.ContainsKey($key)) {
                         $script:PublisherIndex.Remove($key)
+                    }
+                    # BUGFIX: Also remove from PublisherOnlyIndex
+                    $pubOnlyKey = $rule.PublisherName.ToLower()
+                    if ($script:PublisherOnlyIndex.ContainsKey($pubOnlyKey)) {
+                        $script:PublisherOnlyIndex.Remove($pubOnlyKey)
                     }
                 }
                 $result.RemovedCount++

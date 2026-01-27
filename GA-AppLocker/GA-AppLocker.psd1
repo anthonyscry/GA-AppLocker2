@@ -176,6 +176,15 @@ Features:
         'Get-RuleCountsFromRepository',
         'Invoke-RuleBatchOperation',
         'Test-RuleExistsInRepository',
+        # Storage - Backwards Compatibility Aliases
+        'Get-RulesFromDatabase',
+        'Get-RuleFromDatabase',
+        'Add-RuleToDatabase',
+        'Update-RuleInDatabase',
+        'Remove-RuleFromDatabase',
+        'Initialize-RuleDatabase',
+        'Get-RuleDatabasePath',
+        'Test-RuleDatabaseExists',
         # Policy module
         'New-Policy',
         'Get-Policy',

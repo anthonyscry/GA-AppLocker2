@@ -103,5 +103,15 @@ Export-ModuleMember -Function @(
     'Find-RulesInRepository',
     'Get-RuleCountsFromRepository',
     'Invoke-RuleBatchOperation',
-    'Test-RuleExistsInRepository'
+    'Test-RuleExistsInRepository',
+    
+    # Backwards Compatibility Aliases (needed by Rules module)
+    'Get-RulesFromDatabase',
+    'Get-RuleFromDatabase',
+    'Add-RuleToDatabase',
+    'Update-RuleInDatabase',
+    'Remove-RuleFromDatabase',
+    'Initialize-RuleDatabase',
+    'Get-RuleDatabasePath',
+    'Test-RuleDatabaseExists'
 )

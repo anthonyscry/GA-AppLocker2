@@ -308,6 +308,53 @@ function Invoke-BatchRuleGeneration {
 
 #region ===== HELPER FUNCTIONS =====
 
+function script:Test-GuidOnlyCertificate {
+    <#
+    .SYNOPSIS
+        Checks if a certificate subject contains only a GUID as the CN with no other useful info.
+        GUID-only certificates don't provide meaningful publisher identification.
+    #>
+    param([string]$CertSubject)
+    
+    if ([string]::IsNullOrWhiteSpace($CertSubject)) { return $false }
+    
+    # Pattern for GUID-only certificate (CN=GUID with nothing else)
+    $guidPattern = '^CN=[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$'
+    
+    return $CertSubject -match $guidPattern
+}
+
+function script:Get-AppNameFromFileName {
+    <#
+    .SYNOPSIS
+        Extracts a friendly app name from an Appx package filename.
+        e.g., "AcerIncorporated.AcerCareCenterS.appx" -> "Acer Care Center S"
+    #>
+    param([string]$FileName)
+    
+    if ([string]::IsNullOrWhiteSpace($FileName)) { return $null }
+    
+    # Remove extension
+    $name = [System.IO.Path]::GetFileNameWithoutExtension($FileName)
+    
+    # Common patterns: Publisher.AppName or Publisher.App.Name
+    # Try to extract the app name part (after first dot)
+    if ($name -match '^[^.]+\.(.+)$') {
+        $appPart = $Matches[1]
+        
+        # Convert PascalCase to spaces: "AcerCareCenterS" -> "Acer Care Center S"
+        $friendly = $appPart -creplace '([a-z])([A-Z])', '$1 $2'
+        # Also handle "PowerBI" style -> "Power BI"
+        $friendly = $friendly -creplace '([A-Z]+)([A-Z][a-z])', '$1 $2'
+        # Remove dots
+        $friendly = $friendly -replace '\.', ' '
+        
+        return $friendly.Trim()
+    }
+    
+    return $name
+}
+
 function script:Get-RuleTypeForArtifact {
     <#
     .SYNOPSIS
@@ -329,6 +376,12 @@ function script:Get-RuleTypeForArtifact {
     switch ($Mode) {
         'Smart' {
             if ($Artifact.IsSigned -and -not [string]::IsNullOrWhiteSpace($publisherString)) {
+                # Check for GUID-only certificates - use Hash instead since they don't provide
+                # meaningful publisher identification and typically cover only one file
+                if (Test-GuidOnlyCertificate -CertSubject $publisherString) {
+                    Write-RuleLog -Message "GUID-only certificate detected for $($Artifact.FileName), using Hash rule"
+                    return 'Hash'
+                }
                 return 'Publisher'
             }
             # Unsigned file - check UnsignedMode
@@ -543,7 +596,7 @@ function script:New-RuleObjectFromArtifact {
                 default { '*' }
             }
             
-            $pubName = Format-PublisherString -CertSubject $pubStr
+            $pubName = Format-PublisherString -CertSubject $pubStr -FileName $Artifact.FileName
             
             return [PSCustomObject]@{
                 Id              = $ruleId

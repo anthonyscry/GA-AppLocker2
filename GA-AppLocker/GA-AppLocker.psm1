@@ -390,6 +390,15 @@ Export-ModuleMember -Function @(
     'Invoke-RuleIndexRebuild',
     # Storage - Maintenance
     'Remove-OrphanedRuleFiles',
+    # Storage - Backwards Compatibility Aliases
+    'Get-RulesFromDatabase',
+    'Get-RuleFromDatabase',
+    'Add-RuleToDatabase',
+    'Update-RuleInDatabase',
+    'Remove-RuleFromDatabase',
+    'Initialize-RuleDatabase',
+    'Get-RuleDatabasePath',
+    'Test-RuleDatabaseExists',
     # Storage - Repository Pattern
     'Get-RuleFromRepository',
     'Save-RuleToRepository',

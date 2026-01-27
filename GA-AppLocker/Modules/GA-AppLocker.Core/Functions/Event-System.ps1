@@ -264,7 +264,7 @@ function Unregister-AppLockerEvent {
         $handlers = $script:EventHandlers[$EventName]
         $toRemove = $handlers | Where-Object { $_.Id -eq $HandlerId }
         if ($toRemove) {
-            $handlers.Remove($toRemove)
+            [void]$handlers.Remove($toRemove)
             return 1
         }
         return 0

@@ -138,10 +138,30 @@ function script:Format-PublisherString {
     <#
     .SYNOPSIS
         Formats a publisher certificate subject into a display name.
+        Handles GUID-only certificates by returning a clearer indicator.
     #>
-    param([string]$CertSubject)
+    param(
+        [string]$CertSubject,
+        [string]$FileName = $null
+    )
     
     if ([string]::IsNullOrWhiteSpace($CertSubject)) { return 'Unknown' }
+    
+    # Check for GUID-only certificate pattern
+    $guidPattern = '^CN=[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$'
+    if ($CertSubject -match $guidPattern) {
+        # Try to extract app name from filename for Appx packages
+        if ($FileName -and $FileName -match '\.appx$') {
+            $appName = Get-AppNameFromFileName -FileName $FileName
+            if ($appName) {
+                return "$appName (Store App)"
+            }
+        }
+        # Fallback: show shortened GUID with indicator
+        if ($CertSubject -match 'CN=([0-9A-Fa-f]{8})') {
+            return "Store App ($($Matches[1])...)"
+        }
+    }
     
     # Extract CN (Common Name) from certificate subject
     if ($CertSubject -match 'CN=([^,]+)') {
@@ -154,6 +174,37 @@ function script:Format-PublisherString {
     }
     
     return $CertSubject
+}
+
+function script:Get-AppNameFromFileName {
+    <#
+    .SYNOPSIS
+        Extracts a friendly app name from an Appx package filename.
+        e.g., "AcerIncorporated.AcerCareCenterS.appx" -> "Acer Care Center S"
+    #>
+    param([string]$FileName)
+    
+    if ([string]::IsNullOrWhiteSpace($FileName)) { return $null }
+    
+    # Remove extension
+    $name = [System.IO.Path]::GetFileNameWithoutExtension($FileName)
+    
+    # Common patterns: Publisher.AppName or Publisher.App.Name
+    # Try to extract the app name part (after first dot)
+    if ($name -match '^[^.]+\.(.+)$') {
+        $appPart = $Matches[1]
+        
+        # Convert PascalCase to spaces: "AcerCareCenterS" -> "Acer Care Center S"
+        $friendly = $appPart -creplace '([a-z])([A-Z])', '$1 $2'
+        # Also handle "PowerBI" style -> "Power BI"
+        $friendly = $friendly -creplace '([A-Z]+)([A-Z][a-z])', '$1 $2'
+        # Remove dots
+        $friendly = $friendly -replace '\.', ' '
+        
+        return $friendly.Trim()
+    }
+    
+    return $name
 }
 
 function script:ConvertTo-AppLockerXmlRule {
