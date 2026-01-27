@@ -201,28 +201,15 @@ function global:Update-RulesDataGrid {
         if ($txtFiltered) { $txtFiltered.Text = "$filteredCount" }
     }
 
-    # NOTE: Async disabled due to runspace cmdlet issues - using sync load
-    # TODO: Fix async runspace to include core cmdlets properly
-    if ($false -and $Async -and (Get-Command -Name 'Invoke-AsyncOperation' -ErrorAction SilentlyContinue)) {
-        Invoke-AsyncOperation -ScriptBlock { Get-AllRules } -LoadingMessage 'Loading rules...' -OnComplete {
-            param($Result)
-            & $processRulesData $Result $typeFilter $statusFilter $textFilter $dataGrid $Window
-        }.GetNewClosure() -OnError {
-            param($ErrorMessage)
-            Write-Log -Level Error -Message "Failed to load rules: $ErrorMessage"
-            $dataGrid.ItemsSource = $null
-        }.GetNewClosure()
+    # Synchronous load - fast enough for typical deployments (100s-1000s of rules)
+    # For extremely large rule sets (10K+), the JSON index with O(1) lookups keeps this performant
+    try {
+        $result = Get-AllRules
+        & $processRulesData $result $typeFilter $statusFilter $textFilter $dataGrid $Window
     }
-    else {
-        # Synchronous fallback
-        try {
-            $result = Get-AllRules
-            & $processRulesData $result $typeFilter $statusFilter $textFilter $dataGrid $Window
-        }
-        catch {
-            Write-Log -Level Error -Message "Failed to update rules grid: $($_.Exception.Message)"
-            $dataGrid.ItemsSource = $null
-        }
+    catch {
+        Write-Log -Level Error -Message "Failed to update rules grid: $($_.Exception.Message)"
+        $dataGrid.ItemsSource = $null
     }
 }
 
