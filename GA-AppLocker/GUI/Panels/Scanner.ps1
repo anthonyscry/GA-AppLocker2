@@ -1466,7 +1466,7 @@ function global:Show-RuleGenerationConfigDialog {
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Rule Generation Settings" 
-        Width="450" Height="480"
+        Width="480" Height="620"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
         Background="#1E1E1E">
@@ -1595,10 +1595,18 @@ function global:Show-RuleGenerationConfigDialog {
                 <ComboBoxItem Content="Skip (Don't create rules)" Tag="Skip"/>
             </ComboBox>
             
+            <!-- Exclusions -->
+            <TextBlock Text="Exclusions" Foreground="{StaticResource FgBrush}" FontWeight="SemiBold" Margin="0,0,0,8"/>
+            <StackPanel Margin="0,0,0,15">
+                <CheckBox x:Name="ChkSkipDlls" Content="Skip DLLs (Library files)" Foreground="{StaticResource FgBrush}" Margin="0,0,0,6" IsChecked="True"/>
+                <CheckBox x:Name="ChkSkipScripts" Content="Skip Scripts (PS1, BAT, CMD, VBS, JS)" Foreground="{StaticResource FgBrush}" Margin="0,0,0,6"/>
+                <CheckBox x:Name="ChkSkipUnsigned" Content="Skip Unsigned files entirely" Foreground="{StaticResource FgBrush}" Margin="0,0,0,0"/>
+            </StackPanel>
+            
             <!-- Initial Status -->
             <TextBlock Text="Initial Status" Foreground="{StaticResource FgBrush}" FontWeight="SemiBold" Margin="0,0,0,5"/>
             <ComboBox x:Name="CboStatus" Background="{StaticResource ControlBg}" Foreground="{StaticResource FgBrush}" 
-                      BorderBrush="{StaticResource BorderBrush}" Padding="8,6" Margin="0,0,0,15">
+                      BorderBrush="{StaticResource BorderBrush}" Padding="8,6" Margin="0,0,0,10">
                 <ComboBoxItem Content="Pending (Requires approval)" Tag="Pending" IsSelected="True"/>
                 <ComboBoxItem Content="Approved" Tag="Approved"/>
             </ComboBox>
@@ -1628,6 +1636,9 @@ function global:Show-RuleGenerationConfigDialog {
         $cboTargetGroup = $dialog.FindName('CboTargetGroup')
         $cboUnsignedMode = $dialog.FindName('CboUnsignedMode')
         $cboStatus = $dialog.FindName('CboStatus')
+        $chkSkipDlls = $dialog.FindName('ChkSkipDlls')
+        $chkSkipScripts = $dialog.FindName('ChkSkipScripts')
+        $chkSkipUnsigned = $dialog.FindName('ChkSkipUnsigned')
         $btnCancel = $dialog.FindName('BtnCancel')
         $btnGenerate = $dialog.FindName('BtnGenerate')
         
@@ -1643,6 +1654,9 @@ function global:Show-RuleGenerationConfigDialog {
             $result.TargetSid = $cboTargetGroup.SelectedItem.Tag
             $result.UnsignedMode = $cboUnsignedMode.SelectedItem.Tag
             $result.Status = $cboStatus.SelectedItem.Tag
+            $result.SkipDlls = $chkSkipDlls.IsChecked
+            $result.SkipScripts = $chkSkipScripts.IsChecked
+            $result.SkipUnsigned = $chkSkipUnsigned.IsChecked
             $dialog.DialogResult = $true
             $dialog.Close()
         })
@@ -1674,7 +1688,7 @@ function global:Invoke-DirectRuleGenerationWithSettings {
     $artifactCount = $script:CurrentScanArtifacts.Count
     Show-Toast -Message "Generating rules from $artifactCount artifacts..." -Type 'Info'
     Write-Log -Message "Starting batch rule generation for $artifactCount artifacts"
-    Write-Log -Message "Settings: PublisherLevel=$($Settings.PublisherLevel), Action=$($Settings.Action), UnsignedMode=$($Settings.UnsignedMode)"
+    Write-Log -Message "Settings: PublisherLevel=$($Settings.PublisherLevel), Action=$($Settings.Action), UnsignedMode=$($Settings.UnsignedMode), SkipDlls=$($Settings.SkipDlls), SkipScripts=$($Settings.SkipScripts), SkipUnsigned=$($Settings.SkipUnsigned)"
     
     # Show loading overlay
     if (Get-Command -Name 'Show-LoadingOverlay' -ErrorAction SilentlyContinue) {
@@ -1682,15 +1696,25 @@ function global:Invoke-DirectRuleGenerationWithSettings {
     }
     
     try {
+        # Build parameter hashtable for batch generation
+        $genParams = @{
+            Artifacts      = $script:CurrentScanArtifacts
+            Mode           = 'Smart'
+            Action         = $Settings.Action
+            Status         = $Settings.Status
+            DedupeMode     = 'Smart'
+            PublisherLevel = $Settings.PublisherLevel
+            UserOrGroupSid = $Settings.TargetSid
+            UnsignedMode   = $Settings.UnsignedMode
+        }
+        
+        # Add skip switches if enabled
+        if ($Settings.SkipDlls) { $genParams['SkipDlls'] = $true }
+        if ($Settings.SkipScripts) { $genParams['SkipScripts'] = $true }
+        if ($Settings.SkipUnsigned) { $genParams['SkipUnsigned'] = $true }
+        
         # Use batch generation with user's settings from dialog
-        $result = Invoke-BatchRuleGeneration -Artifacts $script:CurrentScanArtifacts `
-            -Mode 'Smart' `
-            -Action $Settings.Action `
-            -Status $Settings.Status `
-            -DedupeMode 'Smart' `
-            -PublisherLevel $Settings.PublisherLevel `
-            -UserOrGroupSid $Settings.TargetSid `
-            -UnsignedMode $Settings.UnsignedMode
+        $result = Invoke-BatchRuleGeneration @genParams
         
         # Hide loading overlay
         if (Get-Command -Name 'Hide-LoadingOverlay' -ErrorAction SilentlyContinue) {
