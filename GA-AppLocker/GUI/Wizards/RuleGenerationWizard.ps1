@@ -214,7 +214,11 @@ function global:Show-WizardStep2 {
     $artifacts = $script:WizardState.Artifacts
     
     # Use Invoke-AsyncOperation if available, otherwise calculate synchronously
-    if (Get-Command -Name 'Invoke-AsyncOperation' -ErrorAction SilentlyContinue) {
+    # Try-catch used since Get-Command fails in WPF context
+    $asyncAvailable = $false
+    try { $asyncAvailable = [bool](Get-Command -Name 'Invoke-AsyncOperation' -ErrorAction Stop) } catch { }
+    
+    if ($asyncAvailable) {
         Invoke-AsyncOperation -ScriptBlock {
             param($Artifacts, $Settings)
             Get-BatchPreview `
@@ -353,8 +357,11 @@ function global:Start-WizardBatchGeneration {
         })
     }
     
-    # Use async operation if available
-    if (Get-Command -Name 'Invoke-AsyncOperation' -ErrorAction SilentlyContinue) {
+    # Use async operation if available (try-catch since Get-Command fails in WPF context)
+    $asyncAvailable = $false
+    try { $asyncAvailable = [bool](Get-Command -Name 'Invoke-AsyncOperation' -ErrorAction Stop) } catch { }
+    
+    if ($asyncAvailable) {
         Invoke-AsyncOperation -ScriptBlock {
             param($Artifacts, $Settings)
             
@@ -449,9 +456,9 @@ function global:Complete-WizardGeneration {
         # Update buttons
         Update-WizardButtons
         
-        # Show toast notification
-        if ($Result.Success -and (Get-Command -Name 'Show-Toast' -ErrorAction SilentlyContinue)) {
-            Show-Toast -Message "Created $($Result.RulesCreated) rules in $($Result.Duration.TotalSeconds.ToString('F1'))s" -Type Success
+        # Show toast notification (use try-catch - Get-Command fails in WPF context)
+        if ($Result.Success) {
+            try { Show-Toast -Message "Created $($Result.RulesCreated) rules in $($Result.Duration.TotalSeconds.ToString('F1'))s" -Type Success } catch { }
         }
     })
 }

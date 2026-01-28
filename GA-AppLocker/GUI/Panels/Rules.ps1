@@ -371,13 +371,12 @@ function global:Invoke-AddSelectedRulesToPolicy {
         return
     }
 
-    # Get available policies
-    if (-not (Get-Command -Name 'Get-AllPolicies' -ErrorAction SilentlyContinue)) {
+    # Get available policies (use try-catch - Get-Command fails in WPF context)
+    $policiesResult = $null
+    try { $policiesResult = Get-AllPolicies } catch {
         Show-Toast -Message 'Policy functions not available.' -Type 'Error'
         return
     }
-
-    $policiesResult = Get-AllPolicies
     if (-not $policiesResult.Success -or $policiesResult.Data.Count -eq 0) {
         Show-Toast -Message 'No policies available. Create a policy first.' -Type 'Warning'
         return
@@ -633,10 +632,9 @@ function global:Set-SelectedRuleStatus {
         }
         
         # Batch update the index once (much faster than individual calls)
+        # Use try-catch - Get-Command fails in WPF context
         if ($updatedIds.Count -gt 0) {
-            if (Get-Command -Name 'Update-RuleStatusInIndex' -ErrorAction SilentlyContinue) {
-                Update-RuleStatusInIndex -RuleIds $updatedIds.ToArray() -Status $Status | Out-Null
-            }
+            try { Update-RuleStatusInIndex -RuleIds $updatedIds.ToArray() -Status $Status | Out-Null } catch { }
         }
         
         if ($errors.Count -gt 0) {
