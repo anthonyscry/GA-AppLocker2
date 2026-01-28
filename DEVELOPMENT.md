@@ -76,6 +76,78 @@ function global:Invoke-ButtonAction {
 }
 ```
 
+### DataGrid Column Standards
+
+All DataGrid panels follow standardized column widths and ordering for consistency:
+
+#### Standard Column Widths
+
+| Data Type | Width | Notes |
+|-----------|-------|-------|
+| Checkbox | 40 | Selection column |
+| Status Icon | 40-50 | Single character/emoji |
+| Type | 80 | Consistent across all grids |
+| Name/Primary | 160-180 | Main identifier |
+| Publisher | 160 | Vendor name |
+| Product | 160 or * | Product name (often fill) |
+| Description | * | Fill remaining space |
+| Collection | 80 | Exe/Dll/Script/etc. |
+| Action | 60 | Allow/Deny |
+| Status Badge | 85 | Colored status indicator |
+| Date | 100 | Created/Modified |
+| Version | 50-70 | Short version string |
+| Count | 60 | Numeric values |
+
+#### Panel Column Layouts
+
+**AD Discovery (MachineDataGrid)**
+| Column | Width | Binding |
+|--------|-------|---------|
+| ☑️ | 40 | (checkbox) |
+| Status | 50 | StatusIcon |
+| Type | 80 | MachineType |
+| Hostname | 160 | Hostname |
+| Operating System | * | OperatingSystem |
+| Last Logon | 100 | LastLogon |
+| WinRM | 70 | WinRMStatus |
+
+**Artifact Scanner (ArtifactDataGrid)**
+| Column | Width | Binding |
+|--------|-------|---------|
+| S | 40 | SignedIcon |
+| Type | 80 | ArtifactType |
+| File Name | 180 | FileName |
+| Publisher | 160 | Publisher |
+| Version | 70 | FileVersion |
+| Machine | 100 | ComputerName |
+| Path | * | FilePath |
+
+**Rule Generator (RulesDataGrid)**
+| Column | Width | Binding |
+|--------|-------|---------|
+| Type | 80 | RuleType |
+| Name | 180 | Name |
+| Publisher | 160 | PublisherName |
+| Product | * | ProductName |
+| Group | 100 | GroupName (template) |
+| Collection | 80 | Collection |
+| Action | 60 | Action |
+| Status | 85 | Status (template) |
+| Created | 100 | CreatedDisplay |
+
+**Policy Builder (PoliciesDataGrid)**
+| Column | Width | Binding |
+|--------|-------|---------|
+| Policy Name | 180 | Name |
+| Description | * | Description |
+| Rules | 60 | RuleCount |
+| Mode | 80 | EnforcementMode |
+| Phase | 60 | Phase |
+| Status | 85 | Status (template) |
+| Target GPO | 120 | TargetGPO |
+| Ver | 50 | Version |
+| Modified | 100 | ModifiedDisplay |
+
 ## Coding Standards
 
 ### Function Requirements

@@ -102,7 +102,7 @@ Start-AppLockerDashboard
 ## Architecture Notes
 - **Modular Design**: 9 specialized sub-modules handle different aspects of the policy lifecycle.
 - **Standardized Results**: All functions return a consistent object: `@{ Success = $true/$false; Data = ...; Error = ... }`.
-- **UI Architecture**: WPF dark theme with 7 dedicated panels and a central button dispatcher pattern.
+- **UI Architecture**: WPF dark theme with 7 dedicated panels, central button dispatcher pattern, and standardized DataGrid columns across all data views.
 - **Security**: DPAPI encryption is used for storing sensitive credentials.
 - **Air-Gapped Ready**: No external dependencies or internet access required after initial setup.
 
