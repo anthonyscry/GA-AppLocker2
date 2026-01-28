@@ -112,7 +112,7 @@ function Update-ModuleStatus {
     }
 }
 
-function script:Update-DeploymentJobsDataGrid {
+function global:Update-DeploymentJobsDataGrid {
     param(
         [System.Windows.Window]$Window,
         [switch]$Async
@@ -227,7 +227,7 @@ function global:Update-DeploymentFilter {
     Update-DeploymentJobsDataGrid -Window $Window
 }
 
-function Update-SelectedJobInfo {
+function global:Update-SelectedJobInfo {
     param([System.Windows.Window]$Window)
 
     $dataGrid = $Window.FindName('DeploymentJobsDataGrid')
@@ -247,7 +247,7 @@ function Update-SelectedJobInfo {
     }
 }
 
-function Invoke-CreateDeploymentJob {
+function global:Invoke-CreateDeploymentJob {
     param([System.Windows.Window]$Window)
 
     $policyCombo = $Window.FindName('CboDeployPolicy')
@@ -308,7 +308,7 @@ function Invoke-CreateDeploymentJob {
     }
 }
 
-function Invoke-DeploySelectedJob {
+function global:Invoke-DeploySelectedJob {
     param([System.Windows.Window]$Window)
 
     if ($script:DeploymentInProgress) {
@@ -475,7 +475,7 @@ function Invoke-DeploySelectedJob {
     $script:DeployTimer.Start()
 }
 
-function Invoke-StopDeployment {
+function global:Invoke-StopDeployment {
     param([System.Windows.Window]$Window)
 
     if (-not $script:DeploymentInProgress) {
@@ -514,7 +514,7 @@ function Update-DeploymentProgress {
     if ($progressBar) { $progressBar.Value = $Percent }
 }
 
-function Invoke-CancelDeploymentJob {
+function global:Invoke-CancelDeploymentJob {
     param([System.Windows.Window]$Window)
 
     if (-not $script:SelectedDeploymentJobId) {
@@ -547,7 +547,7 @@ function Invoke-CancelDeploymentJob {
     }
 }
 
-function Show-DeploymentLog {
+function global:Show-DeploymentLog {
     param([System.Windows.Window]$Window)
 
     try {

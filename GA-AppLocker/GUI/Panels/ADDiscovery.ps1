@@ -58,7 +58,7 @@ function Unregister-DiscoveryPanelEvents {
     $script:ADDiscovery_Handlers = @{}
 }
 
-function Invoke-DomainRefresh {
+function global:Invoke-DomainRefresh {
     param(
         [System.Windows.Window]$Window,
         [switch]$Async
@@ -227,7 +227,7 @@ function Update-MachineDataGrid {
     }
 }
 
-function Invoke-ConnectivityTest {
+function global:Invoke-ConnectivityTest {
     param(
         [System.Windows.Window]$Window,
         [switch]$Async

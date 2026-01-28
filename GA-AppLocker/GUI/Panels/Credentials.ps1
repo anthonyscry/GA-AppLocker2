@@ -88,7 +88,7 @@ function Unregister-CredentialsPanelEvents {
     $script:Credentials_Handlers = @{}
 }
 
-function Invoke-SaveCredential {
+function global:Invoke-SaveCredential {
     param([System.Windows.Window]$Window)
 
     $profileName = $Window.FindName('CredProfileName')
@@ -163,7 +163,7 @@ function Invoke-SaveCredential {
     }
 }
 
-function Update-CredentialsDataGrid {
+function global:Update-CredentialsDataGrid {
     param([System.Windows.Window]$Window)
 
     $dataGrid = $Window.FindName('CredentialsDataGrid')
@@ -193,7 +193,7 @@ function Update-CredentialsDataGrid {
     }
 }
 
-function Invoke-TestSelectedCredential {
+function global:Invoke-TestSelectedCredential {
     param([System.Windows.Window]$Window)
 
     $dataGrid = $Window.FindName('CredentialsDataGrid')
@@ -238,7 +238,7 @@ function Invoke-TestSelectedCredential {
     Update-CredentialsDataGrid -Window $Window
 }
 
-function Invoke-DeleteSelectedCredential {
+function global:Invoke-DeleteSelectedCredential {
     param([System.Windows.Window]$Window)
 
     $dataGrid = $Window.FindName('CredentialsDataGrid')
@@ -280,7 +280,7 @@ function Invoke-DeleteSelectedCredential {
     }
 }
 
-function Invoke-SetDefaultCredential {
+function global:Invoke-SetDefaultCredential {
     param([System.Windows.Window]$Window)
 
     $dataGrid = $Window.FindName('CredentialsDataGrid')

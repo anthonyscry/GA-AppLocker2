@@ -244,7 +244,7 @@ function Update-RuleCounters {
     if ($btnRejected) { $btnRejected.Content = "Rejected ($rejected)" }
 }
 
-function Update-RulesSelectionCount {
+function global:Update-RulesSelectionCount {
     param([System.Windows.Window]$Window)
 
     $dataGrid = $Window.FindName('RulesDataGrid')
@@ -270,7 +270,7 @@ function Update-RulesSelectionCount {
     }
 }
 
-function Invoke-SelectAllRules {
+function global:Invoke-SelectAllRules {
     param(
         [System.Windows.Window]$Window,
         [bool]$SelectAll = $true
@@ -319,7 +319,7 @@ function Invoke-SelectAllRules {
 }
 
 # Helper to get selected rules (respects virtual selection)
-function Get-SelectedRules {
+function global:Get-SelectedRules {
     param([System.Windows.Window]$Window)
     
     $dataGrid = $Window.FindName('RulesDataGrid')
@@ -334,7 +334,7 @@ function Get-SelectedRules {
     return @($dataGrid.SelectedItems)
 }
 
-function Invoke-AddSelectedRulesToPolicy {
+function global:Invoke-AddSelectedRulesToPolicy {
     param([System.Windows.Window]$Window)
 
     $selectedItems = Get-SelectedRules -Window $Window
@@ -472,7 +472,7 @@ function Invoke-GenerateRulesFromArtifacts {
     Invoke-LaunchRuleWizard -Window $Window
 }
 
-function Invoke-CreateManualRule {
+function global:Invoke-CreateManualRule {
     param([System.Windows.Window]$Window)
 
     $typeCombo = $Window.FindName('CboManualRuleType')
@@ -538,7 +538,7 @@ function Invoke-CreateManualRule {
     }
 }
 
-function Set-SelectedRuleStatus {
+function global:Set-SelectedRuleStatus {
     param(
         [System.Windows.Window]$Window,
         [string]$Status
@@ -637,7 +637,7 @@ function Set-SelectedRuleStatus {
     }
 }
 
-function Invoke-DeleteSelectedRules {
+function global:Invoke-DeleteSelectedRules {
     param([System.Windows.Window]$Window)
 
     $selectedItems = Get-SelectedRules -Window $Window
@@ -720,7 +720,7 @@ function Invoke-DeleteSelectedRules {
     Update-WorkflowBreadcrumb -Window $Window
 }
 
-function Invoke-ApproveTrustedVendors {
+function global:Invoke-ApproveTrustedVendors {
     param([System.Windows.Window]$Window)
 
     if (-not (Get-Command -Name 'Approve-TrustedVendorRules' -ErrorAction SilentlyContinue)) {
@@ -758,7 +758,7 @@ function Invoke-ApproveTrustedVendors {
     }.GetNewClosure()
 }
 
-function Invoke-RemoveDuplicateRules {
+function global:Invoke-RemoveDuplicateRules {
     param([System.Windows.Window]$Window)
 
     if (-not (Get-Command -Name 'Remove-DuplicateRules' -ErrorAction SilentlyContinue)) {
@@ -812,7 +812,7 @@ function Invoke-RemoveDuplicateRules {
     }
 }
 
-function Invoke-ExportRulesToXml {
+function global:Invoke-ExportRulesToXml {
     param([System.Windows.Window]$Window)
 
     if (-not (Get-Command -Name 'Export-RulesToXml' -ErrorAction SilentlyContinue)) {
@@ -854,7 +854,7 @@ function Invoke-ExportRulesToXml {
     }
 }
 
-function Invoke-ExportRulesToCsv {
+function global:Invoke-ExportRulesToCsv {
     param([System.Windows.Window]$Window)
 
     $dataGrid = $Window.FindName('RulesDataGrid')
@@ -901,7 +901,7 @@ function Invoke-ExportRulesToCsv {
     }
 }
 
-function Invoke-ImportRulesFromXmlFile {
+function global:Invoke-ImportRulesFromXmlFile {
     <#
     .SYNOPSIS
         Opens file dialog and imports rules from AppLocker XML.
@@ -986,7 +986,7 @@ function Invoke-ImportRulesFromXmlFile {
     }
 }
 
-function Show-RuleDetails {
+function global:Show-RuleDetails {
     param([System.Windows.Window]$Window)
 
     $dataGrid = $Window.FindName('RulesDataGrid')
@@ -994,7 +994,7 @@ function Show-RuleDetails {
     Show-RuleDetailsDialog -Window $Window -Rule $dataGrid.SelectedItem
 }
 
-function Invoke-RulesContextAction {
+function global:Invoke-RulesContextAction {
     <#
     .SYNOPSIS
         Handles context menu actions for the Rules DataGrid.

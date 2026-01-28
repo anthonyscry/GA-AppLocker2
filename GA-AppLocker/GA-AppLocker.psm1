@@ -263,7 +263,7 @@ function Start-AppLockerDashboard {
         try {
             Write-AppLockerLog -Level Error -Message "Failed to start GUI: $($_.Exception.Message)"
         } catch {
-            Write-Host "[Error] Failed to start GUI: $($_.Exception.Message)" -ForegroundColor Red
+            # Write-Host not available in WPF context - silently continue
         }
         [System.Windows.MessageBox]::Show(
             "Failed to start GA-AppLocker Dashboard:`n`n$($_.Exception.Message)",

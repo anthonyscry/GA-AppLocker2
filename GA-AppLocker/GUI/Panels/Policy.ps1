@@ -57,7 +57,7 @@ function Initialize-PolicyPanel {
     Initialize-PolicyCompareDropdowns -Window $Window
 }
 
-function script:Update-PoliciesDataGrid {
+function global:Update-PoliciesDataGrid {
     param(
         [System.Windows.Window]$Window,
         [switch]$Async
@@ -178,7 +178,7 @@ function global:Update-PoliciesFilter {
     Update-PoliciesDataGrid -Window $Window
 }
 
-function Update-SelectedPolicyInfo {
+function global:Update-SelectedPolicyInfo {
     param([System.Windows.Window]$Window)
 
     $dataGrid = $Window.FindName('PoliciesDataGrid')
@@ -260,7 +260,7 @@ function Update-SelectedPolicyInfo {
     }
 }
 
-function Invoke-SavePolicyChanges {
+function global:Invoke-SavePolicyChanges {
     param([System.Windows.Window]$Window)
     
     if (-not $script:SelectedPolicyId) {
@@ -302,7 +302,7 @@ function Invoke-SavePolicyChanges {
     }
 }
 
-function Invoke-CreatePolicy {
+function global:Invoke-CreatePolicy {
     param([System.Windows.Window]$Window)
 
     $name = $Window.FindName('TxtPolicyName').Text
@@ -350,7 +350,7 @@ function Invoke-CreatePolicy {
     }
 }
 
-function Set-SelectedPolicyStatus {
+function global:Set-SelectedPolicyStatus {
     param(
         [System.Windows.Window]$Window,
         [string]$Status
@@ -377,7 +377,7 @@ function Set-SelectedPolicyStatus {
     }
 }
 
-function Invoke-DeleteSelectedPolicy {
+function global:Invoke-DeleteSelectedPolicy {
     param([System.Windows.Window]$Window)
 
     if (-not $script:SelectedPolicyId) {
@@ -412,7 +412,7 @@ function Invoke-DeleteSelectedPolicy {
     }
 }
 
-function Invoke-ExportSelectedPolicy {
+function global:Invoke-ExportSelectedPolicy {
     param([System.Windows.Window]$Window)
 
     if (-not $script:SelectedPolicyId) {
@@ -449,7 +449,7 @@ function Invoke-ExportSelectedPolicy {
     }
 }
 
-function Invoke-DeploySelectedPolicy {
+function global:Invoke-DeploySelectedPolicy {
     param([System.Windows.Window]$Window)
 
     if (-not $script:SelectedPolicyId) {
@@ -485,7 +485,7 @@ function Invoke-DeploySelectedPolicy {
     }
 }
 
-function Invoke-AddRulesToPolicy {
+function global:Invoke-AddRulesToPolicy {
     param([System.Windows.Window]$Window)
 
     if (-not $script:SelectedPolicyId) {
@@ -535,7 +535,7 @@ function Invoke-AddRulesToPolicy {
     }
 }
 
-function Invoke-RemoveRulesFromPolicy {
+function global:Invoke-RemoveRulesFromPolicy {
     param([System.Windows.Window]$Window)
 
     if (-not $script:SelectedPolicyId) {
@@ -575,7 +575,7 @@ function Invoke-RemoveRulesFromPolicy {
     }
 }
 
-function Invoke-SelectTargetOUs {
+function global:Invoke-SelectTargetOUs {
     param([System.Windows.Window]$Window)
 
     if (-not $script:SelectedPolicyId) {
@@ -610,7 +610,7 @@ function Invoke-SelectTargetOUs {
     )
 }
 
-function Invoke-SavePolicyTargets {
+function global:Invoke-SavePolicyTargets {
     param([System.Windows.Window]$Window)
 
     if (-not $script:SelectedPolicyId) {
@@ -658,7 +658,7 @@ function Initialize-PolicyCompareDropdowns {
     }
 }
 
-function Invoke-ComparePolicies {
+function global:Invoke-ComparePolicies {
     param([System.Windows.Window]$Window)
     
     $cboSource = $Window.FindName('CboCompareSource')
@@ -726,7 +726,7 @@ Summary:
     }
 }
 
-function Invoke-ExportDiffReport {
+function global:Invoke-ExportDiffReport {
     param([System.Windows.Window]$Window)
     
     if (-not $script:LastPolicyComparison) {

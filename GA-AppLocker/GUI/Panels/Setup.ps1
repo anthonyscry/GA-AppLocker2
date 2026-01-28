@@ -1,4 +1,4 @@
-﻿#region Setup Panel Functions
+#region Setup Panel Functions
 # Setup.ps1 - Setup panel handlers
 function Initialize-SetupPanel {
     param([System.Windows.Window]$Window)
@@ -65,7 +65,7 @@ function Update-SetupStatus {
     }
 }
 
-function Invoke-InitializeWinRM {
+function global:Invoke-InitializeWinRM {
     param([System.Windows.Window]$Window)
 
     try {
@@ -103,7 +103,7 @@ function Invoke-InitializeWinRM {
     }
 }
 
-function Invoke-ToggleWinRM {
+function global:Invoke-ToggleWinRM {
     param([System.Windows.Window]$Window)
 
     try {
@@ -137,7 +137,7 @@ function Invoke-ToggleWinRM {
     }
 }
 
-function Invoke-InitializeAppLockerGPOs {
+function global:Invoke-InitializeAppLockerGPOs {
     param([System.Windows.Window]$Window)
 
     try {
@@ -180,7 +180,7 @@ function Invoke-InitializeAppLockerGPOs {
     }
 }
 
-function Invoke-InitializeADStructure {
+function global:Invoke-InitializeADStructure {
     param([System.Windows.Window]$Window)
 
     try {
@@ -230,7 +230,7 @@ function Invoke-InitializeADStructure {
     }
 }
 
-function Invoke-InitializeAll {
+function global:Invoke-InitializeAll {
     param([System.Windows.Window]$Window)
 
     try {
