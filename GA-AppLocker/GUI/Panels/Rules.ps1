@@ -110,11 +110,8 @@ function global:Update-RulesDataGrid {
     $dataGrid = $Window.FindName('RulesDataGrid')
     if (-not $dataGrid) { return }
 
-    # Check if module function is available
-    if (-not (Get-Command -Name 'Get-AllRules' -ErrorAction SilentlyContinue)) {
-        $dataGrid.ItemsSource = $null
-        return
-    }
+    # Note: Get-AllRules is always available when module is loaded
+    # Removed Get-Command check that caused WPF crash in certain dispatcher contexts
 
     # Capture filter state for use in async callback
     $typeFilter = $script:CurrentRulesTypeFilter
