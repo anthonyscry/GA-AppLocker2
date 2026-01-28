@@ -218,7 +218,14 @@ function Build-PolicyRuleCollectionXml {
 
     $xml = ''
     foreach ($rule in $Rules) {
-        $action = $rule.Action
+        # Default to 'Allow' if Action is missing, empty, or whitespace (required by AppLocker schema)
+        $action = 'Allow'
+        if ($rule.Action) {
+            $trimmed = "$($rule.Action)".Trim()
+            if ($trimmed -eq 'Allow' -or $trimmed -eq 'Deny') {
+                $action = $trimmed
+            }
+        }
         $name = [System.Security.SecurityElement]::Escape($rule.Name)
         $description = if ($rule.Description) { [System.Security.SecurityElement]::Escape($rule.Description) } else { '' }
         $id = $rule.Id  # Canonical: Id (not RuleId)
@@ -246,7 +253,8 @@ function Build-PolicyRuleCollectionXml {
             }
             'Hash' {
                 # Canonical: Hash, SourceFileName, SourceFileLength
-                $hash = if ($rule.Hash) { "0x$($rule.Hash)" } else { '' }
+                # Hash must be uppercase with 0x prefix
+                $hash = if ($rule.Hash) { "0x$($rule.Hash.ToUpper())" } else { '' }
                 $fileName = if ($rule.SourceFileName) { [System.Security.SecurityElement]::Escape($rule.SourceFileName) } else { '' }
                 $fileLength = if ($rule.SourceFileLength) { $rule.SourceFileLength } else { '0' }
 
