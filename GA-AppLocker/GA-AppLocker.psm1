@@ -230,15 +230,30 @@ function Start-AppLockerDashboard {
         # Show window
         Write-AppLockerLog -Message 'Showing dialog...'
 
+        # Debug: Track why window closes
+        $window.add_Closing({
+            param($s, $e)
+            try {
+                $stack = (Get-PSCallStack | ForEach-Object { "$($_.Command) at $($_.Location)" }) -join "`n"
+                Write-AppLockerLog -Level Warning -Message "MainWindow Closing. DialogResult=$($s.DialogResult)`nStack:`n$stack"
+            } catch { }
+        })
+
+        $window.add_Closed({
+            param($s, $e)
+            try { Write-AppLockerLog -Level Warning -Message "MainWindow Closed." } catch { }
+        })
+
         # Add handler for unhandled dispatcher exceptions
         [System.Windows.Threading.Dispatcher]::CurrentDispatcher.add_UnhandledException({
             param($sender, $e)
             try {
-                Write-AppLockerLog -Level Error -Message "WPF Dispatcher exception: $($e.Exception.Message)"
+                Write-AppLockerLog -Level Error -Message "WPF Dispatcher exception: $($e.Exception.Message)`n$($e.Exception.ToString())"
             } catch {
                 Write-Warning "WPF Dispatcher exception: $($e.Exception.Message)"
             }
-            $e.Handled = $true
+            # Don't swallow - let it crash so we can see the real error
+            $e.Handled = $false
         })
 
         # Add loaded event to verify window renders

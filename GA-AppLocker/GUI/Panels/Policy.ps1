@@ -151,7 +151,7 @@ function global:Update-PoliciesDataGrid {
     }
 }
 
-function Update-PolicyCounters {
+function global:Update-PolicyCounters {
     param(
         [System.Windows.Window]$Window,
         [array]$Policies

@@ -624,15 +624,15 @@
                     <!-- Row 1: Stats Row - 5 cards across -->
                     <Grid Grid.Row="1" Margin="0,0,0,20">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*" MinWidth="120"/>
                             <ColumnDefinition Width="10"/>
-                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*" MinWidth="120"/>
                             <ColumnDefinition Width="10"/>
-                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*" MinWidth="120"/>
                             <ColumnDefinition Width="10"/>
-                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*" MinWidth="120"/>
                             <ColumnDefinition Width="10"/>
-                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*" MinWidth="120"/>
                         </Grid.ColumnDefinitions>
                         
                         <!-- Machines -->
@@ -685,11 +685,11 @@
                     <!-- Row 2: Main Content - 3 columns -->
                     <Grid Grid.Row="2">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*" MinWidth="200"/>
                             <ColumnDefinition Width="15"/>
-                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*" MinWidth="200"/>
                             <ColumnDefinition Width="15"/>
-                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*" MinWidth="220"/>
                         </Grid.ColumnDefinitions>
                         
                         <!-- Column 1: Recent Scans -->
@@ -797,48 +797,73 @@
                                            Foreground="{StaticResource MutedBrush}" Margin="0,0,0,15"/>
                                 
                                 <Button x:Name="BtnGettingStarted1" Tag="NavDiscovery"
-                                        HorizontalAlignment="Stretch" Margin="0,0,0,8" Padding="12,10"
-                                        Background="Transparent" BorderThickness="0" Cursor="Hand">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="1." Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold" Width="20"/>
-                                        <TextBlock Text="Discover machines in AD" Foreground="{StaticResource ForegroundBrush}"/>
-                                    </StackPanel>
+                                        HorizontalAlignment="Stretch" Margin="0,0,0,8" Padding="10,8"
+                                        Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                        HorizontalContentAlignment="Stretch">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="24"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="1." Grid.Column="0" Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold"/>
+                                        <TextBlock Text="Discover machines in AD" Grid.Column="1" Foreground="{StaticResource ForegroundBrush}" TextWrapping="Wrap"/>
+                                    </Grid>
                                 </Button>
                                 
                                 <Button x:Name="BtnGettingStarted2" Tag="NavScanner"
-                                        HorizontalAlignment="Stretch" Margin="0,0,0,8" Padding="12,10"
-                                        Background="Transparent" BorderThickness="0" Cursor="Hand">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="2." Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold" Width="20"/>
-                                        <TextBlock Text="Scan machines for software" Foreground="{StaticResource ForegroundBrush}"/>
-                                    </StackPanel>
+                                        HorizontalAlignment="Stretch" Margin="0,0,0,8" Padding="10,8"
+                                        Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                        HorizontalContentAlignment="Stretch">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="24"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="2." Grid.Column="0" Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold"/>
+                                        <TextBlock Text="Scan for software" Grid.Column="1" Foreground="{StaticResource ForegroundBrush}" TextWrapping="Wrap"/>
+                                    </Grid>
                                 </Button>
                                 
                                 <Button x:Name="BtnGettingStarted3" Tag="NavRules"
-                                        HorizontalAlignment="Stretch" Margin="0,0,0,8" Padding="12,10"
-                                        Background="Transparent" BorderThickness="0" Cursor="Hand">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="3." Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold" Width="20"/>
-                                        <TextBlock Text="Generate AppLocker rules" Foreground="{StaticResource ForegroundBrush}"/>
-                                    </StackPanel>
+                                        HorizontalAlignment="Stretch" Margin="0,0,0,8" Padding="10,8"
+                                        Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                        HorizontalContentAlignment="Stretch">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="24"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="3." Grid.Column="0" Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold"/>
+                                        <TextBlock Text="Generate rules" Grid.Column="1" Foreground="{StaticResource ForegroundBrush}" TextWrapping="Wrap"/>
+                                    </Grid>
                                 </Button>
                                 
                                 <Button x:Name="BtnGettingStarted4" Tag="NavPolicy"
-                                        HorizontalAlignment="Stretch" Margin="0,0,0,8" Padding="12,10"
-                                        Background="Transparent" BorderThickness="0" Cursor="Hand">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="4." Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold" Width="20"/>
-                                        <TextBlock Text="Build policies from rules" Foreground="{StaticResource ForegroundBrush}"/>
-                                    </StackPanel>
+                                        HorizontalAlignment="Stretch" Margin="0,0,0,8" Padding="10,8"
+                                        Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                        HorizontalContentAlignment="Stretch">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="24"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="4." Grid.Column="0" Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold"/>
+                                        <TextBlock Text="Build policies" Grid.Column="1" Foreground="{StaticResource ForegroundBrush}" TextWrapping="Wrap"/>
+                                    </Grid>
                                 </Button>
                                 
                                 <Button x:Name="BtnGettingStarted5" Tag="NavDeploy"
-                                        HorizontalAlignment="Stretch" Margin="0,0,0,8" Padding="12,10"
-                                        Background="Transparent" BorderThickness="0" Cursor="Hand">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="5." Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold" Width="20"/>
-                                        <TextBlock Text="Deploy to Group Policy" Foreground="{StaticResource ForegroundBrush}"/>
-                                    </StackPanel>
+                                        HorizontalAlignment="Stretch" Margin="0,0,0,8" Padding="10,8"
+                                        Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                        HorizontalContentAlignment="Stretch">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="24"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="5." Grid.Column="0" Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold"/>
+                                        <TextBlock Text="Deploy to GPO" Grid.Column="1" Foreground="{StaticResource ForegroundBrush}" TextWrapping="Wrap"/>
+                                    </Grid>
                                 </Button>
                             </StackPanel>
                         </Border>
