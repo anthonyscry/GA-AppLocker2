@@ -111,20 +111,21 @@ function Save-RuleToRepository {
     }
 
     try {
-        # Validate rule has required properties
-        if (-not $Rule.RuleId) {
-            throw "Rule must have a RuleId property"
+        # Validate rule has required properties (accept either RuleId or Id)
+        $ruleId = if ($Rule.RuleId) { $Rule.RuleId } elseif ($Rule.Id) { $Rule.Id } else { $null }
+        if (-not $ruleId) {
+            throw "Rule must have a RuleId or Id property"
         }
 
         # Determine if this is create or update
         $existing = $null
         if (-not $IsNew) {
-            $existing = Get-RuleFromDatabase -RuleId $Rule.RuleId
+            $existing = Get-RuleFromDatabase -RuleId $ruleId
         }
 
         if ($existing) {
             # Update existing rule
-            $updateResult = Update-RuleInDatabase -RuleId $Rule.RuleId -UpdatedRule $Rule
+            $updateResult = Update-RuleInDatabase -RuleId $ruleId -UpdatedRule $Rule
             if (-not $updateResult.Success) {
                 throw $updateResult.Error
             }
@@ -140,7 +141,7 @@ function Save-RuleToRepository {
         }
 
         # Invalidate cache
-        $cacheKey = "Rule_$($Rule.RuleId)"
+        $cacheKey = "Rule_$ruleId"
         if (Get-Command -Name 'Clear-AppLockerCache' -ErrorAction SilentlyContinue) {
             Clear-AppLockerCache -Key $cacheKey
             Clear-AppLockerCache -Pattern 'RuleCounts*'
@@ -150,7 +151,7 @@ function Save-RuleToRepository {
         # Publish event
         if (Get-Command -Name 'Publish-AppLockerEvent' -ErrorAction SilentlyContinue) {
             Publish-AppLockerEvent -EventName $eventName -EventData @{
-                RuleId = $Rule.RuleId
+                RuleId = $ruleId
                 RuleType = $Rule.RuleType
                 Status = $Rule.Status
             }
@@ -450,13 +451,18 @@ function Invoke-RuleBatchOperation {
                     $rule = Get-RuleFromDatabase -RuleId $ruleId
                     if ($rule) {
                         $rule.Status = $Parameters.Status
-                        $rule.ModifiedDate = (Get-Date).ToString('o')
-                        Update-RuleInDatabase -RuleId $ruleId -UpdatedRule $rule | Out-Null
+                        # Add or update ModifiedDate property
+                        if ($rule.PSObject.Properties['ModifiedDate']) {
+                            $rule.ModifiedDate = (Get-Date).ToString('o')
+                        } else {
+                            $rule | Add-Member -NotePropertyName 'ModifiedDate' -NotePropertyValue ((Get-Date).ToString('o')) -Force
+                        }
+                        $null = Update-RuleInDatabase -RuleId $ruleId -UpdatedRule $rule
                         $result.Processed++
                     }
                 }
                 'Delete' {
-                    Remove-RuleFromDatabase -RuleId $ruleId | Out-Null
+                    $null = Remove-RuleFromDatabase -RuleId @($ruleId)
                     $result.Processed++
                 }
             }
@@ -467,14 +473,14 @@ function Invoke-RuleBatchOperation {
         }
     }
 
-    # Bulk cache invalidation
+    # Bulk cache invalidation (suppress output)
     if (Get-Command -Name 'Clear-AppLockerCache' -ErrorAction SilentlyContinue) {
-        Clear-AppLockerCache -Pattern 'Rule*'
+        $null = Clear-AppLockerCache -Pattern 'Rule*'
     }
 
-    # Single bulk event
+    # Single bulk event (suppress output)
     if (Get-Command -Name 'Publish-AppLockerEvent' -ErrorAction SilentlyContinue) {
-        Publish-AppLockerEvent -EventName 'RuleBulkUpdated' -EventData @{
+        $null = Publish-AppLockerEvent -EventName 'RuleBulkUpdated' -EventData @{
             Operation = $Operation
             Count = $result.Processed
             RuleIds = $RuleIds

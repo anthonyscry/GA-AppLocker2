@@ -69,7 +69,7 @@ function Get-Rule {
         if ($useStorage) {
             if ($Id) {
                 # Get specific rule by ID from Storage
-                $rule = Get-RuleFromDatabase -Id $Id
+                $rule = Get-RuleFromDatabase -RuleId $Id
                 if ($rule) {
                     $result.Data = $rule
                     $result.Success = $true

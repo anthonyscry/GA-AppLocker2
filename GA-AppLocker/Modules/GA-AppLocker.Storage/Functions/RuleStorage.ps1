@@ -402,10 +402,14 @@ function Add-Rule {
     try {
         Initialize-JsonIndex
         
-        # Ensure rule has an ID
-        if (-not $Rule.Id) {
-            $Rule | Add-Member -NotePropertyName 'Id' -NotePropertyValue ([guid]::NewGuid().ToString()) -Force
+        # Ensure rule has an ID (accept either Id or RuleId property)
+        $ruleId = if ($Rule.Id) { $Rule.Id } elseif ($Rule.RuleId) { $Rule.RuleId } else { $null }
+        if (-not $ruleId) {
+            $ruleId = [guid]::NewGuid().ToString()
         }
+        # Ensure both Id and RuleId are set for compatibility
+        $Rule | Add-Member -NotePropertyName 'Id' -NotePropertyValue $ruleId -Force
+        $Rule | Add-Member -NotePropertyName 'RuleId' -NotePropertyValue $ruleId -Force
         
         # Save to individual file
         $rulesPath = Get-RuleStoragePath
@@ -621,7 +625,7 @@ function Find-RuleByHash {
 function Find-RuleByPublisher {
     <#
     .SYNOPSIS
-        Finds a rule by publisher name and product (O(1) lookup).
+        Finds a rule by publisher name and product. Supports wildcards.
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
@@ -634,20 +638,60 @@ function Find-RuleByPublisher {
     
     Initialize-JsonIndex
     
-    $key = "$PublisherName|$ProductName".ToLower()
+    # Check if wildcard search is needed
+    $isWildcard = $PublisherName -match '\*' -or $PublisherName -match '\?'
     
-    if ($script:PublisherIndex.ContainsKey($key)) {
-        $ruleId = $script:PublisherIndex[$key]
-        $indexEntry = $script:RuleById[$ruleId]
+    if (-not $isWildcard) {
+        # O(1) exact match lookup
+        $ruleId = $null
         
-        if ($CollectionType -and $indexEntry.CollectionType -ne $CollectionType) {
-            return $null
+        if ($ProductName) {
+            # Look up by publisher+product
+            $key = "$PublisherName|$ProductName".ToLower()
+            if ($script:PublisherIndex.ContainsKey($key)) {
+                $ruleId = $script:PublisherIndex[$key]
+            }
+        } else {
+            # Look up by publisher only
+            $pubOnlyKey = $PublisherName.ToLower()
+            if ($script:PublisherOnlyIndex.ContainsKey($pubOnlyKey)) {
+                $ruleId = $script:PublisherOnlyIndex[$pubOnlyKey]
+            }
         }
         
-        if ($indexEntry.FilePath -and (Test-Path $indexEntry.FilePath)) {
-            return Get-Content $indexEntry.FilePath -Raw | ConvertFrom-Json
+        if ($ruleId) {
+            $indexEntry = $script:RuleById[$ruleId]
+            
+            if ($CollectionType -and $indexEntry.CollectionType -ne $CollectionType) {
+                return $null
+            }
+            
+            if ($indexEntry.FilePath -and (Test-Path $indexEntry.FilePath)) {
+                return Get-Content $indexEntry.FilePath -Raw | ConvertFrom-Json
+            }
+            return $indexEntry
         }
-        return $indexEntry
+    } else {
+        # Wildcard search - iterate through rules
+        $rules = $script:JsonIndex.Rules | Where-Object {
+            $_.RuleType -eq 'Publisher' -and
+            $_.PublisherName -like $PublisherName
+        }
+        
+        if ($ProductName) {
+            $rules = $rules | Where-Object { $_.ProductName -like $ProductName }
+        }
+        if ($CollectionType) {
+            $rules = $rules | Where-Object { $_.CollectionType -eq $CollectionType }
+        }
+        
+        $match = $rules | Select-Object -First 1
+        if ($match) {
+            if ($match.FilePath -and (Test-Path $match.FilePath)) {
+                return Get-Content $match.FilePath -Raw | ConvertFrom-Json
+            }
+            return $match
+        }
     }
     
     return $null
@@ -846,7 +890,12 @@ function Get-RulesFromDatabase {
         [switch]$CountOnly,
         [switch]$FullPayload
     )
-    return Get-AllRules @PSBoundParameters
+    $result = Get-AllRules @PSBoundParameters
+    # Return just the rules array for backwards compatibility
+    if ($result.Success) {
+        return $result.Data
+    }
+    return @()
 }
 
 function Add-RuleToDatabase {

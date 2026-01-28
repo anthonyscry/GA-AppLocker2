@@ -316,7 +316,7 @@ Describe 'Rules Module - XML Export' {
             New-HashRule -Hash $hash -SourceFileName 'export.exe' -SourceFileLength 1024 -Name 'Export Test Rule' -Action 'Allow' -CollectionType 'Exe' -Status 'Approved' -Save | Out-Null
 
             $exportPath = Join-Path $script:TestDataPath 'export-test.xml'
-            $result = Export-RulesToXml -Path $exportPath -Status 'Approved'
+            $result = Export-RulesToXml -OutputPath $exportPath
             
             if ($result.Success) {
                 Test-Path $exportPath | Should -BeTrue
@@ -337,39 +337,39 @@ Describe 'Rules Module - Artifact Conversion' {
 
         It 'Should convert artifact to hash rule' {
             $artifact = [PSCustomObject]@{
-                FileName      = 'test.exe'
-                FilePath      = 'C:\Test\test.exe'
-                Hash          = 'BB' * 32
-                FileSize      = 2048
-                Extension     = '.exe'
-                IsSigned      = $false
-                Publisher     = $null
-                ProductName   = $null
-                Version       = $null
+                FileName          = 'test.exe'
+                FilePath          = 'C:\Test\test.exe'
+                SHA256Hash        = 'BB' * 32
+                SizeBytes         = 2048
+                Extension         = '.exe'
+                IsSigned          = $false
+                SignerCertificate = $null
+                ProductName       = $null
+                ProductVersion    = $null
             }
 
             $result = ConvertFrom-Artifact -Artifact $artifact -PreferredRuleType 'Hash'
             $result.Success | Should -BeTrue
-            $result.Data.RuleType | Should -Be 'Hash'
+            $result.Data[0].RuleType | Should -Be 'Hash'
         }
 
         It 'Should convert signed artifact to publisher rule' {
             $artifact = [PSCustomObject]@{
-                FileName      = 'signed.exe'
-                FilePath      = 'C:\Test\signed.exe'
-                Hash          = 'CC' * 32
-                FileSize      = 4096
-                Extension     = '.exe'
-                IsSigned      = $true
-                Publisher     = 'O=SIGNED PUBLISHER'
-                ProductName   = 'Signed Product'
-                Version       = '1.0.0.0'
+                FileName          = 'signed.exe'
+                FilePath          = 'C:\Test\signed.exe'
+                SHA256Hash        = 'CC' * 32
+                SizeBytes         = 4096
+                Extension         = '.exe'
+                IsSigned          = $true
+                SignerCertificate = 'O=SIGNED PUBLISHER'
+                ProductName       = 'Signed Product'
+                ProductVersion    = '1.0.0.0'
             }
 
             $result = ConvertFrom-Artifact -Artifact $artifact -PreferredRuleType 'Publisher'
             $result.Success | Should -BeTrue
-            $result.Data.RuleType | Should -Be 'Publisher'
-            $result.Data.PublisherName | Should -Be 'O=SIGNED PUBLISHER'
+            $result.Data[0].RuleType | Should -Be 'Publisher'
+            $result.Data[0].PublisherName | Should -Be 'O=SIGNED PUBLISHER'
         }
     }
 }

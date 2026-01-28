@@ -22,7 +22,11 @@ AfterAll {
     # Cleanup test rules
     $testRules = Get-RulesFromDatabase | Where-Object { $_.Name -like 'TestRule*' }
     foreach ($rule in $testRules) {
-        Remove-RuleFromDatabase -RuleId @($rule.RuleId) -ErrorAction SilentlyContinue | Out-Null
+        # Use either RuleId or Id property
+        $ruleId = if ($rule.RuleId) { $rule.RuleId } elseif ($rule.Id) { $rule.Id } else { $null }
+        if ($ruleId) {
+            Remove-RuleFromDatabase -RuleId @($ruleId) -ErrorAction SilentlyContinue | Out-Null
+        }
     }
 }
 
