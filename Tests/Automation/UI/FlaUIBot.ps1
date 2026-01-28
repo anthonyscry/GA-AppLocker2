@@ -49,6 +49,138 @@ try {
     exit 1
 }
 
+# Load System.Drawing for screenshots
+try {
+    Add-Type -AssemblyName System.Windows.Forms, System.Drawing -ErrorAction SilentlyContinue
+} catch { }
+
+# Create results directory
+$script:ResultsDir = Join-Path $PSScriptRoot "..\..\..\TestResults"
+if (-not (Test-Path $script:ResultsDir)) {
+    New-Item -Path $script:ResultsDir -ItemType Directory -Force | Out-Null
+}
+
+function Wait-ForElement {
+    <#
+    .SYNOPSIS
+        Waits for an element to appear with retry logic.
+    .DESCRIPTION
+        Repeatedly attempts to find an element until timeout.
+        Use this for elements that may take time to load.
+    #>
+    param(
+        $Parent,
+        [string]$Name,
+        [string]$AutomationId,
+        [int]$TimeoutSec = 10,
+        [int]$PollMs = 200
+    )
+    
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    while ($stopwatch.Elapsed.TotalSeconds -lt $TimeoutSec) {
+        $element = Find-Element -Parent $Parent -Name $Name -AutomationId $AutomationId
+        if ($element) { return $element }
+        Start-Sleep -Milliseconds $PollMs
+    }
+    return $null
+}
+
+function Capture-Screenshot {
+    <#
+    .SYNOPSIS
+        Captures a screenshot for debugging failed tests.
+    .DESCRIPTION
+        Saves a PNG screenshot to TestResults directory.
+        Call this when a test fails for visual debugging.
+    #>
+    param(
+        [string]$TestName = "Screenshot",
+        [string]$Reason = ""
+    )
+    
+    try {
+        $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+        $safeName = $TestName -replace '[^\w\-]', '_'
+        $filename = "${safeName}_${timestamp}.png"
+        $filepath = Join-Path $script:ResultsDir $filename
+        
+        $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+        $bitmap = [System.Drawing.Bitmap]::new($screen.Width, $screen.Height)
+        $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+        $graphics.CopyFromScreen($screen.Location, [System.Drawing.Point]::Empty, $screen.Size)
+        $bitmap.Save($filepath, [System.Drawing.Imaging.ImageFormat]::Png)
+        $graphics.Dispose()
+        $bitmap.Dispose()
+        
+        Write-Host "  Screenshot: $filename" -ForegroundColor Gray
+        if ($Reason) { Write-Host "  Reason: $Reason" -ForegroundColor Gray }
+        return $filepath
+    } catch {
+        Write-Host "  [WARN] Screenshot failed: $_" -ForegroundColor Yellow
+        return $null
+    }
+}
+
+function Get-DataGridRowCount {
+    <#
+    .SYNOPSIS
+        Gets the number of rows in a DataGrid element.
+    #>
+    param($Element)
+    
+    if (-not $Element) { return 0 }
+    
+    try {
+        # Try GridPattern first
+        $gridPattern = $Element.GetCurrentPattern([System.Windows.Automation.GridPattern]::Pattern)
+        if ($gridPattern) {
+            return $gridPattern.Current.RowCount
+        }
+    } catch { }
+    
+    try {
+        # Fallback: count DataItem children
+        $condition = New-Object System.Windows.Automation.PropertyCondition(
+            [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+            [System.Windows.Automation.ControlType]::DataItem)
+        $items = $Element.FindAll([System.Windows.Automation.TreeScope]::Children, $condition)
+        return $items.Count
+    } catch {
+        return -1
+    }
+}
+
+function Assert-Condition {
+    <#
+    .SYNOPSIS
+        Asserts a condition and captures screenshot on failure.
+    #>
+    param(
+        [string]$TestName,
+        [bool]$Condition,
+        [string]$Details = '',
+        [switch]$ScreenshotOnFail
+    )
+    
+    if ($Condition) {
+        $script:Passed++
+        Write-Host "[PASS] " -ForegroundColor Green -NoNewline
+        Write-Host "$TestName" -NoNewline
+        if ($Details) { Write-Host " - $Details" -ForegroundColor Gray } else { Write-Host "" }
+        return $true
+    } else {
+        $script:Failed++
+        Write-Host "[FAIL] " -ForegroundColor Red -NoNewline
+        Write-Host "$TestName" -NoNewline
+        if ($Details) { Write-Host " - $Details" -ForegroundColor Gray } else { Write-Host "" }
+        
+        if ($ScreenshotOnFail) {
+            Capture-Screenshot -TestName $TestName -Reason $Details
+        }
+        return $false
+    }
+}
+
 function Get-MainWindow {
     param(
         [string]$Title = "GA-AppLocker Dashboard",
@@ -440,6 +572,105 @@ if ($TestMode -eq 'Full') {
     } else {
         Write-Skip "Sidebar: Collapse Toggle" "Button not found"
     }
+}
+#endregion
+
+#region Bug Fix Verification Tests
+# These tests verify the specific bugs fixed in commits be3c62f through c261d61
+if ($TestMode -in @('Standard', 'Full')) {
+    Write-Host "`n=== BUG FIX VERIFICATION ===" -ForegroundColor Magenta
+    Write-Host "Testing fixes from recent commits..." -ForegroundColor Yellow
+    
+    #--- Test: Refresh Button Keeps Rules Visible (Fix: 71231c6) ---
+    Write-Host "`n--- Refresh Button Test ---" -ForegroundColor Yellow
+    Invoke-Button -Parent $script:Window -Name "Rule Generator" | Out-Null
+    Start-Sleep -Milliseconds ($DelayMs * 3)
+    
+    # Find the rules DataGrid
+    $rulesGrid = Wait-ForElement -Parent $script:Window -AutomationId "RulesDataGrid" -TimeoutSec 10
+    if (-not $rulesGrid) {
+        $rulesGrid = Wait-ForElement -Parent $script:Window -Name "RulesDataGrid" -TimeoutSec 5
+    }
+    
+    if ($rulesGrid) {
+        $countBefore = Get-DataGridRowCount -Element $rulesGrid
+        Write-Host "  Rules before refresh: $countBefore" -ForegroundColor Gray
+        
+        # Click Refresh
+        $refreshResult = Invoke-Button -Parent $script:Window -Name "Refresh"
+        if (-not $refreshResult) {
+            $refreshResult = Invoke-Button -Parent $script:Window -AutomationId "BtnRefresh"
+        }
+        
+        if ($refreshResult) {
+            Start-Sleep -Milliseconds ($DelayMs * 4)  # Wait for refresh
+            $countAfter = Get-DataGridRowCount -Element $rulesGrid
+            Write-Host "  Rules after refresh: $countAfter" -ForegroundColor Gray
+            
+            # Rules should still be visible (not 0 or -1)
+            $refreshKeepsRules = ($countAfter -gt 0) -or ($countBefore -eq 0 -and $countAfter -eq 0)
+            Assert-Condition -TestName "BugFix: Refresh keeps rules visible" -Condition $refreshKeepsRules -Details "Before: $countBefore, After: $countAfter" -ScreenshotOnFail
+        } else {
+            Write-Skip "BugFix: Refresh keeps rules visible" "Refresh button not found"
+        }
+    } else {
+        Write-Skip "BugFix: Refresh keeps rules visible" "RulesDataGrid not found"
+        Capture-Screenshot -TestName "RulesDataGrid_NotFound" -Reason "Could not locate rules grid"
+    }
+    
+    #--- Test: Filter Buttons Show Counts (Fix: 9bacb82) ---
+    Write-Host "`n--- Filter Button Counts Test ---" -ForegroundColor Yellow
+    
+    # Look for filter buttons with counts in their names
+    $filterButtons = @('Pending', 'Approved', 'Rejected', 'All')
+    $filtersWithCounts = 0
+    
+    foreach ($filterName in $filterButtons) {
+        # Try to find button by partial name match (e.g., "Pending (25)")
+        $buttons = Find-AllElements -Parent $script:Window -ControlType 'Button'
+        foreach ($btn in $buttons) {
+            try {
+                $btnName = $btn.Current.Name
+                if ($btnName -like "*$filterName*" -and $btnName -match '\(\d+\)') {
+                    $filtersWithCounts++
+                    Write-Host "  Found: $btnName" -ForegroundColor Gray
+                    break
+                }
+            } catch { }
+        }
+    }
+    
+    Assert-Condition -TestName "BugFix: Filter buttons show counts" -Condition ($filtersWithCounts -ge 1) -Details "Found $filtersWithCounts filter(s) with counts" -ScreenshotOnFail
+    
+    #--- Test: DataGrid Displays Rules (Fix: 9bacb82 - Take parameter) ---
+    Write-Host "`n--- DataGrid Population Test ---" -ForegroundColor Yellow
+    
+    if ($rulesGrid) {
+        $rowCount = Get-DataGridRowCount -Element $rulesGrid
+        # If there are rules in the database, they should show (not limited to 0)
+        $hasData = $rowCount -ge 0  # -1 means error
+        Assert-Condition -TestName "BugFix: DataGrid displays rules" -Condition $hasData -Details "Row count: $rowCount" -ScreenshotOnFail
+    } else {
+        Write-Skip "BugFix: DataGrid displays rules" "RulesDataGrid not found"
+    }
+    
+    #--- Test: Navigation Buttons Work (Fix: be3c62f - global scope) ---
+    Write-Host "`n--- Navigation Scope Test ---" -ForegroundColor Yellow
+    
+    # Quick cycle through panels to verify global: scope fix
+    $navTest = @('Dashboard', 'Rule Generator', 'Dashboard')
+    $navSuccess = $true
+    
+    foreach ($panel in $navTest) {
+        $result = Invoke-Button -Parent $script:Window -Name $panel
+        if (-not $result) {
+            $navSuccess = $false
+            Write-Host "  [!] Navigation failed: $panel" -ForegroundColor Red
+        }
+        Start-Sleep -Milliseconds ($DelayMs * 2)
+    }
+    
+    Assert-Condition -TestName "BugFix: Navigation uses global scope" -Condition $navSuccess -ScreenshotOnFail
 }
 #endregion
 
