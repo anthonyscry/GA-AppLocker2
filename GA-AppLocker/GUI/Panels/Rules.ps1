@@ -338,6 +338,29 @@ function global:Get-SelectedRules {
     return @($dataGrid.SelectedItems)
 }
 
+# Helper to reset selection state after grid-modifying operations
+function global:Reset-RulesSelectionState {
+    param([System.Windows.Window]$Window)
+    
+    # Reset virtual selection flag
+    $script:AllRulesSelected = $false
+    
+    # Uncheck the Select All checkbox
+    $selectAllChk = $Window.FindName('ChkSelectAllRules')
+    if ($selectAllChk) {
+        $selectAllChk.IsChecked = $false
+    }
+    
+    # Clear DataGrid selection
+    $dataGrid = $Window.FindName('RulesDataGrid')
+    if ($dataGrid) {
+        $dataGrid.UnselectAll()
+    }
+    
+    # Update selection count display
+    Update-RulesSelectionCount -Window $Window
+}
+
 function global:Invoke-AddSelectedRulesToPolicy {
     param([System.Windows.Window]$Window)
 
@@ -626,8 +649,9 @@ function global:Set-SelectedRuleStatus {
         }
     }
 
+    # Reset selection state and refresh the grid
+    Reset-RulesSelectionState -Window $Window
     Update-RulesDataGrid -Window $Window
-    Update-RulesSelectionCount -Window $Window
     
     # Refresh dashboard stats and sidebar counts
     Update-DashboardStats -Window $Window
@@ -651,9 +675,6 @@ function global:Invoke-DeleteSelectedRules {
         return
     }
     
-    # Reset virtual selection after operation
-    $script:AllRulesSelected = $false
-
     $count = $selectedItems.Count
     
     # Use MessageBox for confirmation
@@ -723,9 +744,9 @@ function global:Invoke-DeleteSelectedRules {
         Hide-LoadingOverlay
     }
     
-    # Refresh the grid
+    # Reset selection state and refresh the grid
+    Reset-RulesSelectionState -Window $Window
     Update-RulesDataGrid -Window $Window
-    Update-RulesSelectionCount -Window $Window
     
     # Refresh dashboard stats and sidebar counts
     Update-DashboardStats -Window $Window
@@ -759,6 +780,8 @@ function global:Invoke-ApproveTrustedVendors {
             $message = "Approved $($Result.TotalUpdated) rules from trusted vendors."
             Show-Toast -Message $message -Type 'Success'
             Write-Log -Message $message
+            # Reset selection state before refreshing grid
+            Reset-RulesSelectionState -Window $Window
             Update-RulesDataGrid -Window $Window -Async
             # Refresh dashboard stats and sidebar counts
             Update-DashboardStats -Window $Window
@@ -809,6 +832,8 @@ function global:Invoke-RemoveDuplicateRules {
             $msg = "Removed $($Result.RemovedCount) duplicate rules."
             Show-Toast -Message $msg -Type 'Success'
             Write-Log -Message $msg
+            # Reset selection state before refreshing grid
+            Reset-RulesSelectionState -Window $Window
             Update-RulesDataGrid -Window $Window
             # Refresh dashboard stats and sidebar counts
             Update-DashboardStats -Window $Window
