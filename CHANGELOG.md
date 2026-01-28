@@ -2,7 +2,9 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
-## [Unreleased]
+## [1.0.0] - 2026-01-27
+
+This release includes critical WPF bug fixes and a comprehensive testing infrastructure.
 
 ### Fixed
 - **WPF Event Handler Scope** (`be3c62f`): Added `global:` prefix to 73 functions across 7 panel files, fixing "function not found" errors in WPF button click handlers.
@@ -60,6 +62,6 @@ try { SomeFunction } catch { }
 - `Tests/Unit/GUI.RulesPanel.Tests.ps1` (new)
 - `Tests/Automation/UI/FlaUIBot.ps1` (enhanced)
 
-## [1.0.0] - Previous Release
+---
 
-Initial release with full AppLocker policy management capabilities.
+**Full Changelog**: https://github.com/anthonyscry/GA-AppLocker2/commits/v1.0.0
