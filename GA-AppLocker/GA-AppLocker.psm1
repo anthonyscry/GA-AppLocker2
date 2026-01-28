@@ -233,9 +233,9 @@ function Start-AppLockerDashboard {
         # Add handler for unhandled dispatcher exceptions
         [System.Windows.Threading.Dispatcher]::CurrentDispatcher.add_UnhandledException({
             param($sender, $e)
-            if (Get-Command -Name 'Write-AppLockerLog' -ErrorAction SilentlyContinue) {
+            try {
                 Write-AppLockerLog -Level Error -Message "WPF Dispatcher exception: $($e.Exception.Message)"
-            } else {
+            } catch {
                 Write-Warning "WPF Dispatcher exception: $($e.Exception.Message)"
             }
             $e.Handled = $true
@@ -243,9 +243,9 @@ function Start-AppLockerDashboard {
 
         # Add loaded event to verify window renders
         $window.add_Loaded({
-            if (Get-Command -Name 'Write-AppLockerLog' -ErrorAction SilentlyContinue) {
+            try {
                 Write-AppLockerLog -Message 'Window Loaded event fired'
-            } else {
+            } catch {
                 Write-Host '[Info] Window Loaded event fired' -ForegroundColor White
             }
         })
@@ -260,9 +260,9 @@ function Start-AppLockerDashboard {
         Write-AppLockerLog -Message 'Application closed'
     }
     catch {
-        if (Get-Command -Name 'Write-AppLockerLog' -ErrorAction SilentlyContinue) {
+        try {
             Write-AppLockerLog -Level Error -Message "Failed to start GUI: $($_.Exception.Message)"
-        } else {
+        } catch {
             Write-Host "[Error] Failed to start GUI: $($_.Exception.Message)" -ForegroundColor Red
         }
         [System.Windows.MessageBox]::Show(
