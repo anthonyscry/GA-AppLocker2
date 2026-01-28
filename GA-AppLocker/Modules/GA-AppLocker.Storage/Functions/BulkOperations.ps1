@@ -311,13 +311,13 @@ function Remove-RulesBulk {
             }
         }
         
-        # Invalidate caches
+        # Invalidate caches (use try-catch - Get-Command fails in WPF context)
         if ($result.Success -and $result.RemovedCount -gt 0) {
-            if (Get-Command -Name 'Clear-AppLockerCache' -ErrorAction SilentlyContinue) {
+            try {
                 Clear-AppLockerCache -Pattern 'GlobalSearch_*' | Out-Null
                 Clear-AppLockerCache -Pattern 'RuleCounts*' | Out-Null
                 Clear-AppLockerCache -Pattern 'RuleQuery*' | Out-Null
-            }
+            } catch { }
             Write-StorageLog -Message "Bulk deleted $($result.RemovedCount) rules"
         }
     }

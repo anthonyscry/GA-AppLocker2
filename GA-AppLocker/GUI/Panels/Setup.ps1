@@ -27,11 +27,10 @@ function Update-SetupStatus {
     param([System.Windows.Window]$Window)
 
     try {
-        if (-not (Get-Command -Name 'Get-SetupStatus' -ErrorAction SilentlyContinue)) {
-            return
-        }
-
-        $status = Get-SetupStatus
+        # Use try-catch - Get-Command fails in WPF context
+        $status = $null
+        try { $status = Get-SetupStatus } catch { return }
+        if (-not $status) { return }
 
         if ($status.Success -and $status.Data) {
             # Update WinRM status
@@ -69,11 +68,6 @@ function global:Invoke-InitializeWinRM {
     param([System.Windows.Window]$Window)
 
     try {
-        if (-not (Get-Command -Name 'Initialize-WinRMGPO' -ErrorAction SilentlyContinue)) {
-            [System.Windows.MessageBox]::Show('Setup module not available.', 'Error', 'OK', 'Error')
-            return
-        }
-
         $confirm = [System.Windows.MessageBox]::Show(
             "This will create the 'AppLocker-EnableWinRM' GPO and link it to the domain root.`n`nThis enables WinRM on ALL computers in the domain.`n`nContinue?",
             'Initialize WinRM GPO',
@@ -141,11 +135,6 @@ function global:Invoke-InitializeAppLockerGPOs {
     param([System.Windows.Window]$Window)
 
     try {
-        if (-not (Get-Command -Name 'Initialize-AppLockerGPOs' -ErrorAction SilentlyContinue)) {
-            [System.Windows.MessageBox]::Show('Setup module not available.', 'Error', 'OK', 'Error')
-            return
-        }
-
         $confirm = [System.Windows.MessageBox]::Show(
             "This will create three AppLocker GPOs:`n`n" +
             "- AppLocker-DC (linked to Domain Controllers OU)`n" +
@@ -184,11 +173,6 @@ function global:Invoke-InitializeADStructure {
     param([System.Windows.Window]$Window)
 
     try {
-        if (-not (Get-Command -Name 'Initialize-ADStructure' -ErrorAction SilentlyContinue)) {
-            [System.Windows.MessageBox]::Show('Setup module not available.', 'Error', 'OK', 'Error')
-            return
-        }
-
         $confirm = [System.Windows.MessageBox]::Show(
             "This will create the AppLocker OU and security groups:`n`n" +
             "OU: AppLocker (at domain root)`n`n" +
@@ -234,11 +218,6 @@ function global:Invoke-InitializeAll {
     param([System.Windows.Window]$Window)
 
     try {
-        if (-not (Get-Command -Name 'Initialize-AppLockerEnvironment' -ErrorAction SilentlyContinue)) {
-            [System.Windows.MessageBox]::Show('Setup module not available.', 'Error', 'OK', 'Error')
-            return
-        }
-
         $confirm = [System.Windows.MessageBox]::Show(
             "This will run ALL initialization steps:`n`n" +
             "1. Create WinRM GPO (linked to domain root)`n" +

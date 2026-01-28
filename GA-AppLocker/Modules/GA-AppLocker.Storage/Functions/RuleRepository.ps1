@@ -52,19 +52,19 @@ function Get-RuleFromRepository {
     $cacheKey = "Rule_$RuleId"
 
     if (-not $BypassCache) {
-        # Try cache first
-        if (Get-Command -Name 'Get-CachedValue' -ErrorAction SilentlyContinue) {
+        # Try cache first (use try-catch - Get-Command fails in WPF context)
+        try {
             $cached = Get-CachedValue -Key $cacheKey -MaxAgeSeconds 300
             if ($cached) { return $cached }
-        }
+        } catch { }
     }
 
     # Get from storage
     $rule = Get-RuleFromDatabase -RuleId $RuleId
 
-    # Cache the result
-    if ($rule -and (Get-Command -Name 'Set-CachedValue' -ErrorAction SilentlyContinue)) {
-        Set-CachedValue -Key $cacheKey -Value $rule -TTLSeconds 300
+    # Cache the result (use try-catch - Get-Command fails in WPF context)
+    if ($rule) {
+        try { Set-CachedValue -Key $cacheKey -Value $rule -TTLSeconds 300 } catch { }
     }
 
     return $rule
@@ -140,22 +140,22 @@ function Save-RuleToRepository {
             $eventName = 'RuleCreated'
         }
 
-        # Invalidate cache
+        # Invalidate cache (use try-catch - Get-Command fails in WPF context)
         $cacheKey = "Rule_$ruleId"
-        if (Get-Command -Name 'Clear-AppLockerCache' -ErrorAction SilentlyContinue) {
+        try {
             Clear-AppLockerCache -Key $cacheKey
             Clear-AppLockerCache -Pattern 'RuleCounts*'
             Clear-AppLockerCache -Pattern 'RuleQuery*'
-        }
+        } catch { }
 
-        # Publish event
-        if (Get-Command -Name 'Publish-AppLockerEvent' -ErrorAction SilentlyContinue) {
+        # Publish event (use try-catch - Get-Command fails in WPF context)
+        try {
             Publish-AppLockerEvent -EventName $eventName -EventData @{
                 RuleId = $ruleId
                 RuleType = $Rule.RuleType
                 Status = $Rule.Status
             }
-        }
+        } catch { }
 
         $result.Success = $true
         $result.Data = $Rule
@@ -207,19 +207,21 @@ function Remove-RuleFromRepository {
             throw $deleteResult.Error
         }
 
-        # Invalidate cache
-        if (Get-Command -Name 'Clear-AppLockerCache' -ErrorAction SilentlyContinue) {
+        # Invalidate cache (use try-catch - Get-Command fails in WPF context)
+        try {
             Clear-AppLockerCache -Key "Rule_$RuleId"
             Clear-AppLockerCache -Pattern 'RuleCounts*'
             Clear-AppLockerCache -Pattern 'RuleQuery*'
-        }
+        } catch { }
 
-        # Publish event
-        if ($rule -and (Get-Command -Name 'Publish-AppLockerEvent' -ErrorAction SilentlyContinue)) {
-            Publish-AppLockerEvent -EventName 'RuleDeleted' -EventData @{
-                RuleId = $RuleId
-                RuleType = $rule.RuleType
-            }
+        # Publish event (use try-catch - Get-Command fails in WPF context)
+        if ($rule) {
+            try {
+                Publish-AppLockerEvent -EventName 'RuleDeleted' -EventData @{
+                    RuleId = $RuleId
+                    RuleType = $rule.RuleType
+                }
+            } catch { }
         }
 
         $result.Success = $true
@@ -300,10 +302,11 @@ function Find-RulesInRepository {
     $cacheKey = "RuleQuery_$([System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes("$filterJson|$Take|$Skip|$OrderBy|$Descending")))"
 
     if (-not $BypassCache) {
-        if (Get-Command -Name 'Get-CachedValue' -ErrorAction SilentlyContinue) {
+        # Use try-catch - Get-Command fails in WPF context
+        try {
             $cached = Get-CachedValue -Key $cacheKey -MaxAgeSeconds 60
             if ($cached) { return $cached }
-        }
+        } catch { }
     }
 
     # Build query parameters for Get-RulesFromDatabase
@@ -346,9 +349,9 @@ function Find-RulesInRepository {
         }
     }
 
-    # Cache results
-    if ($rules -and (Get-Command -Name 'Set-CachedValue' -ErrorAction SilentlyContinue)) {
-        Set-CachedValue -Key $cacheKey -Value $rules -TTLSeconds 60
+    # Cache results (use try-catch - Get-Command fails in WPF context)
+    if ($rules) {
+        try { Set-CachedValue -Key $cacheKey -Value $rules -TTLSeconds 60 } catch { }
     }
 
     return $rules
@@ -381,16 +384,18 @@ function Get-RuleCountsFromRepository {
     $cacheKey = 'RuleCounts_All'
 
     if (-not $BypassCache) {
-        if (Get-Command -Name 'Get-CachedValue' -ErrorAction SilentlyContinue) {
+        # Use try-catch - Get-Command fails in WPF context
+        try {
             $cached = Get-CachedValue -Key $cacheKey -MaxAgeSeconds 120
             if ($cached) { return $cached }
-        }
+        } catch { }
     }
 
     $counts = Get-RuleCounts
 
-    if ($counts -and (Get-Command -Name 'Set-CachedValue' -ErrorAction SilentlyContinue)) {
-        Set-CachedValue -Key $cacheKey -Value $counts -TTLSeconds 120
+    # Use try-catch - Get-Command fails in WPF context
+    if ($counts) {
+        try { Set-CachedValue -Key $cacheKey -Value $counts -TTLSeconds 120 } catch { }
     }
 
     return $counts
@@ -473,19 +478,17 @@ function Invoke-RuleBatchOperation {
         }
     }
 
-    # Bulk cache invalidation (suppress output)
-    if (Get-Command -Name 'Clear-AppLockerCache' -ErrorAction SilentlyContinue) {
-        $null = Clear-AppLockerCache -Pattern 'Rule*'
-    }
+    # Bulk cache invalidation (use try-catch - Get-Command fails in WPF context)
+    try { $null = Clear-AppLockerCache -Pattern 'Rule*' } catch { }
 
-    # Single bulk event (suppress output)
-    if (Get-Command -Name 'Publish-AppLockerEvent' -ErrorAction SilentlyContinue) {
+    # Single bulk event (use try-catch - Get-Command fails in WPF context)
+    try {
         $null = Publish-AppLockerEvent -EventName 'RuleBulkUpdated' -EventData @{
             Operation = $Operation
             Count = $result.Processed
             RuleIds = $RuleIds
         }
-    }
+    } catch { }
 
     $result.Success = ($result.Failed -eq 0)
     return $result

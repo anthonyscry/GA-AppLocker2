@@ -1432,8 +1432,8 @@ function global:Invoke-LaunchRuleWizard {
     # Check if wizard overlay exists in XAML (not just the PS function)
     $wizardOverlay = $Window.FindName('RuleWizardOverlay')
     
-    if ($wizardOverlay -and (Get-Command -Name 'Initialize-RuleGenerationWizard' -ErrorAction SilentlyContinue)) {
-        # Launch the 3-step wizard UI
+    if ($wizardOverlay) {
+        # Launch the 3-step wizard UI (use try-catch - Get-Command fails in WPF context)
         try {
             Initialize-RuleGenerationWizard -Artifacts $script:CurrentScanArtifacts
             return
@@ -1690,10 +1690,8 @@ function global:Invoke-DirectRuleGenerationWithSettings {
     Write-Log -Message "Starting batch rule generation for $artifactCount artifacts"
     Write-Log -Message "Settings: PublisherLevel=$($Settings.PublisherLevel), Action=$($Settings.Action), UnsignedMode=$($Settings.UnsignedMode), SkipDlls=$($Settings.SkipDlls), SkipScripts=$($Settings.SkipScripts), SkipUnsigned=$($Settings.SkipUnsigned)"
     
-    # Show loading overlay
-    if (Get-Command -Name 'Show-LoadingOverlay' -ErrorAction SilentlyContinue) {
-        Show-LoadingOverlay -Message "Generating Rules..." -SubMessage "Processing $artifactCount artifacts..."
-    }
+    # Show loading overlay (use try-catch - Get-Command fails in WPF context)
+    try { Show-LoadingOverlay -Message "Generating Rules..." -SubMessage "Processing $artifactCount artifacts..." } catch { }
     
     try {
         # Build parameter hashtable for batch generation
@@ -1716,10 +1714,8 @@ function global:Invoke-DirectRuleGenerationWithSettings {
         # Use batch generation with user's settings from dialog
         $result = Invoke-BatchRuleGeneration @genParams
         
-        # Hide loading overlay
-        if (Get-Command -Name 'Hide-LoadingOverlay' -ErrorAction SilentlyContinue) {
-            Hide-LoadingOverlay
-        }
+        # Hide loading overlay (use try-catch - Get-Command fails in WPF context)
+        try { Hide-LoadingOverlay } catch { }
         
         # Show results
         $msg = "Created $($result.RulesCreated) rules"
@@ -1727,20 +1723,14 @@ function global:Invoke-DirectRuleGenerationWithSettings {
         Show-Toast -Message $msg -Type 'Success'
         Write-Log -Message "Batch generation complete: $($result.RulesCreated) created, $($result.AlreadyExisted) existed"
         
-        # Navigate to Rules panel to see results
-        if (Get-Command -Name 'Set-ActivePanel' -ErrorAction SilentlyContinue) {
-            Set-ActivePanel -PanelName 'PanelRules'
-        }
+        # Navigate to Rules panel to see results (use try-catch - Get-Command fails in WPF context)
+        try { Set-ActivePanel -PanelName 'PanelRules' } catch { }
         
-        # Auto-refresh the Rules DataGrid to show newly created rules
-        if (Get-Command -Name 'Update-RulesDataGrid' -ErrorAction SilentlyContinue) {
-            Update-RulesDataGrid -Window $Window
-        }
+        # Auto-refresh the Rules DataGrid to show newly created rules (use try-catch - Get-Command fails in WPF context)
+        try { Update-RulesDataGrid -Window $Window } catch { }
     }
     catch {
-        if (Get-Command -Name 'Hide-LoadingOverlay' -ErrorAction SilentlyContinue) {
-            Hide-LoadingOverlay
-        }
+        try { Hide-LoadingOverlay } catch { }
         Show-Toast -Message "Generation failed: $($_.Exception.Message)" -Type 'Error'
         Write-Log -Level Error -Message "Batch generation failed: $($_.Exception.Message)"
     }
@@ -1757,10 +1747,8 @@ function global:Invoke-DirectRuleGeneration {
     Show-Toast -Message "Generating rules from $artifactCount artifacts (Smart mode)..." -Type 'Info'
     Write-Log -Message "Starting batch rule generation for $artifactCount artifacts"
     
-    # Show loading overlay
-    if (Get-Command -Name 'Show-LoadingOverlay' -ErrorAction SilentlyContinue) {
-        Show-LoadingOverlay -Message "Generating Rules..." -SubMessage "Processing $artifactCount artifacts..."
-    }
+    # Show loading overlay (use try-catch - Get-Command fails in WPF context)
+    try { Show-LoadingOverlay -Message "Generating Rules..." -SubMessage "Processing $artifactCount artifacts..." } catch { }
     
     try {
         # Read Publisher Granularity from Rules panel ComboBox
@@ -1809,10 +1797,8 @@ function global:Invoke-DirectRuleGeneration {
             -UserOrGroupSid $targetSid `
             -UnsignedMode $unsignedMode
         
-        # Hide loading overlay
-        if (Get-Command -Name 'Hide-LoadingOverlay' -ErrorAction SilentlyContinue) {
-            Hide-LoadingOverlay
-        }
+        # Hide loading overlay (use try-catch - Get-Command fails in WPF context)
+        try { Hide-LoadingOverlay } catch { }
         
         # Show results
         $msg = "Created $($result.RulesCreated) rules"
@@ -1820,20 +1806,14 @@ function global:Invoke-DirectRuleGeneration {
         Show-Toast -Message $msg -Type 'Success'
         Write-Log -Message "Batch generation complete: $($result.RulesCreated) created, $($result.AlreadyExisted) existed"
         
-        # Navigate to Rules panel to see results
-        if (Get-Command -Name 'Set-ActivePanel' -ErrorAction SilentlyContinue) {
-            Set-ActivePanel -PanelName 'PanelRules'
-        }
+        # Navigate to Rules panel to see results (use try-catch - Get-Command fails in WPF context)
+        try { Set-ActivePanel -PanelName 'PanelRules' } catch { }
         
-        # Auto-refresh the Rules DataGrid to show newly created rules
-        if (Get-Command -Name 'Update-RulesDataGrid' -ErrorAction SilentlyContinue) {
-            Update-RulesDataGrid -Window $Window
-        }
+        # Auto-refresh the Rules DataGrid to show newly created rules (use try-catch - Get-Command fails in WPF context)
+        try { Update-RulesDataGrid -Window $Window } catch { }
     }
     catch {
-        if (Get-Command -Name 'Hide-LoadingOverlay' -ErrorAction SilentlyContinue) {
-            Hide-LoadingOverlay
-        }
+        try { Hide-LoadingOverlay } catch { }
         Show-Toast -Message "Generation failed: $($_.Exception.Message)" -Type 'Error'
         Write-Log -Level Error -Message "Batch generation failed: $($_.Exception.Message)"
     }
