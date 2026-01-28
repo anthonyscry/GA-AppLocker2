@@ -212,10 +212,10 @@ function global:Update-OUTreeView {
             # Create TreeViewItem directly here instead of calling another function
             $rootItem = [System.Windows.Controls.TreeViewItem]::new()
             $rootIcon = switch ($root.MachineType) {
-                'DomainController' { [char]0x1F3E2 }
-                'Server' { [char]0x1F5A7 }
-                'Workstation' { [char]0x1F5A5 }
-                default { [char]0x1F4C1 }
+                'DomainController' { [char]::ConvertFromUtf32(0x1F3E2) }
+                'Server' { [char]::ConvertFromUtf32(0x1F5A7) }
+                'Workstation' { [char]::ConvertFromUtf32(0x1F5A5) }
+                default { [char]::ConvertFromUtf32(0x1F4C1) }
             }
             $rootHeader = "$rootIcon $($root.Name)"
             if ($root.ComputerCount -gt 0) { $rootHeader += " ($($root.ComputerCount))" }
@@ -271,10 +271,10 @@ function global:Add-ChildOUsToTreeItem {
         $childItem = [System.Windows.Controls.TreeViewItem]::new()
 
         $icon = switch ($child.MachineType) {
-            'DomainController' { [char]0x1F3E2 }
-            'Server' { [char]0x1F5A7 }
-            'Workstation' { [char]0x1F5A5 }
-            default { [char]0x1F4C1 }
+            'DomainController' { [char]::ConvertFromUtf32(0x1F3E2) }
+            'Server' { [char]::ConvertFromUtf32(0x1F5A7) }
+            'Workstation' { [char]::ConvertFromUtf32(0x1F5A5) }
+            default { [char]::ConvertFromUtf32(0x1F4C1) }
         }
 
         $header = "$icon $($child.Name)"
@@ -299,10 +299,10 @@ function global:New-TreeViewItem {
     param($OU, $AllOUs)
 
     $icon = switch ($OU.MachineType) {
-        'DomainController' { [char]0x1F3E2 }
-        'Server' { [char]0x1F5A7 }
-        'Workstation' { [char]0x1F5A5 }
-        default { [char]0x1F4C1 }
+        'DomainController' { [char]::ConvertFromUtf32(0x1F3E2) }
+        'Server' { [char]::ConvertFromUtf32(0x1F5A7) }
+        'Workstation' { [char]::ConvertFromUtf32(0x1F5A5) }
+        default { [char]::ConvertFromUtf32(0x1F4C1) }
     }
 
     $header = "$icon $($OU.Name)"
@@ -333,9 +333,9 @@ function global:Update-MachineDataGrid {
         # Wrap in @() to ensure array for DataGrid ItemsSource (PS 5.1 compatible)
         $machinesWithIcon = @($Machines | ForEach-Object {
             $statusIcon = switch ($_.IsOnline) {
-                $true { '&#x1F7E2;' }
-                $false { '&#x1F534;' }
-                default { '&#x26AA;' }
+                $true { [char]::ConvertFromUtf32(0x1F7E2) }
+                $false { [char]::ConvertFromUtf32(0x1F534) }
+                default { [char]0x26AA }
             }
             $_ | Add-Member -NotePropertyName 'StatusIcon' -NotePropertyValue $statusIcon -PassThru -Force
         })

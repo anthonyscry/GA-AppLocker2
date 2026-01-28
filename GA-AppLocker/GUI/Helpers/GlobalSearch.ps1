@@ -378,7 +378,7 @@ function Update-SearchResultsPopup {
     # Add Machines section
     if ($Results.Machines.Count -gt 0) {
         $totalResults += $Results.Machines.Count
-        Add-SearchResultSection -Panel $resultsPanel -Title 'MACHINES' -Icon '&#x1F5A5;' `
+        Add-SearchResultSection -Panel $resultsPanel -Title 'MACHINES' -Icon ([char]::ConvertFromUtf32(0x1F5A5)) `
             -Items $Results.Machines -DisplayProperty 'Name' -SubProperty 'OperatingSystem' `
             -ClickAction { param($item) 
                 Set-ActivePanel -PanelName 'PanelDiscovery'
@@ -389,7 +389,7 @@ function Update-SearchResultsPopup {
     # Add Artifacts section
     if ($Results.Artifacts.Count -gt 0) {
         $totalResults += $Results.Artifacts.Count
-        Add-SearchResultSection -Panel $resultsPanel -Title 'ARTIFACTS' -Icon '&#x1F4C4;' `
+        Add-SearchResultSection -Panel $resultsPanel -Title 'ARTIFACTS' -Icon ([char]::ConvertFromUtf32(0x1F4C4)) `
             -Items $Results.Artifacts -DisplayProperty 'FileName' -SubProperty 'Publisher' `
             -ClickAction { param($item)
                 Set-ActivePanel -PanelName 'PanelScanner'
@@ -399,7 +399,7 @@ function Update-SearchResultsPopup {
     # Add Rules section
     if ($Results.Rules.Count -gt 0) {
         $totalResults += $Results.Rules.Count
-        Add-SearchResultSection -Panel $resultsPanel -Title 'RULES' -Icon '&#x1F4DD;' `
+        Add-SearchResultSection -Panel $resultsPanel -Title 'RULES' -Icon ([char]::ConvertFromUtf32(0x1F4DD)) `
             -Items $Results.Rules -DisplayProperty 'Name' -SubProperty 'Status' `
             -ClickAction { param($item)
                 Set-ActivePanel -PanelName 'PanelRules'
@@ -409,7 +409,7 @@ function Update-SearchResultsPopup {
     # Add Policies section
     if ($Results.Policies.Count -gt 0) {
         $totalResults += $Results.Policies.Count
-        Add-SearchResultSection -Panel $resultsPanel -Title 'POLICIES' -Icon '&#x1F4CB;' `
+        Add-SearchResultSection -Panel $resultsPanel -Title 'POLICIES' -Icon ([char]::ConvertFromUtf32(0x1F4CB)) `
             -Items $Results.Policies -DisplayProperty 'Name' -SubProperty 'Status' `
             -ClickAction { param($item)
                 Set-ActivePanel -PanelName 'PanelPolicy'
