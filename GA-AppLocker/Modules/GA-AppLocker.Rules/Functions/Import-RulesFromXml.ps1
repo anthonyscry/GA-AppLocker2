@@ -51,7 +51,7 @@ function Import-RulesFromXml {
         $existingPublishers = @{}
         
         if ($SkipDuplicates) {
-            $allRules = Get-AllRules
+            $allRules = Get-AllRules -Take 100000
             if ($allRules.Success -and $allRules.Data) {
                 foreach ($rule in $allRules.Data) {
                     if ($rule.SHA256Hash -or $rule.HashValue) {

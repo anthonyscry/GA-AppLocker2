@@ -500,7 +500,7 @@ function global:Invoke-AddRulesToPolicy {
     $policy = $policyResult.Data
     $currentRuleIds = @($policy.RuleIds)
 
-    $rulesResult = Get-AllRules
+    $rulesResult = Get-AllRules -Take 100000
     if (-not $rulesResult.Success) { return }
 
     $availableRules = $rulesResult.Data | Where-Object { 

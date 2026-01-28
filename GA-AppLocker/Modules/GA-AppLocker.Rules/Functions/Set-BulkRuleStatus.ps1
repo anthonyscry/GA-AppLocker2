@@ -365,7 +365,7 @@ function Approve-TrustedVendorRules {
         Write-RuleLog -Message "Approving rules from $($trustedPatterns.Count) trusted vendors (optimized)..."
 
         # Load all pending rules ONCE instead of 22 times
-        $allRulesResult = Get-AllRules -Status 'Pending'
+        $allRulesResult = Get-AllRules -Status 'Pending' -Take 100000
         if (-not $allRulesResult.Success) {
             throw "Failed to load rules: $($allRulesResult.Error)"
         }

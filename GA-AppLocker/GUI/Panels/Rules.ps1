@@ -183,6 +183,8 @@ function global:Update-RulesDataGrid {
             [PSCustomObject]$props
         }
 
+        # Force WPF to refresh by clearing first (prevents stale binding)
+        $DataGrid.ItemsSource = $null
         $DataGrid.ItemsSource = @($displayData)
 
         # Update counters from the original result data
@@ -201,7 +203,8 @@ function global:Update-RulesDataGrid {
     # Synchronous load - fast enough for typical deployments (100s-1000s of rules)
     # For extremely large rule sets (10K+), the JSON index with O(1) lookups keeps this performant
     try {
-        $result = Get-AllRules
+        # Use high Take value to load all rules (default is 1000)
+        $result = Get-AllRules -Take 100000
         & $processRulesData $result $typeFilter $statusFilter $textFilter $dataGrid $Window
     }
     catch {
@@ -233,10 +236,11 @@ function Update-RuleCounters {
     if ($txtRejected) { $txtRejected.Text = "$rejected" }
 
     # Also update filter button content to show counts
+    # Note: Button names match XAML: BtnFilterPending, BtnFilterApproved, BtnFilterRejected
     $btnAll = $Window.FindName('BtnFilterAllRules')
-    $btnPending = $Window.FindName('BtnFilterRulesPending')
-    $btnApproved = $Window.FindName('BtnFilterRulesApproved')
-    $btnRejected = $Window.FindName('BtnFilterRulesRejected')
+    $btnPending = $Window.FindName('BtnFilterPending')
+    $btnApproved = $Window.FindName('BtnFilterApproved')
+    $btnRejected = $Window.FindName('BtnFilterRejected')
 
     if ($btnAll) { $btnAll.Content = "All ($total)" }
     if ($btnPending) { $btnPending.Content = "Pending ($pending)" }
@@ -669,39 +673,47 @@ function global:Invoke-DeleteSelectedRules {
         $idsToDelete = @($selectedItems | ForEach-Object { $_.Id })
         
         # Use bulk delete for efficiency (uses transaction)
-        if (Get-Command -Name 'Remove-RulesBulk' -ErrorAction SilentlyContinue) {
+        # Note: Using try-catch instead of Get-Command which can fail in WPF context
+        $deleteResult = $null
+        try {
             $deleteResult = Remove-RulesBulk -RuleIds $idsToDelete
-            
-            if ($deleteResult.Success) {
-                $deleted = $deleteResult.RemovedCount
-                Show-Toast -Message "Deleted $deleted rule(s)." -Type 'Success'
-                # Caches already invalidated by Remove-RulesBulk
-            }
-            else {
-                Show-Toast -Message "Delete failed: $($deleteResult.Error)" -Type 'Error'
-            }
         }
-        elseif (Get-Command -Name 'Remove-RuleFromDatabase' -ErrorAction SilentlyContinue) {
-            # Fallback to single-rule deletion
-            $deleteResult = Remove-RuleFromDatabase -Id $idsToDelete
-            
+        catch {
+            # Remove-RulesBulk not available, try fallback
+            $deleteResult = $null
+        }
+        
+        if ($deleteResult) {
             if ($deleteResult.Success) {
                 $deleted = $deleteResult.RemovedCount
                 Show-Toast -Message "Deleted $deleted rule(s)." -Type 'Success'
-                
-                # Invalidate caches
-                if (Get-Command -Name 'Clear-AppLockerCache' -ErrorAction SilentlyContinue) {
-                    Clear-AppLockerCache -Pattern 'GlobalSearch_*' | Out-Null
-                    Clear-AppLockerCache -Pattern 'RuleCounts*' | Out-Null
-                    Clear-AppLockerCache -Pattern 'RuleQuery*' | Out-Null
-                }
             }
             else {
                 Show-Toast -Message "Delete failed: $($deleteResult.Error)" -Type 'Error'
             }
         }
         else {
-            Show-Toast -Message "Remove-RulesBulk not available. Please update GA-AppLocker.Storage module." -Type 'Error'
+            # Fallback to single-rule deletion
+            try {
+                $deleteResult = Remove-RuleFromDatabase -Id $idsToDelete
+                if ($deleteResult.Success) {
+                    $deleted = $deleteResult.RemovedCount
+                    Show-Toast -Message "Deleted $deleted rule(s)." -Type 'Success'
+                    
+                    # Invalidate caches
+                    try {
+                        Clear-AppLockerCache -Pattern 'GlobalSearch_*' | Out-Null
+                        Clear-AppLockerCache -Pattern 'RuleCounts*' | Out-Null
+                        Clear-AppLockerCache -Pattern 'RuleQuery*' | Out-Null
+                    } catch { }
+                }
+                else {
+                    Show-Toast -Message "Delete failed: $($deleteResult.Error)" -Type 'Error'
+                }
+            }
+            catch {
+                Show-Toast -Message "Delete function not available. Please update GA-AppLocker.Storage module." -Type 'Error'
+            }
         }
     }
     catch {

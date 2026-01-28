@@ -376,7 +376,11 @@ function Remove-RulesFromIndex {
     try {
         Initialize-JsonIndex
 
-        $idsToRemove = [System.Collections.Generic.HashSet[string]]::new($RuleIds)
+        # Use case-insensitive comparison for GUIDs (Rule IDs may have different casing)
+        $idsToRemove = [System.Collections.Generic.HashSet[string]]::new(
+            [string[]]$RuleIds,
+            [System.StringComparer]::OrdinalIgnoreCase
+        )
         
         # Filter out removed rules
         $remaining = [System.Collections.Generic.List[PSCustomObject]]::new()

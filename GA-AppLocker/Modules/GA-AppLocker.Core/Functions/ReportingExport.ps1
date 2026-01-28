@@ -50,7 +50,7 @@ function Export-AppLockerReport {
         $ruleStats = @{ Total = 0; Approved = 0; Pending = 0; Rejected = 0; Review = 0 }
         $rules = @()
         if ($IncludeRules -and (Get-Command 'Get-AllRules' -ErrorAction SilentlyContinue)) {
-            $rulesResult = Get-AllRules
+            $rulesResult = Get-AllRules -Take 100000
             if ($rulesResult.Success) {
                 $rules = @($rulesResult.Data)
                 $ruleStats.Total = $rules.Count
