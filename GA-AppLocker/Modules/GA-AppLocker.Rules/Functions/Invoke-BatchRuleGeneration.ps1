@@ -306,6 +306,158 @@ function Invoke-BatchRuleGeneration {
     }
 }
 
+#region ===== PREVIEW FUNCTION =====
+
+function Get-BatchPreview {
+    <#
+    .SYNOPSIS
+        Calculates a preview of what rules would be created from artifacts.
+    .DESCRIPTION
+        Used by the Rule Generation Wizard to show estimated counts before
+        actually generating rules. Performs the same filtering/deduplication
+        logic as Invoke-BatchRuleGeneration but doesn't create any rules.
+    .PARAMETER Artifacts
+        Array of artifact objects from scanning module.
+    .PARAMETER Mode
+        Rule type preference: Smart, Publisher, Hash, Path.
+    .PARAMETER SkipDlls
+        Exclude DLL artifacts.
+    .PARAMETER SkipUnsigned
+        Exclude unsigned artifacts.
+    .PARAMETER SkipScripts
+        Exclude script artifacts.
+    .PARAMETER DedupeMode
+        Deduplication strategy: Smart, Publisher, Hash, None.
+    .PARAMETER PublisherLevel
+        Granularity for publisher rules.
+    .OUTPUTS
+        PSCustomObject with preview statistics.
+    #>
+    [CmdletBinding()]
+    [OutputType([PSCustomObject])]
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [array]$Artifacts,
+
+        [ValidateSet('Smart', 'Publisher', 'Hash', 'Path')]
+        [string]$Mode = 'Smart',
+
+        [switch]$SkipDlls,
+        [switch]$SkipUnsigned,
+        [switch]$SkipScripts,
+
+        [ValidateSet('Smart', 'Publisher', 'Hash', 'None')]
+        [string]$DedupeMode = 'Smart',
+
+        [ValidateSet('PublisherOnly', 'PublisherProduct', 'PublisherProductFile', 'Exact')]
+        [string]$PublisherLevel = 'PublisherProduct',
+
+        [ValidateSet('Hash', 'Path', 'Skip')]
+        [string]$UnsignedMode = 'Hash'
+    )
+
+    $preview = [PSCustomObject]@{
+        TotalArtifacts = $Artifacts.Count
+        AfterExclusions = 0
+        AfterDedup = 0
+        NewRulesToCreate = 0
+        ExistingRules = 0
+        EstimatedPublisher = 0
+        EstimatedHash = 0
+        EstimatedPath = 0
+        SampleRules = @()
+    }
+
+    if ($Artifacts.Count -eq 0) {
+        return $preview
+    }
+
+    # Phase 1: Apply exclusions
+    $filtered = [System.Collections.Generic.List[PSCustomObject]]::new()
+    foreach ($art in $Artifacts) {
+        $skip = $false
+        if ($SkipDlls -and $art.ArtifactType -eq 'DLL') { $skip = $true }
+        if ($SkipUnsigned -and -not $art.IsSigned) { $skip = $true }
+        if ($SkipScripts -and $art.ArtifactType -in @('PS1', 'BAT', 'CMD', 'VBS', 'JS', 'WSF')) { $skip = $true }
+        
+        if (-not $skip) {
+            $filtered.Add($art)
+        }
+    }
+    $preview.AfterExclusions = $filtered.Count
+
+    if ($filtered.Count -eq 0) {
+        return $preview
+    }
+
+    # Phase 2: Deduplicate
+    $unique = if ($DedupeMode -eq 'None') {
+        $filtered
+    } else {
+        Get-UniqueArtifactsForBatch -Artifacts $filtered -Mode $DedupeMode -RuleMode $Mode -PublisherLevel $PublisherLevel -UnsignedMode $UnsignedMode
+    }
+    $preview.AfterDedup = $unique.Count
+
+    # Phase 3: Check existing rules
+    $existingIndex = Get-ExistingRuleIndex
+    $toCreate = [System.Collections.Generic.List[PSCustomObject]]::new()
+    $existingCount = 0
+    $pubCount = 0
+    $hashCount = 0
+    $pathCount = 0
+
+    foreach ($art in $unique) {
+        $ruleType = Get-RuleTypeForArtifact -Artifact $art -Mode $Mode -UnsignedMode $UnsignedMode
+        if ($ruleType -eq 'Skip') { continue }
+        
+        $exists = Test-RuleExistsInIndex -Artifact $art -Index $existingIndex -RuleType $ruleType -PublisherLevel $PublisherLevel
+        
+        if ($exists) {
+            $existingCount++
+        } else {
+            $toCreate.Add($art)
+            switch ($ruleType) {
+                'Publisher' { $pubCount++ }
+                'Hash' { $hashCount++ }
+                'Path' { $pathCount++ }
+            }
+        }
+    }
+
+    $preview.ExistingRules = $existingCount
+    $preview.NewRulesToCreate = $toCreate.Count
+    $preview.EstimatedPublisher = $pubCount
+    $preview.EstimatedHash = $hashCount
+    $preview.EstimatedPath = $pathCount
+
+    # Generate sample rules (first 10)
+    $sampleRules = [System.Collections.Generic.List[PSCustomObject]]::new()
+    $sampleCount = [Math]::Min(10, $toCreate.Count)
+    
+    for ($i = 0; $i -lt $sampleCount; $i++) {
+        $art = $toCreate[$i]
+        $ruleType = Get-RuleTypeForArtifact -Artifact $art -Mode $Mode -UnsignedMode $UnsignedMode
+        
+        $sampleRules.Add([PSCustomObject]@{
+            FileName = $art.FileName
+            RuleType = $ruleType
+            Publisher = if ($art.SignerCertificate) { 
+                (Format-PublisherString -CertSubject $art.SignerCertificate -FileName $art.FileName)
+            } elseif ($art.PublisherName) {
+                $art.PublisherName
+            } else { 'N/A' }
+            Product = if ($art.ProductName) { $art.ProductName } else { 'N/A' }
+            IsSigned = $art.IsSigned
+        })
+    }
+    $preview.SampleRules = $sampleRules.ToArray()
+
+    return $preview
+}
+
+#endregion
+
 #region ===== HELPER FUNCTIONS =====
 
 function script:Test-GuidOnlyCertificate {

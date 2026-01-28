@@ -268,6 +268,46 @@ function Rebuild-RulesIndex {
     
     return $result
 }
+
+function Get-ExistingRuleIndex {
+    <#
+    .SYNOPSIS
+        Returns the existing rule index for O(1) duplicate checking.
+    .DESCRIPTION
+        Used by Invoke-BatchRuleGeneration to check if rules already exist
+        before creating new ones. Returns hashtables for hash and publisher lookups.
+    .OUTPUTS
+        PSCustomObject with Hashes, Publishers, and PublishersOnly HashSets for O(1) lookups.
+    #>
+    [CmdletBinding()]
+    [OutputType([PSCustomObject])]
+    param()
+    
+    Initialize-JsonIndex
+    
+    # Convert hashtable keys to HashSets for O(1) Contains() checks
+    $hashSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($key in $script:HashIndex.Keys) {
+        $hashSet.Add($key) | Out-Null
+    }
+    
+    $pubSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($key in $script:PublisherIndex.Keys) {
+        $pubSet.Add($key) | Out-Null
+    }
+    
+    $pubOnlySet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($key in $script:PublisherOnlyIndex.Keys) {
+        $pubOnlySet.Add($key) | Out-Null
+    }
+    
+    return [PSCustomObject]@{
+        Hashes = $hashSet
+        Publishers = $pubSet
+        PublishersOnly = $pubOnlySet
+        TotalRules = if ($script:JsonIndex -and $script:JsonIndex.Rules) { $script:JsonIndex.Rules.Count } else { 0 }
+    }
+}
 #endregion
 
 #region ===== CRUD OPERATIONS =====

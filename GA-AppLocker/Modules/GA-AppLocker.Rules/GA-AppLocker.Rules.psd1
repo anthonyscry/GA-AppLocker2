@@ -39,6 +39,7 @@
         'Approve-TrustedVendorRules',
         # Batch Rule Generation (10x faster)
         'Invoke-BatchRuleGeneration',
+        'Get-BatchPreview',
         # Deduplication
         'Remove-DuplicateRules',
         'Find-DuplicateRules',
