@@ -31,7 +31,7 @@ function Initialize-DashboardPanel {
     Update-DashboardStats -Window $Window
 }
 
-function Update-DashboardStats {
+function global:Update-DashboardStats {
     param([System.Windows.Window]$Window)
 
     # Update stats from actual data

@@ -213,7 +213,7 @@ function global:Update-RulesDataGrid {
     }
 }
 
-function Update-RuleCounters {
+function global:Update-RuleCounters {
     param(
         [System.Windows.Window]$Window,
         [array]$Rules
