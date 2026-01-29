@@ -23,6 +23,53 @@ function Initialize-DiscoveryPanel {
         $script:ADDiscovery_Handlers['btnTest'] = { Invoke-ButtonAction -Action 'TestConnectivity' }
         $btnTest.Add_Click($script:ADDiscovery_Handlers['btnTest'])
     }
+
+    # Wire up DataGrid row-click to toggle checkbox (Bug 6: UX enhancement)
+    $dataGrid = $Window.FindName('MachineDataGrid')
+    if ($dataGrid) {
+        $script:ADDiscovery_Handlers['dataGridMouseUp'] = {
+            param($sender, $e)
+            # Only toggle when clicking on non-checkbox cells
+            $cell = $sender.CurrentCell
+            if ($null -eq $cell -or $null -eq $cell.Item) { return }
+            # Skip if the user clicked directly on the checkbox column (column index 0)
+            if ($null -ne $cell.Column -and $sender.Columns.IndexOf($cell.Column) -eq 0) { return }
+            $item = $cell.Item
+            if ($item.PSObject.Properties.Name -contains 'IsChecked') {
+                $item.IsChecked = -not $item.IsChecked
+                $sender.Items.Refresh()
+            }
+        }
+        $dataGrid.Add_CurrentCellChanged($script:ADDiscovery_Handlers['dataGridMouseUp'])
+    }
+
+    # Wire up OUTreeView selection to filter machines (Bug 3: missing feature)
+    $treeView = $Window.FindName('OUTreeView')
+    if ($treeView) {
+        $script:ADDiscovery_Handlers['treeViewSelected'] = {
+            param($sender, $e)
+            $selectedItem = $sender.SelectedItem
+            if ($null -eq $selectedItem) { return }
+            $selectedDN = $selectedItem.Tag
+            if (-not $selectedDN) { return }
+
+            if (-not $script:DiscoveredMachines -or $script:DiscoveredMachines.Count -eq 0) { return }
+
+            # Filter machines whose DistinguishedName ends with the selected OU's DN
+            $filtered = @($script:DiscoveredMachines | Where-Object {
+                $_.DistinguishedName -like "*,$selectedDN" -or
+                $_.DistinguishedName -like "*$selectedDN"
+            })
+
+            Update-MachineDataGrid -Window $Window -Machines $filtered
+
+            $machineCount = $Window.FindName('DiscoveryMachineCount')
+            if ($machineCount) {
+                $machineCount.Text = "$($filtered.Count) of $($script:DiscoveredMachines.Count) machines (filtered by OU)"
+            }
+        }
+        $treeView.Add_SelectedItemChanged($script:ADDiscovery_Handlers['treeViewSelected'])
+    }
 }
 
 function Unregister-DiscoveryPanelEvents {
@@ -51,6 +98,22 @@ function Unregister-DiscoveryPanelEvents {
         $btnTest = $Window.FindName('BtnTestConnectivity')
         if ($btnTest) {
             try { $btnTest.Remove_Click($script:ADDiscovery_Handlers['btnTest']) } catch { }
+        }
+    }
+    
+    # Remove DataGrid row-click handler
+    if ($script:ADDiscovery_Handlers['dataGridMouseUp']) {
+        $dataGrid = $Window.FindName('MachineDataGrid')
+        if ($dataGrid) {
+            try { $dataGrid.Remove_CurrentCellChanged($script:ADDiscovery_Handlers['dataGridMouseUp']) } catch { }
+        }
+    }
+    
+    # Remove TreeView selection handler
+    if ($script:ADDiscovery_Handlers['treeViewSelected']) {
+        $treeView = $Window.FindName('OUTreeView')
+        if ($treeView) {
+            try { $treeView.Remove_SelectedItemChanged($script:ADDiscovery_Handlers['treeViewSelected']) } catch { }
         }
     }
     

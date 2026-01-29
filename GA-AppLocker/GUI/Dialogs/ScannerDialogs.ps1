@@ -135,13 +135,17 @@ function global:Show-MachineSelectionDialog {
         & $updateCount
     }.GetNewClosure())
     
-    $script:DialogResult = $null
+    # Store selected machines on dialog.Tag to avoid .GetNewClosure() scope issues
+    # (.GetNewClosure() creates a new module scope, so $script: vars inside it
+    #  are different from $script: vars in the outer function)
+    $dialog.Tag = $null
     
     $btnOK.Add_Click({
-        $script:DialogResult = @()
+        $selectedMachines = @()
         foreach ($cb in $machineStack.Children) {
-            if ($cb.IsChecked) { $script:DialogResult += $cb.Tag }
+            if ($cb.IsChecked) { $selectedMachines += $cb.Tag }
         }
+        $dialog.Tag = $selectedMachines
         $dialog.DialogResult = $true
         $dialog.Close()
     }.GetNewClosure())
@@ -153,6 +157,6 @@ function global:Show-MachineSelectionDialog {
     
     $result = $dialog.ShowDialog()
     
-    if ($result -eq $true) { return $script:DialogResult }
+    if ($result -eq $true) { return $dialog.Tag }
     return $null
 }

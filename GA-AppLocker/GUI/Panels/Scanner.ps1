@@ -948,7 +948,13 @@ function global:Invoke-SelectMachinesForScan {
     $machineList = $Window.FindName('ScanMachineList')
     $machineCount = $Window.FindName('ScanMachineCount')
 
-    if ($machineList) { $machineList.ItemsSource = $script:SelectedScanMachines | Select-Object -ExpandProperty Hostname }
+    if ($machineList) {
+        $machineList.ItemsSource = @($script:SelectedScanMachines | ForEach-Object {
+            if ($_.PSObject.Properties.Name -contains 'Hostname') { $_.Hostname }
+            elseif ($_.PSObject.Properties.Name -contains 'Name') { $_.Name }
+            else { "$_" }
+        })
+    }
     if ($machineCount) { $machineCount.Text = "$($script:SelectedScanMachines.Count)" }
 
     $chkRemote = $Window.FindName('ChkScanRemote')

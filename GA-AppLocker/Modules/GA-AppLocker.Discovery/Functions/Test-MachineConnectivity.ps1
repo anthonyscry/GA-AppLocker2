@@ -93,7 +93,7 @@ function Test-PingConnectivity {
                         $jobResult = Receive-Job -Job $job -ErrorAction SilentlyContinue
                         $pingResults[$job.Name] = ($jobResult -eq $true)
                         Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
-                        $jobs.Remove($job)
+                        [void]$jobs.Remove($job)
                     }
                 }
                 else {
@@ -123,7 +123,7 @@ function Test-PingConnectivity {
                     $jobResult = Receive-Job -Job $job -ErrorAction SilentlyContinue
                     $pingResults[$job.Name] = ($jobResult -eq $true)
                     Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
-                    $jobs.Remove($job)
+                    [void]$jobs.Remove($job)
                 }
             }
             else {
