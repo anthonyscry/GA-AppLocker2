@@ -8,7 +8,7 @@
 
 @{
     RootModule        = 'GA-AppLocker.Discovery.psm1'
-    ModuleVersion     = '1.1.0'
+    ModuleVersion     = '1.1.1'
     GUID              = 'b2c3d4e5-f6a7-8901-bcde-234567890abc'
     Author            = 'GA-AppLocker Team'
     CompanyName       = 'GA-AppLocker'
