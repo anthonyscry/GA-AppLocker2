@@ -1,42 +1,34 @@
-# API Test Artifacts
-Test-GeminiAPI.ps1
-Test-GroqAPI.ps1
-Test-ZhipuAPI.ps1
-test_*.py
-setup_api_keys.py
-zhipu_api_demo.py
-*_api_test_results*.json
-*_connectivity_test_results*.json
-*_demo_results*.json
-.env
-.env.local
-API-SETUP.md
-*-API-*.md
-ZHIPU-GLM-CODING-PLAN.md
+# Build & Release Artifacts
+BuildOutput/
+Release_*/
+*.zip
+*.nupkg
 
-# Windows artifacts
+# Test Artifacts
+TestResults/
+Tests/TestData/Generated/
+*_test_output.txt
+test-import.xml
+test_output.txt
+tests-output.txt
+
+# Temporary/Cache
+*.log
 nul
-Thumbs.db
-desktop.ini
-
-# PowerShell
-*.ps1xml
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-.Python
-*.egg-info/
-.venv/
-venv/
-
-# IDE
+.vs/
 .vscode/
 .idea/
-*.suo
-*.user
 
-# Build output
-bin/
-obj/
+# User Settings
+*.user
+.env
+config.local.json
+
+# Legacy/Misc
+API-SETUP.md
+*-API-*.md
+Test-*.ps1
+!Tests/Test-*.ps1
+!Tests/*/Test-*.ps1
+!Run-Dashboard.ps1
+!build.ps1
