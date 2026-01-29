@@ -6,12 +6,20 @@
 .DESCRIPTION
     Exports data in formats suitable for Power BI, Excel, and generates
     HTML reports for compliance and audit purposes.
-#>
+
+
+    .EXAMPLE
+    Export-AppLockerReport
+    # Export AppLockerReport
+    #>
 
 function Export-AppLockerReport {
     <#
     .SYNOPSIS
         Exports a comprehensive HTML report of AppLocker data.
+
+    .DESCRIPTION
+        Exports a comprehensive HTML report of AppLocker data. Writes output to the specified path.
 
     .PARAMETER OutputPath
         Path to save the HTML report.
@@ -312,6 +320,9 @@ function Export-ForPowerBI {
     <#
     .SYNOPSIS
         Exports data in formats optimized for Power BI.
+
+    .DESCRIPTION
+        Exports data in formats optimized for Power BI. Writes output to the specified path.
 
     .PARAMETER OutputDirectory
         Directory to save the export files.

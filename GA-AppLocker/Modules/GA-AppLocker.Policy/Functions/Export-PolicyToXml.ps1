@@ -30,8 +30,15 @@ function Export-PolicyToXml {
     .EXAMPLE
         Export-PolicyToXml -PolicyId "abc123" -OutputPath "C:\Policies\baseline.xml"
 
+    .PARAMETER SkipValidation
+        If specified, skips the 5-stage validation pipeline after export.
+        By default, exported XML is validated automatically.
+
     .EXAMPLE
         Export-PolicyToXml -PolicyId "abc123" -OutputPath "C:\Policies\phase2.xml" -PhaseOverride 2
+
+    .EXAMPLE
+        Export-PolicyToXml -PolicyId "abc123" -OutputPath "C:\Policies\quick.xml" -SkipValidation
     #>
     [CmdletBinding()]
     param(
@@ -46,7 +53,10 @@ function Export-PolicyToXml {
 
         [Parameter(Mandatory = $false)]
         [ValidateRange(1, 4)]
-        [int]$PhaseOverride
+        [int]$PhaseOverride,
+
+        [Parameter(Mandatory = $false)]
+        [switch]$SkipValidation
     )
 
     try {
@@ -171,7 +181,27 @@ $(Build-PolicyRuleCollectionXml -Rules $appxRules)
         # Count actually exported rules (after phase filtering)
         $exportedRuleCount = @($exeRules).Count + @($scriptRules).Count + @($msiRules).Count + @($dllRules).Count + @($appxRules).Count
 
-        return @{
+        # Run 5-stage validation pipeline on exported XML (unless skipped)
+        $validationResult = $null
+        $validationPassed = $true
+        if (-not $SkipValidation) {
+            try {
+                $validationResult = Invoke-AppLockerPolicyValidation -XmlPath $OutputPath
+                $validationPassed = $validationResult.OverallSuccess
+            }
+            catch {
+                # Validation module may not be available; treat as warning, not failure
+                $validationResult = @{
+                    OverallSuccess = $false
+                    TotalErrors    = 0
+                    TotalWarnings  = 1
+                    Summary        = "Validation skipped: $($_.Exception.Message)"
+                }
+                $validationPassed = $true  # Don't fail export if validation module is unavailable
+            }
+        }
+
+        $result = @{
             Success = $true
             Data    = @{
                 Path            = $OutputPath
@@ -187,9 +217,18 @@ $(Build-PolicyRuleCollectionXml -Rules $appxRules)
                     Dll    = @($dllRules).Count
                     Appx   = @($appxRules).Count
                 }
+                Validation      = $validationResult
             }
             Message = "Exported $exportedRuleCount rules (Phase $effectivePhase) to $OutputPath"
         }
+
+        # If validation failed, still return the export but flag it
+        if (-not $validationPassed) {
+            $result.Data.ValidationFailed = $true
+            $result.Message += " [WARNING: Validation failed with $($validationResult.TotalErrors) error(s)]"
+        }
+
+        return $result
     }
     catch {
         return @{

@@ -61,7 +61,8 @@ GA-AppLocker2/
 │       ├── GA-AppLocker.Policy/    # Policy management, comparison, snapshots
 │       ├── GA-AppLocker.Deployment/ # GPO deployment
 │       ├── GA-AppLocker.Setup/     # Environment initialization
-│       └── GA-AppLocker.Storage/   # Indexed storage (O(1) lookups)
+│       ├── GA-AppLocker.Storage/   # Indexed storage (O(1) lookups)
+│       └── GA-AppLocker.Validation/ # Policy XML validation (5-stage pipeline)
 ├── Tests/                          # Test suites
 ├── Test-AllModules.ps1             # Main test suite (70 tests)
 ├── Run-Dashboard.ps1               # Quick launcher
@@ -100,7 +101,7 @@ Start-AppLockerDashboard
 ```
 
 ## Architecture Notes
-- **Modular Design**: 9 specialized sub-modules handle different aspects of the policy lifecycle.
+- **Modular Design**: 10 specialized sub-modules handle different aspects of the policy lifecycle.
 - **Standardized Results**: All functions return a consistent object: `@{ Success = $true/$false; Data = ...; Error = ... }`.
 - **UI Architecture**: WPF dark theme with 7 dedicated panels, central button dispatcher pattern, and standardized DataGrid columns across all data views.
 - **Security**: DPAPI encryption is used for storing sensitive credentials.
@@ -217,6 +218,15 @@ High-performance indexed storage for rules (handles 35k+ rules efficiently).
 - `Remove-RulesFromIndex`: Remove rules from index.
 - `Save-RulesBulk`: Single disk I/O for bulk saves.
 - `Remove-RulesBulk`: Bulk rule deletion with index sync.
+
+### Validation
+5-stage policy XML validation pipeline for STIG compliance.
+- `Invoke-AppLockerPolicyValidation`: Runs complete 5-stage validation pipeline.
+- `Test-AppLockerXmlSchema`: Validates root element, Version attribute, collection types, enforcement modes.
+- `Test-AppLockerRuleGuids`: Validates GUID format (8-4-4-4-12), uppercase enforcement, uniqueness.
+- `Test-AppLockerRuleSids`: Validates SID format, well-known SID resolution.
+- `Test-AppLockerRuleConditions`: Validates publisher/hash/path conditions, user-writable path warnings.
+- `Test-AppLockerPolicyImport`: Live import test via Test-AppLockerPolicy with fallback.
 
 ## Testing
 The project includes a comprehensive test suite with unit tests, integration tests, and UI automation.

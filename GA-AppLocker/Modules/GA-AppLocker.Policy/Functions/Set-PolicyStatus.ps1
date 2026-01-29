@@ -3,6 +3,10 @@ function Set-PolicyStatus {
     .SYNOPSIS
         Updates the status of a policy.
 
+
+.DESCRIPTION
+    Updates the status of a policy. Persists the change to the local GA-AppLocker data store under %LOCALAPPDATA%\GA-AppLocker.
+
     .PARAMETER PolicyId
         The unique identifier of the policy.
 
@@ -67,6 +71,10 @@ function Remove-Policy {
     <#
     .SYNOPSIS
         Removes a policy.
+
+
+.DESCRIPTION
+    Removes a policy.
 
     .PARAMETER PolicyId
         The unique identifier of the policy to remove.

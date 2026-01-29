@@ -25,6 +25,9 @@ function Get-RuleStoragePath {
     <#
     .SYNOPSIS
         Gets the path to the rules storage directory.
+
+    .DESCRIPTION
+        Gets the path to the rules storage directory.
     #>
     [CmdletBinding()]
     [OutputType([string])]
@@ -49,6 +52,9 @@ function script:Get-JsonIndexPath {
 function Reset-RulesIndexCache {
     <#
     .SYNOPSIS
+        Forces the rules index to be reloaded from disk on next access.
+
+    .DESCRIPTION
         Forces the rules index to be reloaded from disk on next access.
     #>
     [CmdletBinding()]
@@ -148,6 +154,9 @@ function Rebuild-RulesIndex {
     <#
     .SYNOPSIS
         Rebuilds the JSON index from rule files on disk.
+
+    .DESCRIPTION
+        Rebuilds the JSON index from rule files on disk. Reconstructs from source files. May take time for large datasets.
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
@@ -308,6 +317,9 @@ function Get-RuleById {
     <#
     .SYNOPSIS
         Gets a rule by its ID.
+
+    .DESCRIPTION
+        Gets a rule by its ID. Returns the requested data in a standard result object.
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
@@ -336,6 +348,9 @@ function Get-AllRules {
     <#
     .SYNOPSIS
         Gets rules with optional filtering.
+
+    .DESCRIPTION
+        Gets rules with optional filtering. Returns the requested data in a standard result object.
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
@@ -417,6 +432,9 @@ function Get-AllRules {
 function Add-Rule {
     <#
     .SYNOPSIS
+        Adds a new rule to storage.
+
+    .DESCRIPTION
         Adds a new rule to storage.
     #>
     [CmdletBinding()]
@@ -500,6 +518,9 @@ function Update-Rule {
     <#
     .SYNOPSIS
         Updates an existing rule.
+
+    .DESCRIPTION
+        Updates an existing rule. Modifies the existing item in the data store.
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
@@ -552,6 +573,9 @@ function Remove-Rule {
     <#
     .SYNOPSIS
         Removes a rule from storage.
+
+    .DESCRIPTION
+        Removes a rule from storage. Permanently removes the item from storage.
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
@@ -625,6 +649,9 @@ function Find-RuleByHash {
     <#
     .SYNOPSIS
         Finds a rule by its hash value (O(1) lookup).
+
+    .DESCRIPTION
+        Finds a rule by its hash value (O(1) lookup). Uses indexed lookups for O(1) performance.
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
@@ -659,6 +686,9 @@ function Find-RuleByPublisher {
     <#
     .SYNOPSIS
         Finds a rule by publisher name and product. Supports wildcards.
+
+    .DESCRIPTION
+        Finds a rule by publisher name and product. Supports wildcards. Uses indexed lookups for O(1) performance.
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
@@ -734,6 +764,9 @@ function Get-RuleCounts {
     <#
     .SYNOPSIS
         Gets rule counts grouped by status, type, and collection.
+
+    .DESCRIPTION
+        Gets rule counts grouped by status, type, and collection. Returns the requested data in a standard result object.
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
@@ -786,6 +819,9 @@ function Update-RuleStatusInIndex {
     <#
     .SYNOPSIS
         Updates rule status in the JSON index without full rebuild.
+
+    .DESCRIPTION
+        Updates rule status in the JSON index without full rebuild. Modifies the existing item in the data store.
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
@@ -841,6 +877,9 @@ function Remove-RulesFromIndex {
     <#
     .SYNOPSIS
         Removes rules from the JSON index by ID.
+
+    .DESCRIPTION
+        Removes rules from the JSON index by ID. Permanently removes the item from storage.
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]

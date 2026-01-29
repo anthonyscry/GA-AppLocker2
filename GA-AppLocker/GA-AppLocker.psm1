@@ -97,6 +97,12 @@ try {
         Import-Module $deployModulePath -ErrorAction Stop
     }
     
+    # Validation module - depends on Core (policy XML validation pipeline)
+    $validationModulePath = Join-Path $modulePath 'Modules\GA-AppLocker.Validation\GA-AppLocker.Validation.psd1'
+    if (Test-Path $validationModulePath) {
+        Import-Module $validationModulePath -ErrorAction Stop
+    }
+    
     # Setup module - import as module (not dot-source, which can cause issues)
     $setupModulePath = Join-Path $modulePath 'Modules\GA-AppLocker.Setup\GA-AppLocker.Setup.psm1'
     if (Test-Path $setupModulePath) {
@@ -472,6 +478,13 @@ Export-ModuleMember -Function @(
     'Backup-AppLockerData',
     'Restore-AppLockerData',
     'Get-BackupHistory',
+    # Validation module
+    'Test-AppLockerXmlSchema',
+    'Test-AppLockerRuleGuids',
+    'Test-AppLockerRuleSids',
+    'Test-AppLockerRuleConditions',
+    'Test-AppLockerPolicyImport',
+    'Invoke-AppLockerPolicyValidation',
     # Setup module
     'Initialize-WinRMGPO',
     'Initialize-AppLockerGPOs',

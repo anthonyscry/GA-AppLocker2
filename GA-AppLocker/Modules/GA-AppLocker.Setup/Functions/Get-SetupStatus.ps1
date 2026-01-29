@@ -135,6 +135,9 @@ function Initialize-AppLockerEnvironment {
     <#
     .SYNOPSIS
         Runs all initialization steps at once.
+
+    .DESCRIPTION
+        Runs all initialization steps at once. Idempotent - safe to call multiple times.
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]

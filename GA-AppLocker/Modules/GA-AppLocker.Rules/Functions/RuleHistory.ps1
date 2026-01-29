@@ -8,12 +8,20 @@
     - View previous versions
     - Restore from previous version
     - Compare versions
-#>
+
+
+    .EXAMPLE
+    Get-RuleHistory
+    # Get RuleHistory
+    #>
 
 function Get-RuleHistory {
     <#
     .SYNOPSIS
         Gets the version history for a rule.
+
+    .DESCRIPTION
+        Gets the version history for a rule. Returns the requested data in a standard result object.
 
     .PARAMETER RuleId
         The rule ID to get history for.
@@ -92,6 +100,9 @@ function Save-RuleVersion {
     <#
     .SYNOPSIS
         Saves a new version of a rule to history.
+
+    .DESCRIPTION
+        Saves a new version of a rule to history. Writes data to persistent storage.
 
     .PARAMETER Rule
         The rule object to save.
@@ -182,6 +193,9 @@ function Restore-RuleVersion {
     .SYNOPSIS
         Restores a rule to a previous version.
 
+    .DESCRIPTION
+        Restores a rule to a previous version. Restores from a previously saved version.
+
     .PARAMETER RuleId
         The rule ID to restore.
 
@@ -257,6 +271,9 @@ function Compare-RuleVersions {
     <#
     .SYNOPSIS
         Compares two versions of a rule.
+
+    .DESCRIPTION
+        Compares two versions of a rule. Returns the differences found between items.
 
     .PARAMETER RuleId
         The rule ID to compare versions for.
@@ -360,6 +377,9 @@ function Get-RuleVersionContent {
     .SYNOPSIS
         Gets the full content of a specific rule version.
 
+    .DESCRIPTION
+        Gets the full content of a specific rule version. Returns the requested data in a standard result object.
+
     .PARAMETER RuleId
         The rule ID.
 
@@ -410,6 +430,9 @@ function Remove-RuleHistory {
     .SYNOPSIS
         Removes all history for a rule.
 
+    .DESCRIPTION
+        Removes all history for a rule. Permanently removes the item from storage.
+
     .PARAMETER RuleId
         The rule ID to remove history for.
 
@@ -449,6 +472,9 @@ function Invoke-RuleHistoryCleanup {
     <#
     .SYNOPSIS
         Cleans up old rule history, keeping only recent versions.
+
+    .DESCRIPTION
+        Cleans up old rule history, keeping only recent versions. Executes the operation and returns a result object.
 
     .PARAMETER KeepVersions
         Number of versions to keep per rule. Default: 10.
@@ -522,6 +548,9 @@ function Invoke-RuleHistoryCleanup {
 function script:Get-RuleHistoryPath {
     <#
     .SYNOPSIS
+        Gets the path to rule history storage directory.
+
+    .DESCRIPTION
         Gets the path to rule history storage directory.
     #>
     $dataPath = Get-AppLockerDataPath

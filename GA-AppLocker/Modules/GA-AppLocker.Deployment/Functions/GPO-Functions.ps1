@@ -3,6 +3,10 @@ function Test-GPOExists {
     .SYNOPSIS
         Tests if a GPO exists.
 
+
+.DESCRIPTION
+    Tests if a GPO exists. Returns a result object indicating success or failure. Check the Success property of the returned hashtable.
+
     .PARAMETER GPOName
         The name of the GPO to check.
 
@@ -49,6 +53,10 @@ function New-AppLockerGPO {
     <#
     .SYNOPSIS
         Creates a new GPO for AppLocker policies.
+
+
+.DESCRIPTION
+    Creates a new GPO for AppLocker policies.
 
     .PARAMETER GPOName
         The name for the new GPO.
@@ -225,6 +233,10 @@ function Get-DeploymentHistory {
     <#
     .SYNOPSIS
         Gets deployment history entries.
+
+
+.DESCRIPTION
+    Gets deployment history entries.
 
     .PARAMETER JobId
         Optional filter by job ID.

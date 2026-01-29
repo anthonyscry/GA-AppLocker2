@@ -5,12 +5,20 @@
 .DESCRIPTION
     Provides functions to create, manage, and execute scheduled scans.
     Schedules are stored locally and executed via Windows Task Scheduler.
-#>
+
+
+    .EXAMPLE
+    New-ScheduledScan
+    # New ScheduledScan
+    #>
 
 function New-ScheduledScan {
     <#
     .SYNOPSIS
         Creates a new scheduled scan configuration.
+
+    .DESCRIPTION
+        Creates a new scheduled scan configuration. Creates the object and returns a standard result object.
 
     .PARAMETER Name
         Name for the scheduled scan.
@@ -114,6 +122,9 @@ function Get-ScheduledScans {
     <#
     .SYNOPSIS
         Gets all scheduled scans.
+
+    .DESCRIPTION
+        Gets all scheduled scans. Returns the requested data in a standard result object.
     #>
     [CmdletBinding()]
     param(
@@ -151,6 +162,9 @@ function Remove-ScheduledScan {
     <#
     .SYNOPSIS
         Removes a scheduled scan.
+
+    .DESCRIPTION
+        Removes a scheduled scan. Permanently removes the item from storage.
 
     .PARAMETER Id
         ID of the scheduled scan to remove.
@@ -200,6 +214,9 @@ function Set-ScheduledScanEnabled {
     <#
     .SYNOPSIS
         Enables or disables a scheduled scan.
+
+    .DESCRIPTION
+        Enables or disables a scheduled scan. Persists the change to the GA-AppLocker data store.
 
     .PARAMETER Id
         ID of the scheduled scan.
@@ -265,6 +282,9 @@ function Invoke-ScheduledScan {
     <#
     .SYNOPSIS
         Manually triggers a scheduled scan.
+
+    .DESCRIPTION
+        Manually triggers a scheduled scan. Executes the operation and returns a result object.
 
     .PARAMETER Id
         ID of the scheduled scan to run.

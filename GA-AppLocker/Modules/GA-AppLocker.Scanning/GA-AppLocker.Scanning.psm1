@@ -79,6 +79,9 @@ function script:Get-FileArtifact {
     <#
     .SYNOPSIS
         Extracts artifact information from a file.
+
+    .DESCRIPTION
+        Extracts artifact information from a file.
     #>
     param(
         [Parameter(Mandatory)]

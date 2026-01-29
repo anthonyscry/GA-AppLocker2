@@ -7,12 +7,20 @@
     Creates full backups of all GA-AppLocker data including rules, policies,
     settings, credentials (encrypted), and audit logs. Supports restore with
     validation.
-#>
+
+
+    .EXAMPLE
+    Backup-AppLockerData
+    # Backup AppLockerData
+    #>
 
 function Backup-AppLockerData {
     <#
     .SYNOPSIS
         Creates a full backup of GA-AppLocker data.
+
+    .DESCRIPTION
+        Creates a full backup of GA-AppLocker data. Creates a backup copy for disaster recovery.
 
     .PARAMETER OutputPath
         Path for the backup file (.zip).
@@ -203,6 +211,9 @@ function Restore-AppLockerData {
     <#
     .SYNOPSIS
         Restores GA-AppLocker data from a backup.
+
+    .DESCRIPTION
+        Restores GA-AppLocker data from a backup. Restores from a previously saved version.
 
     .PARAMETER BackupPath
         Path to the backup .zip file.
@@ -403,6 +414,9 @@ function Get-BackupHistory {
     <#
     .SYNOPSIS
         Lists available backups in a directory.
+
+    .DESCRIPTION
+        Lists available backups in a directory. Returns the requested data in a standard result object.
 
     .PARAMETER BackupDirectory
         Directory containing backup files.

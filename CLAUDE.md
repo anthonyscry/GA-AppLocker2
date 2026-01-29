@@ -52,7 +52,8 @@ GA-AppLocker2/
 │       ├── GA-AppLocker.Policy/    # Policy management + XML export
 │       ├── GA-AppLocker.Deployment/ # GPO deployment
 │       ├── GA-AppLocker.Setup/     # Environment initialization
-│       └── GA-AppLocker.Storage/   # Indexed rule storage (O(1) lookups)
+│       ├── GA-AppLocker.Storage/   # Indexed rule storage (O(1) lookups)
+│       └── GA-AppLocker.Validation/ # Policy XML validation (5-stage pipeline)
 ├── Tests/
 │   ├── Unit/                       # Unit tests
 │   └── Integration/                # AD integration tests
@@ -61,7 +62,7 @@ GA-AppLocker2/
 └── Run-Dashboard.ps1               # Quick launcher
 ```
 
-### 9 Sub-Modules
+### 10 Sub-Modules
 
 | Module | Purpose | Key Functions |
 |--------|---------|---------------|
@@ -74,6 +75,7 @@ GA-AppLocker2/
 | **Deployment** | GPO deployment | `Start-Deployment`, `Import-PolicyToGPO`, `New-AppLockerGPO` |
 | **Setup** | Environment init | `Initialize-AppLockerEnvironment`, `Initialize-WinRMGPO` |
 | **Storage** | Indexed rule storage + repository | `Initialize-RuleDatabase`, `Find-RuleByHash`, `Get-RulesFromDatabase`, `Get-RuleFromRepository`, `Save-RuleToRepository` |
+| **Validation** | Policy XML validation (5-stage pipeline) | `Invoke-AppLockerPolicyValidation`, `Test-AppLockerXmlSchema`, `Test-AppLockerRuleGuids`, `Test-AppLockerRuleSids`, `Test-AppLockerRuleConditions`, `Test-AppLockerPolicyImport` |
 
 ## Code Conventions
 

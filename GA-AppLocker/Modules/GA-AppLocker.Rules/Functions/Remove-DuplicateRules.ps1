@@ -316,6 +316,9 @@ function Remove-DuplicateRules {
 <#
 .SYNOPSIS
     Sorts a group of duplicate rules based on the keep strategy.
+
+.DESCRIPTION
+    Sorts a group of duplicate rules based on the keep strategy.
 #>
 function Sort-DuplicateGroup {
     param(

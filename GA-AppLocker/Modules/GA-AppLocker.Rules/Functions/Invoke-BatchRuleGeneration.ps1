@@ -465,6 +465,9 @@ function script:Test-GuidOnlyCertificate {
     .SYNOPSIS
         Checks if a certificate subject contains only a GUID as the CN with no other useful info.
         GUID-only certificates don't provide meaningful publisher identification.
+
+    .DESCRIPTION
+        Checks if a certificate subject contains only a GUID as the CN with no other useful info. GUID-only certificates don't provide meaningful publisher identification.
     #>
     param([string]$CertSubject)
     
@@ -481,6 +484,9 @@ function script:Get-AppNameFromFileName {
     .SYNOPSIS
         Extracts a friendly app name from an Appx package filename.
         e.g., "AcerIncorporated.AcerCareCenterS.appx" -> "Acer Care Center S"
+
+    .DESCRIPTION
+        Extracts a friendly app name from an Appx package filename. e.g., "AcerIncorporated.AcerCareCenterS.appx" -> "Acer Care Center S".
     #>
     param([string]$FileName)
     
@@ -510,6 +516,9 @@ function script:Get-AppNameFromFileName {
 function script:Get-RuleTypeForArtifact {
     <#
     .SYNOPSIS
+        Determines the rule type for an artifact based on mode and unsigned handling.
+
+    .DESCRIPTION
         Determines the rule type for an artifact based on mode and unsigned handling.
     #>
     param(
@@ -553,6 +562,9 @@ function script:Get-RuleTypeForArtifact {
 function script:Get-UniqueArtifactsForBatch {
     <#
     .SYNOPSIS
+        Deduplicates artifacts based on what will become unique rules.
+
+    .DESCRIPTION
         Deduplicates artifacts based on what will become unique rules.
     #>
     param(
@@ -632,6 +644,9 @@ function script:Test-RuleExistsInIndex {
     <#
     .SYNOPSIS
         Checks if a rule already exists for this artifact using O(1) index lookup.
+
+    .DESCRIPTION
+        Checks if a rule already exists for this artifact using O(1) index lookup.
     #>
     param(
         [PSCustomObject]$Artifact,
@@ -688,6 +703,9 @@ function script:Test-RuleExistsInIndex {
 function script:New-RuleObjectFromArtifact {
     <#
     .SYNOPSIS
+        Creates a rule object in memory without saving to disk.
+
+    .DESCRIPTION
         Creates a rule object in memory without saving to disk.
     #>
     param(
@@ -834,6 +852,9 @@ function script:New-RuleObjectFromArtifact {
 function script:New-BatchSummary {
     <#
     .SYNOPSIS
+        Creates a summary object for batch generation results.
+
+    .DESCRIPTION
         Creates a summary object for batch generation results.
     #>
     param(

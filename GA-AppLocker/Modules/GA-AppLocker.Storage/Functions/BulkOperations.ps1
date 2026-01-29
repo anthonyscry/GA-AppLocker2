@@ -5,7 +5,12 @@
 .DESCRIPTION
     Provides batch write and index update operations to minimize disk I/O.
     Used by Invoke-BatchRuleGeneration for 10x+ performance improvement.
-#>
+
+
+    .EXAMPLE
+    Save-RulesBulk
+    # Save RulesBulk
+    #>
 
 function Save-RulesBulk {
     <#
@@ -270,6 +275,9 @@ function Remove-RulesBulk {
     .SYNOPSIS
         Removes multiple rules in a single optimized operation.
 
+    .DESCRIPTION
+        Removes multiple rules in a single optimized operation. Permanently removes the item from storage.
+
     .PARAMETER RuleIds
         Array of rule IDs to remove.
 
@@ -333,6 +341,9 @@ function Clear-RulesIndex {
     <#
     .SYNOPSIS
         Clears the entire rules index (used after bulk delete all).
+
+    .DESCRIPTION
+        Clears the entire rules index (used after bulk delete all). Permanently removes the item from storage.
     #>
     [CmdletBinding()]
     param()
@@ -352,6 +363,9 @@ function Remove-RulesFromIndex {
     <#
     .SYNOPSIS
         Removes rules from the in-memory index.
+
+    .DESCRIPTION
+        Removes rules from the in-memory index. Permanently removes the item from storage.
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]

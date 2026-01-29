@@ -7,12 +7,20 @@
     Records user actions with timestamps, user identity, action type,
     target objects, and details. Supports querying, filtering, and
     export of audit logs.
-#>
+
+
+    .EXAMPLE
+    Write-AuditLog
+    # Write AuditLog
+    #>
 
 function Write-AuditLog {
     <#
     .SYNOPSIS
         Writes an entry to the audit trail.
+
+    .DESCRIPTION
+        Writes an entry to the audit trail. Writes a timestamped entry to the log.
 
     .PARAMETER Action
         The action performed (e.g., 'RuleApproved', 'PolicyDeployed').
@@ -118,6 +126,9 @@ function Get-AuditLog {
     .SYNOPSIS
         Retrieves audit log entries with optional filtering.
 
+    .DESCRIPTION
+        Retrieves audit log entries with optional filtering. Returns the requested data in a standard result object.
+
     .PARAMETER Category
         Filter by category.
 
@@ -218,6 +229,9 @@ function Export-AuditLog {
     .SYNOPSIS
         Exports audit log to CSV or JSON file.
 
+    .DESCRIPTION
+        Exports audit log to CSV or JSON file. Writes output to the specified path.
+
     .PARAMETER OutputPath
         Path to save the export file.
 
@@ -293,6 +307,9 @@ function Clear-AuditLog {
     .SYNOPSIS
         Clears audit log entries older than specified days.
 
+    .DESCRIPTION
+        Clears audit log entries older than specified days. Removes all matching items.
+
     .PARAMETER DaysToKeep
         Number of days of entries to keep.
 
@@ -359,6 +376,9 @@ function Get-AuditLogPath {
     <#
     .SYNOPSIS
         Gets the path to the audit log file.
+
+    .DESCRIPTION
+        Gets the path to the audit log file. Returns the requested data in a standard result object.
     #>
     $dataPath = if (Get-Command -Name 'Get-AppLockerDataPath' -ErrorAction SilentlyContinue) {
         Get-AppLockerDataPath
@@ -372,6 +392,9 @@ function Get-AuditLogSummary {
     <#
     .SYNOPSIS
         Gets a summary of audit log activity.
+
+    .DESCRIPTION
+        Gets a summary of audit log activity. Returns the requested data in a standard result object.
 
     .PARAMETER Days
         Number of days to include in summary.

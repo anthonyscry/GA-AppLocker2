@@ -119,6 +119,9 @@ function Enable-WinRMGPO {
     <#
     .SYNOPSIS
         Enables the WinRM GPO link.
+
+    .DESCRIPTION
+        Enables the WinRM GPO link. Can be re-enabled with the corresponding Enable- function.
     #>
     [CmdletBinding()]
     param([string]$GPOName = 'AppLocker-EnableWinRM')
@@ -149,6 +152,9 @@ function Disable-WinRMGPO {
     <#
     .SYNOPSIS
         Disables the WinRM GPO link.
+
+    .DESCRIPTION
+        Disables the WinRM GPO link. Can be re-enabled with the corresponding Enable- function.
     #>
     [CmdletBinding()]
     param([string]$GPOName = 'AppLocker-EnableWinRM')

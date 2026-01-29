@@ -5,7 +5,12 @@
 .DESCRIPTION
     Provides functions to compare two policies and identify added, removed, and modified rules.
     Useful for reviewing changes before deployment or auditing policy drift.
-#>
+
+
+    .EXAMPLE
+    Compare-Policies
+    # Compare Policies
+    #>
 
 function Compare-Policies {
     <#

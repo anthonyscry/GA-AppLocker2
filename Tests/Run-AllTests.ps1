@@ -95,12 +95,20 @@ if ($Quick) {
 
 if ($Coverage) {
     $config.CodeCoverage.Enabled = $true
-    $config.CodeCoverage.Path = @(
-        "$modulePath\Modules\GA-AppLocker.Policy\Functions\*.ps1",
-        "$modulePath\Modules\GA-AppLocker.Rules\Functions\*.ps1"
-    )
+    # Cover all module Functions/ directories
+    $coveragePaths = @()
+    $modulesDir = Join-Path $modulePath 'Modules'
+    $subModules = Get-ChildItem -Path $modulesDir -Directory -ErrorAction SilentlyContinue
+    foreach ($mod in $subModules) {
+        $funcDir = Join-Path $mod.FullName 'Functions'
+        if (Test-Path $funcDir) {
+            $coveragePaths += Join-Path $funcDir '*.ps1'
+        }
+    }
+    $config.CodeCoverage.Path = $coveragePaths
     $config.CodeCoverage.OutputPath = Join-Path $projectRoot 'coverage.xml'
-    Write-Host "Code Coverage: Enabled" -ForegroundColor Yellow
+    $config.CodeCoverage.OutputFormat = 'JaCoCo'
+    Write-Host "Code Coverage: Enabled ($($coveragePaths.Count) module paths)" -ForegroundColor Yellow
 }
 
 if ($OutputPath) {

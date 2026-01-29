@@ -5,7 +5,12 @@
     Contains data validation, transformation, and filtering logic
     extracted from the Scanner panel UI code. These functions have
     NO dependencies on $Window or WPF types.
-#>
+
+
+    .EXAMPLE
+    Test-ScanPathValid
+    # Test ScanPathValid
+    #>
 
 function Test-ScanPathValid {
     <#
@@ -42,6 +47,9 @@ function Get-ScanPathsFromText {
     <#
     .SYNOPSIS
         Parses scan paths from multi-line text input.
+
+    .DESCRIPTION
+        Parses scan paths from multi-line text input. Returns the requested data in a standard result object.
     #>
     param([string]$Text)
     
@@ -58,6 +66,9 @@ function Get-FilteredArtifacts {
     <#
     .SYNOPSIS
         Filters artifacts by type criteria.
+
+    .DESCRIPTION
+        Filters artifacts by type criteria. Returns the requested data in a standard result object.
     #>
     param(
         [array]$Artifacts,
@@ -97,6 +108,9 @@ function Get-ArtifactCountsByType {
     <#
     .SYNOPSIS
         Counts artifacts by file type.
+
+    .DESCRIPTION
+        Counts artifacts by file type.
     #>
     param([array]$Artifacts)
     
@@ -127,6 +141,9 @@ function Format-ArtifactForDisplay {
     <#
     .SYNOPSIS
         Formats an artifact for display in the data grid.
+
+    .DESCRIPTION
+        Formats an artifact for display in the data grid.
     #>
     param([PSCustomObject]$Artifact)
     
@@ -147,6 +164,9 @@ function Format-FileSize {
     <#
     .SYNOPSIS
         Formats file size in human-readable format.
+
+    .DESCRIPTION
+        Formats file size in human-readable format. Returns the requested data in a standard result object.
     #>
     param([long]$Bytes)
     
@@ -160,6 +180,9 @@ function Get-ScanProgressMessage {
     <#
     .SYNOPSIS
         Gets a progress message for scan status display.
+
+    .DESCRIPTION
+        Gets a progress message for scan status display. Returns the requested data in a standard result object.
     #>
     param(
         [int]$Scanned,
@@ -186,6 +209,9 @@ function Get-ScanSummary {
     <#
     .SYNOPSIS
         Generates a summary of scan results.
+
+    .DESCRIPTION
+        Generates a summary of scan results. Returns a result object with Success, Data, and Error properties.
     #>
     param(
         [array]$Artifacts,
@@ -213,6 +239,9 @@ function Test-ArtifactSelectionValid {
     <#
     .SYNOPSIS
         Validates artifact selection for bulk operations.
+
+    .DESCRIPTION
+        Validates artifact selection for bulk operations.
     #>
     param(
         [array]$SelectedArtifacts,
@@ -225,6 +254,9 @@ function Test-ArtifactSelectionValid {
 function Group-ArtifactsByPublisher {
     <#
     .SYNOPSIS
+        Groups artifacts by publisher for summary display.
+
+    .DESCRIPTION
         Groups artifacts by publisher for summary display.
     #>
     param([array]$Artifacts)

@@ -5,7 +5,12 @@
     Contains data validation, transformation, and filtering logic
     extracted from the Rules panel UI code. These functions have
     NO dependencies on $Window or WPF types.
-#>
+
+
+    .EXAMPLE
+    Get-RuleGenerationOptions
+    # Get RuleGenerationOptions
+    #>
 
 function Get-RuleGenerationOptions {
     <#
@@ -43,6 +48,9 @@ function Test-ArtifactsAvailable {
     <#
     .SYNOPSIS
         Validates that artifacts are available for processing.
+
+    .DESCRIPTION
+        Validates that artifacts are available for processing. Returns the requested data in a standard result object.
     #>
     param([array]$Artifacts)
     
@@ -83,6 +91,9 @@ function Get-RuleCountsByStatus {
     <#
     .SYNOPSIS
         Counts rules by status category.
+
+    .DESCRIPTION
+        Counts rules by status category. Returns the requested data in a standard result object.
     #>
     param([array]$Rules)
     
@@ -109,6 +120,9 @@ function Get-RuleCountsByType {
     <#
     .SYNOPSIS
         Counts rules by type category.
+
+    .DESCRIPTION
+        Counts rules by type category.
     #>
     param([array]$Rules)
     
@@ -131,6 +145,9 @@ function Format-RuleForExport {
     <#
     .SYNOPSIS
         Formats a rule object for CSV/export.
+
+    .DESCRIPTION
+        Formats a rule object for CSV/export. Returns the requested data in a standard result object.
     #>
     param([PSCustomObject]$Rule)
     
@@ -156,6 +173,9 @@ function Get-RuleDisplayText {
     <#
     .SYNOPSIS
         Gets display text for a rule based on its type.
+
+    .DESCRIPTION
+        Gets display text for a rule based on its type. Returns a result object with Success, Data, and Error properties.
     #>
     param([PSCustomObject]$Rule)
     
@@ -185,6 +205,9 @@ function Test-RuleSelectionValid {
     <#
     .SYNOPSIS
         Validates a rule selection for bulk operations.
+
+    .DESCRIPTION
+        Validates a rule selection for bulk operations.
     #>
     param(
         [array]$SelectedRules,
@@ -197,6 +220,9 @@ function Test-RuleSelectionValid {
 function Group-RulesByPublisher {
     <#
     .SYNOPSIS
+        Groups rules by publisher for tree view display.
+
+    .DESCRIPTION
         Groups rules by publisher for tree view display.
     #>
     param([array]$Rules)

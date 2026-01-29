@@ -3,6 +3,10 @@ function Get-Policy {
     .SYNOPSIS
         Retrieves a policy by ID or name.
 
+
+.DESCRIPTION
+    Retrieves a policy by ID or name. Returns the requested data wrapped in a standard result object with Success, Data, and Error properties.
+
     .PARAMETER PolicyId
         The unique identifier of the policy.
 
@@ -83,6 +87,10 @@ function Get-AllPolicies {
     <#
     .SYNOPSIS
         Retrieves all policies.
+
+
+.DESCRIPTION
+    Retrieves all policies.
 
     .PARAMETER Status
         Optional filter by status (Draft, Active, Deployed, Archived).

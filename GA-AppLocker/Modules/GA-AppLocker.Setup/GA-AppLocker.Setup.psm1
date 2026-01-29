@@ -78,6 +78,9 @@ function script:Get-DomainDN {
     <#
     .SYNOPSIS
         Gets the domain distinguished name.
+
+    .DESCRIPTION
+        Gets the domain distinguished name.
     #>
     try {
         if (Test-ModuleAvailable -ModuleName 'ActiveDirectory') {
@@ -103,6 +106,9 @@ function script:Get-DomainDN {
 function script:Get-DefaultOUPath {
     <#
     .SYNOPSIS
+        Gets the default OU paths for different machine types.
+
+    .DESCRIPTION
         Gets the default OU paths for different machine types.
     #>
     param([string]$Type)

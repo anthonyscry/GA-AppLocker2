@@ -79,6 +79,9 @@ function script:Get-RuleStoragePath {
     <#
     .SYNOPSIS
         Gets the path to rule storage directory.
+
+    .DESCRIPTION
+        Gets the path to rule storage directory.
     #>
     $dataPath = Get-AppLockerDataPath
     $rulePath = Join-Path $dataPath 'Rules'
@@ -93,6 +96,9 @@ function script:Get-RuleStoragePath {
 function script:Get-CollectionType {
     <#
     .SYNOPSIS
+        Determines the AppLocker collection type for a file extension.
+
+    .DESCRIPTION
         Determines the AppLocker collection type for a file extension.
     #>
     param([string]$Extension)
@@ -110,6 +116,9 @@ function script:New-RuleId {
     <#
     .SYNOPSIS
         Generates a new unique rule GUID.
+
+    .DESCRIPTION
+        Generates a new unique rule GUID.
     #>
     return [guid]::NewGuid().ToString()
 }
@@ -117,6 +126,9 @@ function script:New-RuleId {
 function script:Save-Rule {
     <#
     .SYNOPSIS
+        Saves a rule to storage and updates the index.
+
+    .DESCRIPTION
         Saves a rule to storage and updates the index.
     #>
     param([PSCustomObject]$Rule)
@@ -139,6 +151,9 @@ function script:Format-PublisherString {
     .SYNOPSIS
         Formats a publisher certificate subject into a display name.
         Handles GUID-only certificates by returning a clearer indicator.
+
+    .DESCRIPTION
+        Formats a publisher certificate subject into a display name. Handles GUID-only certificates by returning a clearer indicator.
     #>
     param(
         [string]$CertSubject,
@@ -181,6 +196,9 @@ function script:Get-AppNameFromFileName {
     .SYNOPSIS
         Extracts a friendly app name from an Appx package filename.
         e.g., "AcerIncorporated.AcerCareCenterS.appx" -> "Acer Care Center S"
+
+    .DESCRIPTION
+        Extracts a friendly app name from an Appx package filename. e.g., "AcerIncorporated.AcerCareCenterS.appx" -> "Acer Care Center S".
     #>
     param([string]$FileName)
     

@@ -119,6 +119,9 @@ function Start-RuleIndexWatcher {
 .SYNOPSIS
     Stops monitoring the Rules directory.
 
+.DESCRIPTION
+    Stops monitoring the Rules directory. Gracefully stops the running operation.
+
 .EXAMPLE
     Stop-RuleIndexWatcher
 
@@ -173,6 +176,9 @@ function Stop-RuleIndexWatcher {
 .SYNOPSIS
     Gets the current watcher status.
 
+.DESCRIPTION
+    Gets the current watcher status. Returns the requested data in a standard result object.
+
 .OUTPUTS
     [PSCustomObject] Watcher status information.
 #>
@@ -192,6 +198,9 @@ function Get-RuleIndexWatcherStatus {
 <#
 .SYNOPSIS
     Sets the debounce delay for index rebuilding.
+
+.DESCRIPTION
+    Sets the debounce delay for index rebuilding. Persists the change to the GA-AppLocker data store.
 
 .PARAMETER Milliseconds
     Delay in milliseconds to wait after the last file change before rebuilding.

@@ -8,7 +8,12 @@
     - Version history with metadata
     - Easy rollback to previous states
     - Audit trail of policy changes
-#>
+
+
+    .EXAMPLE
+    New-PolicySnapshot
+    # New PolicySnapshot
+    #>
 
 function New-PolicySnapshot {
     <#

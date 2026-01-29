@@ -7,12 +7,20 @@
     Sends email notifications for important events like policy deployments,
     rule approvals, and scan completions. Works with on-premises SMTP servers
     for air-gapped environments.
-#>
+
+
+    .EXAMPLE
+    Get-EmailSettings
+    # Get EmailSettings
+    #>
 
 function Get-EmailSettings {
     <#
     .SYNOPSIS
         Gets the current email notification settings.
+
+    .DESCRIPTION
+        Gets the current email notification settings. Returns the requested data in a standard result object.
     #>
     try {
         $settingsPath = Join-Path (Get-AppLockerDataPath) 'Config\email-settings.json'
@@ -60,6 +68,9 @@ function Set-EmailSettings {
     <#
     .SYNOPSIS
         Configures email notification settings.
+
+    .DESCRIPTION
+        Configures email notification settings. Persists the change to the GA-AppLocker data store.
 
     .PARAMETER SmtpServer
         SMTP server hostname or IP address.
@@ -152,6 +163,9 @@ function Set-EmailNotifyOn {
     .SYNOPSIS
         Configures which events trigger email notifications.
 
+    .DESCRIPTION
+        Configures which events trigger email notifications. Persists the change to the GA-AppLocker data store.
+
     .PARAMETER PolicyDeployed
         Notify when a policy is deployed.
 
@@ -212,6 +226,9 @@ function Send-AppLockerNotification {
     <#
     .SYNOPSIS
         Sends an email notification.
+
+    .DESCRIPTION
+        Sends an email notification. Uses the configured email transport settings.
 
     .PARAMETER Subject
         Email subject line.
@@ -362,6 +379,9 @@ function Test-EmailSettings {
     <#
     .SYNOPSIS
         Tests email settings by sending a test email.
+
+    .DESCRIPTION
+        Tests email settings by sending a test email. Returns a result object with Success, Data, and Error properties.
 
     .EXAMPLE
         Test-EmailSettings

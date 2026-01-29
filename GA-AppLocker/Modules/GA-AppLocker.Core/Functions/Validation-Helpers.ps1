@@ -41,6 +41,9 @@ $script:ValidTiers = @(0, 1, 2)
 .SYNOPSIS
     Validates a SHA256 hash string.
 
+.DESCRIPTION
+    Validates a SHA256 hash string. Returns $true if the input matches the expected format, $false otherwise.
+
 .PARAMETER Hash
     The hash string to validate.
 
@@ -66,6 +69,9 @@ function Test-ValidHash {
 <#
 .SYNOPSIS
     Validates a Windows SID string.
+
+.DESCRIPTION
+    Validates a Windows SID string. Returns $true if the input matches the expected format, $false otherwise.
 
 .PARAMETER Sid
     The SID string to validate.
@@ -94,6 +100,9 @@ function Test-ValidSid {
 .SYNOPSIS
     Validates a GUID string.
 
+.DESCRIPTION
+    Validates a GUID string. Returns $true if the input matches the expected format, $false otherwise.
+
 .PARAMETER Guid
     The GUID string to validate.
 
@@ -120,6 +129,9 @@ function Test-ValidGuid {
 <#
 .SYNOPSIS
     Validates a file path string.
+
+.DESCRIPTION
+    Validates a file path string. Returns $true if the input matches the expected format, $false otherwise.
 
 .PARAMETER Path
     The path string to validate.
@@ -172,6 +184,9 @@ function Test-ValidPath {
 .SYNOPSIS
     Validates a Distinguished Name (DN) string.
 
+.DESCRIPTION
+    Validates a Distinguished Name (DN) string. Returns $true if the input matches the expected format, $false otherwise.
+
 .PARAMETER DistinguishedName
     The DN string to validate.
 
@@ -198,6 +213,9 @@ function Test-ValidDistinguishedName {
 <#
 .SYNOPSIS
     Validates a hostname string.
+
+.DESCRIPTION
+    Validates a hostname string. Returns $true if the input matches the expected format, $false otherwise.
 
 .PARAMETER Hostname
     The hostname string to validate.
@@ -230,6 +248,9 @@ function Test-ValidHostname {
 .SYNOPSIS
     Validates an AppLocker collection type.
 
+.DESCRIPTION
+    Validates an AppLocker collection type. Returns $true if the input matches the expected format, $false otherwise.
+
 .PARAMETER CollectionType
     The collection type to validate.
 
@@ -255,6 +276,9 @@ function Test-ValidCollectionType {
 <#
 .SYNOPSIS
     Validates an AppLocker rule action.
+
+.DESCRIPTION
+    Validates an AppLocker rule action. Returns $true if the input matches the expected format, $false otherwise.
 
 .PARAMETER Action
     The action to validate.
@@ -282,6 +306,9 @@ function Test-ValidRuleAction {
 .SYNOPSIS
     Validates a rule status.
 
+.DESCRIPTION
+    Validates a rule status. Returns $true if the input matches the expected format, $false otherwise.
+
 .PARAMETER Status
     The status to validate.
 
@@ -307,6 +334,9 @@ function Test-ValidRuleStatus {
 <#
 .SYNOPSIS
     Validates a policy status.
+
+.DESCRIPTION
+    Validates a policy status. Returns $true if the input matches the expected format, $false otherwise.
 
 .PARAMETER Status
     The status to validate.
@@ -334,6 +364,9 @@ function Test-ValidPolicyStatus {
 .SYNOPSIS
     Validates an enforcement mode.
 
+.DESCRIPTION
+    Validates an enforcement mode. Returns $true if the input matches the expected format, $false otherwise.
+
 .PARAMETER Mode
     The enforcement mode to validate.
 
@@ -359,6 +392,9 @@ function Test-ValidEnforcementMode {
 <#
 .SYNOPSIS
     Validates a tier value.
+
+.DESCRIPTION
+    Validates a tier value. Returns $true if the input matches the expected format, $false otherwise.
 
 .PARAMETER Tier
     The tier to validate (0, 1, or 2).
@@ -387,6 +423,9 @@ function Test-ValidTier {
 <#
 .SYNOPSIS
     Asserts that a value is not null or empty.
+
+.DESCRIPTION
+    Asserts that a value is not null or empty. Throws [System.ArgumentException] if the assertion fails. Use for parameter validation.
 
 .PARAMETER Value
     The value to check.
@@ -432,6 +471,9 @@ function Assert-NotNullOrEmpty {
 <#
 .SYNOPSIS
     Asserts that a numeric value is within a range.
+
+.DESCRIPTION
+    Asserts that a numeric value is within a range. Throws [System.ArgumentException] if the assertion fails. Use for parameter validation.
 
 .PARAMETER Value
     The value to check.
@@ -488,6 +530,9 @@ function Assert-InRange {
 .SYNOPSIS
     Asserts that a value matches a pattern.
 
+.DESCRIPTION
+    Asserts that a value matches a pattern. Throws [System.ArgumentException] if the assertion fails. Use for parameter validation.
+
 .PARAMETER Value
     The value to check.
 
@@ -532,6 +577,9 @@ function Assert-MatchesPattern {
 <#
 .SYNOPSIS
     Asserts that a value is in a set of allowed values.
+
+.DESCRIPTION
+    Asserts that a value is in a set of allowed values. Throws [System.ArgumentException] if the assertion fails. Use for parameter validation.
 
 .PARAMETER Value
     The value to check.
@@ -578,6 +626,9 @@ function Assert-InSet {
 .SYNOPSIS
     Sanitizes a string for safe use in file names.
 
+.DESCRIPTION
+    Sanitizes a string for safe use in file names. Transforms input to a safe format.
+
 .PARAMETER Value
     The string to sanitize.
 
@@ -614,6 +665,9 @@ function ConvertTo-SafeFileName {
 .SYNOPSIS
     Sanitizes a string for safe use in XML content.
 
+.DESCRIPTION
+    Sanitizes a string for safe use in XML content. Transforms input to a safe format.
+
 .PARAMETER Value
     The string to sanitize.
 
@@ -644,6 +698,9 @@ function ConvertTo-SafeXmlString {
 <#
 .SYNOPSIS
     Gets the list of valid values for a domain type.
+
+.DESCRIPTION
+    Gets the list of valid values for a domain type. Returns the requested data in a standard result object.
 
 .PARAMETER Type
     The type to get valid values for.

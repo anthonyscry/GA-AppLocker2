@@ -233,6 +233,9 @@ function Get-SuggestedGroup {
 <#
 .SYNOPSIS
     Gets the known vendors database.
+
+.DESCRIPTION
+    Gets the known vendors database. Returns the requested data wrapped in a standard result object with Success, Data, and Error properties.
 #>
 function Get-KnownVendors {
     [CmdletBinding()]
@@ -286,6 +289,9 @@ function Get-KnownVendors {
 <#
 .SYNOPSIS
     Gets suggestion based on file path patterns.
+
+.DESCRIPTION
+    Gets suggestion based on file path patterns.
 #>
 function Get-PathBasedSuggestion {
     [CmdletBinding()]
@@ -325,6 +331,9 @@ function Get-PathBasedSuggestion {
 
 <#
 .SYNOPSIS
+    Extracts a clean company name from publisher certificate subject.
+
+.DESCRIPTION
     Extracts a clean company name from publisher certificate subject.
 #>
 function Extract-CompanyName {

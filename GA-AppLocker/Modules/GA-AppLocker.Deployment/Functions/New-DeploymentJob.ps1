@@ -96,6 +96,10 @@ function Get-DeploymentJob {
     .SYNOPSIS
         Retrieves a deployment job by ID.
 
+
+.DESCRIPTION
+    Retrieves a deployment job by ID. Returns the requested data wrapped in a standard result object with Success, Data, and Error properties.
+
     .PARAMETER JobId
         The unique identifier of the deployment job.
 
@@ -139,6 +143,10 @@ function Get-AllDeploymentJobs {
     <#
     .SYNOPSIS
         Retrieves all deployment jobs.
+
+
+.DESCRIPTION
+    Retrieves all deployment jobs.
 
     .PARAMETER Status
         Optional filter by status.

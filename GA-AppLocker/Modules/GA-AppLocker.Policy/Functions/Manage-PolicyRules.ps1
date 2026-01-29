@@ -3,6 +3,10 @@ function Add-RuleToPolicy {
     .SYNOPSIS
         Adds one or more rules to a policy.
 
+
+.DESCRIPTION
+    Adds one or more rules to a policy.
+
     .PARAMETER PolicyId
         The unique identifier of the policy.
 
@@ -79,6 +83,10 @@ function Remove-RuleFromPolicy {
     <#
     .SYNOPSIS
         Removes one or more rules from a policy.
+
+
+.DESCRIPTION
+    Removes one or more rules from a policy.
 
     .PARAMETER PolicyId
         The unique identifier of the policy.

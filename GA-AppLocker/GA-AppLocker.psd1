@@ -55,6 +55,7 @@ Features:
         'Modules\GA-AppLocker.Rules\GA-AppLocker.Rules.psd1',
         'Modules\GA-AppLocker.Policy\GA-AppLocker.Policy.psd1',
         'Modules\GA-AppLocker.Deployment\GA-AppLocker.Deployment.psd1',
+        'Modules\GA-AppLocker.Validation\GA-AppLocker.Validation.psd1',
         'Modules\GA-AppLocker.Setup\GA-AppLocker.Setup.psm1'
     )
 
@@ -215,6 +216,13 @@ Features:
         'New-AppLockerGPO',
         'Import-PolicyToGPO',
         'Get-DeploymentHistory',
+        # Validation module
+        'Test-AppLockerXmlSchema',
+        'Test-AppLockerRuleGuids',
+        'Test-AppLockerRuleSids',
+        'Test-AppLockerRuleConditions',
+        'Test-AppLockerPolicyImport',
+        'Invoke-AppLockerPolicyValidation',
         # Setup module
         'Initialize-WinRMGPO',
         'Initialize-AppLockerGPOs',

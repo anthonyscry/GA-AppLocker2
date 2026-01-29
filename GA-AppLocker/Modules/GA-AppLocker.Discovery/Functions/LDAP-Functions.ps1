@@ -5,7 +5,12 @@
     PowerShell 5.1 compatible LDAP functions.
 .NOTES
     Author: GA-AppLocker Team
-#>
+
+
+    .EXAMPLE
+    Get-LdapConnection
+    # Get LdapConnection
+    #>
 
 function Get-LdapConnection {
     [CmdletBinding()]

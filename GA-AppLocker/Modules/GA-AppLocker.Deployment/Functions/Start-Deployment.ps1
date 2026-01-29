@@ -248,6 +248,10 @@ function Stop-Deployment {
     .SYNOPSIS
         Cancels a pending or running deployment.
 
+
+.DESCRIPTION
+    Cancels a pending or running deployment. Gracefully stops the running operation.
+
     .PARAMETER JobId
         The ID of the deployment job to cancel.
 
@@ -304,6 +308,10 @@ function Get-DeploymentStatus {
     <#
     .SYNOPSIS
         Gets the current status of a deployment job.
+
+
+.DESCRIPTION
+    Gets the current status of a deployment job.
 
     .PARAMETER JobId
         The ID of the deployment job.

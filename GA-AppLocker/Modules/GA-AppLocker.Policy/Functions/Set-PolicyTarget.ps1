@@ -3,6 +3,10 @@ function Set-PolicyTarget {
     .SYNOPSIS
         Sets the target OUs or GPO for a policy.
 
+
+.DESCRIPTION
+    Sets the target OUs or GPO for a policy. Persists the change to the local GA-AppLocker data store under %LOCALAPPDATA%\GA-AppLocker.
+
     .PARAMETER PolicyId
         The unique identifier of the policy.
 
