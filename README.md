@@ -1,287 +1,153 @@
-# GA-AppLocker
+# GA-AppLocker v1.2.0
 
-GA-AppLocker is a PowerShell WPF application designed for enterprise AppLocker policy management in air-gapped, classified, or highly secure environments. It provides a modular framework for discovering network assets, scanning for artifacts, generating rules, building policies, and deploying them via Group Policy Objects (GPOs).
+Enterprise AppLocker policy management for air-gapped, classified, and highly secure Windows environments. Complete workflow from AD discovery through GPO deployment — no internet required.
 
-## Project Overview
-GA-AppLocker simplifies the complex process of maintaining AppLocker policies by providing a centralized dashboard with an intuitive dark-themed UI. It follows a tiered credential model and uses DPAPI encryption for secure credential storage, making it suitable for high-security environments where internet access is unavailable.
-
-## Key Features
-- **AD Discovery**: Scan the Active Directory domain for Organizational Units (OUs) and computers.
-- **Artifact Scanning**: Collect executable artifacts (EXE, MSI, DLL, Script, etc.) from local or remote machines using WinRM.
-- **Rule Generation**: Automatically generate Publisher, Hash, and Path rules with an approval workflow.
-- **Rule Generation Wizard**: 3-step wizard for 10x faster batch rule creation with preview.
-- **Rule History & Versioning**: Track all rule changes with version history and rollback capability.
-- **Policy Builder**: Combine approved rules into comprehensive policies with various enforcement modes (Audit, Enforce).
-- **Policy Comparison & Snapshots**: Compare policies and create versioned backups with rollback.
-- **GPO Deployment**: Deploy generated policies directly to GPOs and link them to targeted OUs (async, non-blocking).
-- **Tiered Credentials**: Manage administrative credentials securely using DPAPI encryption.
-- **Global Search**: Search across rules, policies, and artifacts with Ctrl+F.
-- **Dark/Light Theme**: Toggle between dark and light themes.
-- **Keyboard Shortcuts**: Full keyboard navigation (Ctrl+1-9 for panels, F5 refresh, etc.).
-- **Drag-and-Drop**: Drop files to scan or import rules/policies.
-- **Scheduled Scans**: Configure automated artifact scans on schedule.
-- **Workflow Progress**: Visual breadcrumb indicator showing progress through Discovery → Scanner → Rules → Policy stages.
-- **Session Persistence**: Automatically saves and restores session state across application restarts (7-day expiry).
-
-## Project Structure
-```text
-GA-AppLocker2/
-├── GA-AppLocker/                    # Main module
-│   ├── GA-AppLocker.psd1           # Module manifest (182 exported functions)
-│   ├── GA-AppLocker.psm1           # Module loader
-│   ├── GUI/
-│   │   ├── MainWindow.xaml         # WPF UI definition (dark theme)
-│   │   ├── MainWindow.xaml.ps1     # UI event handlers
-│   │   ├── ToastHelpers.ps1        # Toast notifications
-│   │   ├── Helpers/
-│   │   │   ├── UIHelpers.ps1       # Shared UI utilities
-│   │   │   ├── AsyncHelpers.ps1    # Async operations (non-blocking UI)
-│   │   │   ├── GlobalSearch.ps1    # Global search functionality
-│   │   │   ├── ThemeManager.ps1    # Dark/Light theme support
-│   │   │   ├── KeyboardShortcuts.ps1 # Keyboard navigation
-│   │   │   └── DragDropHelpers.ps1 # Drag-and-drop support
-│   │   ├── Wizards/
-│   │   │   ├── RuleGenerationWizard.ps1  # 3-step rule wizard
-│   │   │   └── SetupWizard.ps1     # First-run setup wizard
-│   │   └── Panels/                 # Panel-specific handlers
-│   │       ├── Dashboard.ps1       # Dashboard stats, quick actions
-│   │       ├── ADDiscovery.ps1     # AD/OU discovery
-│   │       ├── Credentials.ps1     # Credential management
-│   │       ├── Scanner.ps1         # Artifact scanning
-│   │       ├── Rules.ps1           # Rule management
-│   │       ├── Policy.ps1          # Policy building
-│   │       ├── Deploy.ps1          # GPO deployment
-│   │       └── Setup.ps1           # Environment initialization
-│   └── Modules/
-│       ├── GA-AppLocker.Core/      # Logging, config, cache, events, validation
-│       ├── GA-AppLocker.Discovery/ # AD discovery (domain, OU, machines)
-│       ├── GA-AppLocker.Credentials/ # Tiered credential management
-│       ├── GA-AppLocker.Scanning/  # Artifact collection, scheduled scans
-│       ├── GA-AppLocker.Rules/     # Rule generation, history, batch ops
-│       ├── GA-AppLocker.Policy/    # Policy management, comparison, snapshots
-│       ├── GA-AppLocker.Deployment/ # GPO deployment
-│       ├── GA-AppLocker.Setup/     # Environment initialization
-│       ├── GA-AppLocker.Storage/   # Indexed storage (O(1) lookups)
-│       └── GA-AppLocker.Validation/ # Policy XML validation (5-stage pipeline)
-├── Tests/                          # Test suites
-├── Test-AllModules.ps1             # Main test suite (70 tests)
-├── Run-Dashboard.ps1               # Quick launcher
-└── docs/                           # Design documents
-```
-
-## Requirements
-- **OS**: Windows 10 or Windows Server 2019+
-- **Shell**: PowerShell 5.1+
-- **Framework**: .NET Framework 4.7.2+
-- **Tools**: RSAT (Remote Server Administration Tools) for AD features
-- **Environment**: Domain-joined machine
-
-## Installation
-Clone the repository or copy the project files to your local machine:
-
-```powershell
-git clone https://github.com/your-repo/GA-AppLocker2.git
-cd GA-AppLocker2
-```
-
-## Usage
-### Quick Start
-To launch the GA-AppLocker Dashboard, run the launcher script:
+## Quick Start
 
 ```powershell
 .\Run-Dashboard.ps1
 ```
 
-### Manual Import
-You can also import the module manually and start the dashboard:
+Or import manually:
 
 ```powershell
-Import-Module .\GA-AppLocker\GA-AppLocker.psd1
+Import-Module .\GA-AppLocker\GA-AppLocker.psd1 -Force
 Start-AppLockerDashboard
 ```
 
-## Architecture Notes
-- **Modular Design**: 10 specialized sub-modules handle different aspects of the policy lifecycle.
-- **Standardized Results**: All functions return a consistent object: `@{ Success = $true/$false; Data = ...; Error = ... }`.
-- **UI Architecture**: WPF dark theme with 7 dedicated panels, central button dispatcher pattern, and standardized DataGrid columns across all data views.
-- **Security**: DPAPI encryption is used for storing sensitive credentials.
-- **Air-Gapped Ready**: No external dependencies or internet access required after initial setup.
+## Requirements
+
+| Requirement | Details |
+|-------------|---------|
+| OS | Windows 10 / Server 2019+ |
+| PowerShell | 5.1+ |
+| .NET Framework | 4.7.2+ |
+| RSAT | Required for AD features (graceful fallback via LDAP if missing) |
+| GroupPolicy module | Required for GPO deployment (exports XML for manual import if missing) |
+
+## Workflow
+
+```
+AD Discovery ──► Artifact Scanning ──► Rule Generation ──► Policy Building ──► GPO Deployment
+```
+
+1. **Discover** — Enumerate domain OUs and computers via AD module or LDAP fallback
+2. **Scan** — Collect executables (EXE, DLL, MSI, scripts) from local and remote machines via WinRM
+3. **Generate** — Create Publisher, Hash, or Path rules with the 3-step wizard or batch operations
+4. **Build** — Combine approved rules into policies with phased enforcement (Audit → Enforce)
+5. **Deploy** — Push policies to GPOs and link to target OUs
+6. **Validate** — 5-stage XML validation pipeline ensures STIG-compliant policy output
+
+## Features
+
+### Core Workflow
+- **AD Discovery** with LDAP fallback for environments without RSAT
+- **Local & remote artifact scanning** (14 file types) with parallel WinRM collection
+- **Three rule types**: Publisher (digital signature), Hash (SHA256), Path (filesystem)
+- **3-step Rule Generation Wizard**: Configure → Preview → Generate (10x faster batch processing)
+- **Phased policy enforcement**: Phase 1 (EXE only) → Phase 4 (full enforcement)
+- **5-stage policy validation**: Schema, GUIDs, SIDs, conditions, live import test
+- **Async GPO deployment** with fallback to XML export for manual import
+
+### Management & Operations
+- **Rule history & versioning** with rollback capability
+- **Bulk operations**: Approve trusted vendors, remove duplicates, batch status changes
+- **Policy comparison & snapshots** with restore
+- **Tiered credentials** (T0/T1/T2) with DPAPI encryption
+- **Scheduled scans** with configurable targets
+
+### User Interface
+- **Dark/light theme** toggle
+- **8 dedicated panels**: Dashboard, AD Discovery, Credentials, Scanner, Rules, Policy, Deploy, Setup
+- **Keyboard shortcuts**: Ctrl+1-9 navigation, F5 refresh, Ctrl+F search, Ctrl+S save
+- **Drag-and-drop**: Drop files to scan or import rules/policies
+- **Context menus**: Right-click rules for approve/reject/delete/copy
+- **Toast notifications** and loading overlays for async operations
+- **Session persistence** across restarts (7-day expiry)
+- **Global search** across rules, policies, and artifacts
+- **Workflow breadcrumb** showing progress through stages
+
+## Architecture
+
+```
+GA-AppLocker/
+├── GA-AppLocker.psd1              # Module manifest
+├── GA-AppLocker.psm1              # Module loader
+├── GUI/
+│   ├── MainWindow.xaml            # WPF UI (dark theme, 8 panels)
+│   ├── MainWindow.xaml.ps1        # Core UI logic
+│   ├── ToastHelpers.ps1           # Notifications
+│   ├── Helpers/                   # Async, search, theme, keyboard, drag-drop
+│   ├── Wizards/                   # Rule generation wizard, setup wizard
+│   ├── Dialogs/                   # Rules and scanner dialogs
+│   └── Panels/                    # Per-panel event handlers (8 files)
+└── Modules/
+    ├── GA-AppLocker.Core/         # Logging, config, cache, events, validation helpers
+    ├── GA-AppLocker.Discovery/    # AD/LDAP discovery, parallel connectivity testing
+    ├── GA-AppLocker.Credentials/  # DPAPI credential storage, tiered access
+    ├── GA-AppLocker.Scanning/     # Local/remote artifact collection, scheduled scans
+    ├── GA-AppLocker.Rules/        # Rule generation, history, bulk ops, templates
+    ├── GA-AppLocker.Policy/       # Policy builder, comparison, snapshots, XML export
+    ├── GA-AppLocker.Deployment/   # GPO deployment with fallback
+    ├── GA-AppLocker.Setup/        # Environment initialization
+    ├── GA-AppLocker.Storage/      # JSON index with O(1) lookups (35k+ rules)
+    └── GA-AppLocker.Validation/   # 5-stage policy XML validation pipeline
+```
+
+**10 sub-modules**, ~195 exported functions. All functions return standardized result objects:
+
+```powershell
+@{ Success = $true; Data = <result>; Error = $null }
+```
 
 ## Performance
-GA-AppLocker is optimized to handle large enterprise environments with 35,000+ rules:
+
+Optimized for large enterprise environments:
 
 | Operation | Performance |
 |-----------|-------------|
-| Rule loading | ~100ms (indexed) |
-| Hash/Publisher lookup | O(1) hashtable |
-| UI during long operations | Non-blocking (async) |
-| Artifact scanning progress | Real-time updates |
-
-Key optimizations:
-- **Storage Module**: JSON index with in-memory hashtables for O(1) lookups
-- **Async UI**: Background runspaces with dispatcher-safe progress updates
-- **Efficient Collections**: `List<T>` and `HashSet<T>` instead of array concatenation
-
-## Module Reference
-
-### Core
-Core utilities for logging, configuration, environment validation, and session management.
-- `Write-AppLockerLog`: Standardized logging to file and console.
-- `Get-AppLockerConfig`: Retrieves application settings.
-- `Set-AppLockerConfig`: Updates application settings.
-- `Test-Prerequisites`: Validates environment requirements.
-- `Get-AppLockerDataPath`: Returns the data storage root path.
-- `Save-SessionState`: Persists application state to disk for session recovery.
-- `Restore-SessionState`: Loads previously saved session state (with 7-day expiry).
-- `Clear-SessionState`: Removes saved session state file.
-
-### Discovery
-Discover Active Directory assets.
-- `Get-DomainInfo`: Retrieves current AD domain details.
-- `Get-OUTree`: Lists all OUs in the domain.
-- `Get-ComputersByOU`: Retrieves computers within specific OUs.
-- `Test-MachineConnectivity`: Validates WinRM connectivity to target machines.
-
-### Credentials
-Secure credential management for tiered administration.
-- `New-CredentialProfile`: Creates and encrypts a new credential.
-- `Get-CredentialProfile`: Retrieves a specific credential profile.
-- `Get-AllCredentialProfiles`: Lists all stored credentials.
-- `Remove-CredentialProfile`: Deletes a credential profile.
-- `Test-CredentialProfile`: Validates credential against target.
-- `Get-CredentialForTier`: Retrieves credential associated with a specific admin tier.
-- `Get-CredentialStoragePath`: Returns the path where credentials are saved.
-
-### Scanning
-Collect artifacts from targets.
-- `Get-LocalArtifacts`: Scans the local machine for executables.
-- `Get-RemoteArtifacts`: Scans remote machines via WinRM.
-- `Get-AppLockerEventLogs`: Collects AppLocker event logs for analysis.
-- `Start-ArtifactScan`: Orchestrates a full scan job.
-- `Get-ScanResults`: Retrieves results of previous scans.
-- `Export-ScanResults`: Exports scan data to CSV/JSON.
-
-### Rules
-Transform artifacts into AppLocker rules.
-- `New-PublisherRule`: Creates rules based on digital signatures.
-- `New-HashRule`: Creates rules based on file hash.
-- `New-PathRule`: Creates rules based on file or folder paths.
-- `ConvertFrom-Artifact`: Auto-converts scanned artifacts into suggested rules.
-- `Invoke-BatchRuleGeneration`: High-performance batch rule creation (10x faster).
-- `Get-Rule`: Retrieves a specific rule.
-- `Get-AllRules`: Lists all generated rules.
-- `Remove-Rule`: Deletes a rule (with index sync).
-- `Set-RuleStatus`: Approves or rejects rules for policy inclusion (with index sync).
-- `Set-BulkRuleStatus`: Bulk status changes by pattern/vendor.
-- `Remove-DuplicateRules`: Find and remove duplicate rules.
-- `Get-RuleHistory`: View rule change history.
-- `Restore-RuleVersion`: Rollback to previous rule version.
-- `Import-RulesFromXml`: Import rules from AppLocker XML.
-- `Export-RulesToXml`: Exports rules to AppLocker XML format.
-
-### Policy
-Build and manage AppLocker policies.
-- `New-Policy`: Creates a new policy container.
-- `Get-Policy`: Retrieves a specific policy.
-- `Get-AllPolicies`: Lists all policies.
-- `Remove-Policy`: Deletes a policy.
-- `Set-PolicyStatus`: Sets policy as Active or Draft.
-- `Add-RuleToPolicy`: Links rules to a policy.
-- `Remove-RuleFromPolicy`: Unlinks rules from a policy.
-- `Set-PolicyTarget`: Defines GPO and OU targets for the policy.
-- `Export-PolicyToXml`: Generates the final AppLocker XML.
-- `Test-PolicyCompliance`: Validates policy against targets.
-
-### Deployment
-Deploy policies to the enterprise.
-- `New-DeploymentJob`: Stages a policy for deployment.
-- `Get-DeploymentJob`: Retrieves job details.
-- `Get-AllDeploymentJobs`: Lists deployment history.
-- `Start-Deployment`: Executes GPO import and linking.
-- `Stop-Deployment`: Cancels a pending job.
-- `Get-DeploymentStatus`: Tracks progress of a deployment.
-- `Test-GPOExists`: Verifies target GPO exists.
-- `New-AppLockerGPO`: Creates a new GPO for AppLocker policies.
-- `Import-PolicyToGPO`: Imports XML into GPO.
-- `Get-DeploymentHistory`: Lists past deployment logs.
-
-### Storage
-High-performance indexed storage for rules (handles 35k+ rules efficiently).
-- `Initialize-RuleDatabase`: Builds or rebuilds the rule index.
-- `Find-RuleByHash`: O(1) lookup by file hash.
-- `Find-RuleByPublisher`: O(1) lookup by publisher name.
-- `Get-RulesFromDatabase`: Paginated rule retrieval with filtering.
-- `Get-RuleCounts`: Fast count by status without loading all rules.
-- `Start-RuleIndexWatcher`: Auto-rebuild index on file changes.
-- `Add-RulesToIndex`: Incremental index updates (no full rebuild).
-- `Update-RuleStatusInIndex`: Update rule status in index.
-- `Remove-RulesFromIndex`: Remove rules from index.
-- `Save-RulesBulk`: Single disk I/O for bulk saves.
-- `Remove-RulesBulk`: Bulk rule deletion with index sync.
-
-### Validation
-5-stage policy XML validation pipeline for STIG compliance.
-- `Invoke-AppLockerPolicyValidation`: Runs complete 5-stage validation pipeline.
-- `Test-AppLockerXmlSchema`: Validates root element, Version attribute, collection types, enforcement modes.
-- `Test-AppLockerRuleGuids`: Validates GUID format (8-4-4-4-12), uppercase enforcement, uniqueness.
-- `Test-AppLockerRuleSids`: Validates SID format, well-known SID resolution.
-- `Test-AppLockerRuleConditions`: Validates publisher/hash/path conditions, user-writable path warnings.
-- `Test-AppLockerPolicyImport`: Live import test via Test-AppLockerPolicy with fallback.
-
-## Testing
-The project includes a comprehensive test suite with unit tests, integration tests, and UI automation.
-
-```powershell
-# Quick module tests
-.\Test-AllModules.ps1
-
-# Pester unit tests
-Invoke-Pester -Path Tests\Unit\ -Output Detailed
-
-# UI automation (requires interactive session)
-.\Tests\Automation\UI\FlaUIBot.ps1 -TestMode Standard
-
-# Full automated suite
-.\Tests\Automation\Run-AutomatedTests.ps1 -All
-```
-
-**Test Infrastructure:**
-
-| Type | Location | Description |
-|------|----------|-------------|
-| Unit Tests | `Tests/Unit/` | Pester 5+ tests for module logic |
-| Integration | `Tests/Integration/` | AD and E2E tests |
-| UI Automation | `Tests/Automation/UI/` | WPF GUI testing with UIAutomation |
-| Workflows | `Tests/Automation/Workflows/` | End-to-end workflow tests |
-| Performance | `Tests/Performance/` | Benchmarks for large datasets |
-
-**Test Coverage:**
-- Core module (logging, config, cache, events, validation)
-- Discovery module (AD, OU, machines)
-- Credentials module (DPAPI storage)
-- Scanning module (local/remote artifacts, scheduled scans)
-- Rules module (creation, history, bulk ops)
-- Policy module (creation, comparison, snapshots)
-- Deployment module (GPO management)
-- Storage module (index operations, bulk I/O)
-- GUI logic (selection state, filters, navigation)
-- E2E workflow tests
-
-See [DEVELOPMENT.md](DEVELOPMENT.md#testing) for detailed testing documentation.
+| Rule loading (35k+) | ~100ms (indexed) |
+| Hash / Publisher lookup | O(1) hashtable |
+| Batch rule generation (1k artifacts) | ~30 seconds |
+| Connectivity test (100 machines) | Parallel via WMI jobs |
+| UI during long operations | Non-blocking (background runspaces) |
 
 ## Data Storage
-All application data is stored in: `%LOCALAPPDATA%\GA-AppLocker\`
 
-- **Config**: `config.json`
-- **Session**: `session.json` (auto-saved UI state, expires after 7 days)
-- **Credentials**: `Credentials\` (DPAPI encrypted)
-- **Scans**: `Scans\`
-- **Rules**: `Rules\`
-- **Policies**: `Policies\`
-- **Deployments**: `Deployments\`
+All data stored locally in `%LOCALAPPDATA%\GA-AppLocker\`:
 
-## Contributing
-Please refer to the internal documentation for coding standards and contribution guidelines.
+| Path | Purpose |
+|------|---------|
+| `config.json` | Application settings |
+| `session.json` | UI state (7-day expiry) |
+| `Credentials\` | DPAPI-encrypted credential profiles |
+| `Scans\` | Scan results |
+| `Rules\` | Generated rules + JSON index |
+| `Policies\` | Policy definitions + snapshots |
+| `Deployments\` | Deployment job history |
+| `Logs\` | Daily log files |
+
+## Testing
+
+```powershell
+# Pester unit tests (378 passing)
+Invoke-Pester -Path Tests\Unit\ -Output Detailed
+
+# UI automation (requires interactive PowerShell session)
+.\Tests\Automation\UI\FlaUIBot.ps1 -TestMode Standard
+
+# Full automated suite with mock data
+.\Tests\Automation\Run-AutomatedTests.ps1 -All -UseMockData
+```
+
+## Air-Gap Deployment
+
+GA-AppLocker is designed for networks with no internet access:
+
+1. Copy the `GA-AppLocker\` folder and `Run-Dashboard.ps1` to the target machine
+2. Run `.\Run-Dashboard.ps1` from PowerShell
+3. No external package managers, no NuGet, no internet calls at runtime
 
 ## License
-This project is proprietary and intended for internal enterprise use.
+
+Proprietary — internal enterprise use only.

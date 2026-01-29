@@ -12,9 +12,8 @@ test-import.xml
 test_output.txt
 tests-output.txt
 
-# Temporary/Cache
+# Temporary / Cache
 *.log
-nul
 .vs/
 .vscode/
 .idea/
@@ -24,11 +23,26 @@ nul
 .env
 config.local.json
 
-# Legacy/Misc
+# AI / Dev Session Artifacts
+.planning/
+.sisyphus/
+baselines/
+GA-AppLocker/.context/
+nul
+
+# Dev-Only Docs (not shipped)
+docs/archive/
+docs/project-meta/
+docs/cmdlets/
+docs/AI-Development-Team-Prompts.md
+docs/GA-AppLocker-Full-Specification*.md
+docs/GA-AppLocker-Implementation-Prompt.md
+docs/GA-AppLocker-Spec-Review.md
+docs/GA-AppLocker-Vision-Requirements*.md
+TODO.md
+DEVELOPMENT.md
+PSScriptAnalyzerSettings.psd1
+
+# Legacy
 API-SETUP.md
 *-API-*.md
-Test-*.ps1
-!Tests/Test-*.ps1
-!Tests/*/Test-*.ps1
-!Run-Dashboard.ps1
-!build.ps1

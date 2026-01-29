@@ -31,7 +31,7 @@
 
 #region ===== MODULE CONFIGURATION =====
 $script:APP_NAME = 'GA-AppLocker'
-$script:APP_VERSION = '1.0.0'
+$script:APP_VERSION = '1.2.0'
 $script:APP_TITLE = 'GA-AppLocker Dashboard'
 #endregion
 
