@@ -12,5 +12,5 @@ if (Get-Module GA-AppLocker -ErrorAction SilentlyContinue) {
 # Also remove sub-modules that may be cached from a prior version
 Get-Module GA-AppLocker.* -ErrorAction SilentlyContinue | Remove-Module -Force -ErrorAction SilentlyContinue
 
-Import-Module "$PSScriptRoot\GA-AppLocker\GA-AppLocker.psd1" -Force
+Import-Module "$PSScriptRoot\GA-AppLocker\GA-AppLocker.psd1" -Force -DisableNameChecking
 Start-AppLockerDashboard -SkipPrerequisites

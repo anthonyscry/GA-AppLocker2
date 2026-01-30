@@ -31,7 +31,6 @@
 
 #region ===== MODULE CONFIGURATION =====
 $script:APP_NAME = 'GA-AppLocker'
-$script:APP_VERSION = '1.2.0'
 $script:APP_TITLE = 'GA-AppLocker Dashboard'
 #endregion
 
@@ -55,10 +54,10 @@ try {
         Import-Module $coreModulePath -ErrorAction Stop
     }
     
-    # Storage module - SQLite backend (depends on Core)
+    # Storage module - JSON backend (depends on Core)
     $storageModulePath = Join-Path $modulePath 'Modules\GA-AppLocker.Storage\GA-AppLocker.Storage.psd1'
     if (Test-Path $storageModulePath) {
-        Import-Module $storageModulePath -ErrorAction Stop
+        Import-Module $storageModulePath -ErrorAction Stop -DisableNameChecking
     }
     
     # Discovery module - depends on Core
@@ -149,7 +148,8 @@ function Start-AppLockerDashboard {
         [switch]$SkipPrerequisites
     )
 
-    Write-AppLockerLog -Message "Starting $script:APP_TITLE v$script:APP_VERSION"
+    $modVer = (Get-Module GA-AppLocker).Version
+    Write-AppLockerLog -Message "Starting $script:APP_TITLE v$modVer"
 
     #region --- Prerequisites Check ---
     if (-not $SkipPrerequisites) {
