@@ -50,28 +50,36 @@ function Write-AppLockerLog {
     )
 
     #region --- Build Log Entry ---
-    $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+    # Use .NET DateTime directly — Get-Date cmdlet can fail in WPF dispatcher/delegate contexts
+    # where Microsoft.PowerShell.Utility module resolution breaks after extended runtime.
+    $now = [DateTime]::Now
+    $timestamp = $now.ToString('yyyy-MM-dd HH:mm:ss')
     $logEntry = "[$timestamp] [$Level] $Message"
     #endregion
 
     #region --- Write to File ---
-    $dataPath = Get-AppLockerDataPath
-    $logsPath = Join-Path $dataPath 'Logs'
-    $logFile = Join-Path $logsPath "GA-AppLocker_$(Get-Date -Format 'yyyy-MM-dd').log"
+    try {
+        $dataPath = Get-AppLockerDataPath
+    }
+    catch {
+        # Fallback if Get-AppLockerDataPath not available in current scope
+        $dataPath = [System.IO.Path]::Combine($env:LOCALAPPDATA, 'GA-AppLocker')
+    }
+    $logsPath = [System.IO.Path]::Combine($dataPath, 'Logs')
+    $logFile = [System.IO.Path]::Combine($logsPath, "GA-AppLocker_$($now.ToString('yyyy-MM-dd')).log")
 
-    # Ensure logs directory exists
-    if (-not (Test-Path $logsPath)) {
-        New-Item -Path $logsPath -ItemType Directory -Force | Out-Null
+    # Ensure logs directory exists (use .NET — Test-Path/New-Item can fail in delegate contexts)
+    if (-not [System.IO.Directory]::Exists($logsPath)) {
+        [void][System.IO.Directory]::CreateDirectory($logsPath)
     }
 
-    # Append to log file
-    # Note: Add-Content uses file locking but is not fully thread-safe for high-concurrency scenarios
+    # Append to log file (use .NET — Add-Content can fail in delegate contexts)
     try {
-        Add-Content -Path $logFile -Value $logEntry -ErrorAction Stop
+        [System.IO.File]::AppendAllText($logFile, "$logEntry`r`n")
     }
     catch {
         # Fallback: write to console if file write fails
-        Write-Warning "Failed to write to log file: $($_.Exception.Message)"
+        try { Write-Warning "Failed to write to log file: $($_.Exception.Message)" } catch { }
     }
     #endregion
 

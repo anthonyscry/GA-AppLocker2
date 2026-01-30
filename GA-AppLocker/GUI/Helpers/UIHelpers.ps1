@@ -3,8 +3,23 @@
 
 function global:Write-Log {
     param([string]$Message, [string]$Level = 'Info')
-    if (Get-Command -Name 'Write-AppLockerLog' -ErrorAction SilentlyContinue) {
-        Write-AppLockerLog -Message $Message -Level $Level -NoConsole
+    try {
+        if (Get-Command -Name 'Write-AppLockerLog' -ErrorAction SilentlyContinue) {
+            Write-AppLockerLog -Message $Message -Level $Level -NoConsole
+        }
+    }
+    catch {
+        # Absolute fallback: if even Get-Command fails (WPF delegate context cmdlet resolution loss),
+        # silently swallow — logging must NEVER crash the UI
+        try {
+            $ts = [DateTime]::Now.ToString('yyyy-MM-dd HH:mm:ss')
+            $fallbackPath = [System.IO.Path]::Combine($env:LOCALAPPDATA, 'GA-AppLocker', 'Logs')
+            if ([System.IO.Directory]::Exists($fallbackPath)) {
+                $fallbackFile = [System.IO.Path]::Combine($fallbackPath, "GA-AppLocker_$([DateTime]::Now.ToString('yyyy-MM-dd')).log")
+                [System.IO.File]::AppendAllText($fallbackFile, "[$ts] [$Level] $Message`r`n")
+            }
+        }
+        catch { }
     }
 }
 

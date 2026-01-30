@@ -2,6 +2,16 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.4] - 2026-01-30
+
+### Critical Fix — WPF Dispatcher Crash (`Get-Date` not recognized)
+
+- **Write-AppLockerLog now uses only .NET methods** — After ~9 minutes of runtime, WPF delegate/dispatcher contexts in PowerShell 5.1 can lose cmdlet resolution for `Microsoft.PowerShell.Utility` commands. `Get-Date`, `Join-Path`, `Test-Path`, `New-Item`, and `Add-Content` were all replaced with .NET equivalents (`[DateTime]::Now`, `[IO.Path]::Combine()`, `[IO.Directory]::Exists()`, `[IO.Directory]::CreateDirectory()`, `[IO.File]::AppendAllText()`). Also added try/catch fallback for `Get-AppLockerDataPath`.
+
+- **Write-Log safe wrapper hardened** — `global:Write-Log` (UIHelpers.ps1) now wraps the entire call in try/catch. If even `Get-Command` fails in the degraded dispatcher context, falls back to pure .NET file write. Logging must never crash the UI.
+
+---
+
 ## [1.2.3] - 2026-01-29
 
 ### Remote Scanning & UX Fixes (lab.local continued testing)
