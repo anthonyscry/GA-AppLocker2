@@ -261,7 +261,7 @@ All rule modifications auto-sync the JSON index:
 
 | Version | Date | Key Changes |
 |---------|------|-------------|
-| 1.2.11 | Jan 30, 2026 | Fix Rules DataGrid Group column blank (SID-to-name resolver, circle colors by scope) |
+| 1.2.11 | Jan 30, 2026 | Fix Rules DataGrid Group column blank (SID-to-name resolver, circle colors by scope), fix hardcoded v1.2.0 startup log, suppress unapproved verb warnings |
 | 1.2.10 | Jan 30, 2026 | Air-gap scan speedup (replace Get-AuthenticodeSignature with .NET), WinRM 30s timeout, throttle/batch defaults, fix remote scan nested array bug, no-machines null guard, module reload, scan progress logging, troubleshooting scripts |
 | 1.2.9 | Jan 30, 2026 | Fix OU tree (Depth calc, error handling), LDAP LastLogon, scan per-machine progress |
 | 1.2.8 | Jan 30, 2026 | Dynamic version display, hide breadcrumb on sidebar collapse, APPX scanning pipeline fix |

@@ -8,6 +8,10 @@ All notable changes to GA-AppLocker will be documented in this file.
 
 - **Rules DataGrid Group column was blank (grey circle, no text)** — The Group column binds to `GroupName` and `GroupRiskLevel` properties, but these were never derived from the `UserOrGroupSid` stored on each rule. Rules generated targeting AppLocker-Users, Administrators, or any group showed only a grey circle with no label. Fixed by adding a SID-to-friendly-name resolver in `Update-RulesDataGrid` that caches well-known SIDs (Everyone, Administrators, Users, etc.), resolves domain SIDs via .NET `NTAccount.Translate()`, and handles `UNRESOLVED:` prefixes. Circle color now indicates scope: green (targeted groups), orange (Users/Domain Users), red (Everyone/Guests). Tooltip shows the raw SID on hover.
 
+- **Startup log showed hardcoded v1.2.0** — `$script:APP_VERSION` in `GA-AppLocker.psm1` was hardcoded to `'1.2.0'` and never updated. Startup log now reads version dynamically from `(Get-Module GA-AppLocker).Version`.
+
+- **Unapproved verb warnings on import** — `Import-Module` showed two warnings about `Rebuild-RulesIndex` using the unapproved verb `Rebuild`. Added `-DisableNameChecking` to Storage module import and `Run-Dashboard.ps1`.
+
 ---
 
 ## [1.2.10] - 2026-01-30
