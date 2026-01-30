@@ -43,6 +43,12 @@ function Initialize-ScannerPanel {
     $btnSelectMachines = $Window.FindName('BtnSelectMachines')
     if ($btnSelectMachines) { $btnSelectMachines.Add_Click({ Invoke-ButtonAction -Action 'SelectMachines' }) }
 
+    $btnRemoveMachines = $Window.FindName('BtnRemoveScanMachines')
+    if ($btnRemoveMachines) { $btnRemoveMachines.Add_Click({ Invoke-RemoveScanMachines -Window $global:GA_MainWindow }) }
+
+    $btnClearMachines = $Window.FindName('BtnClearScanMachines')
+    if ($btnClearMachines) { $btnClearMachines.Add_Click({ Invoke-ClearScanMachines -Window $global:GA_MainWindow }) }
+
     $btnBrowsePath = $Window.FindName('BtnBrowsePath')
     if ($btnBrowsePath) { $btnBrowsePath.Add_Click({ Invoke-BrowseScanPath -Window $global:GA_MainWindow }) }
 
@@ -443,7 +449,33 @@ function global:Invoke-StartArtifactScan {
                     # Update workflow breadcrumb
                     Update-WorkflowBreadcrumb -Window $win
 
-                    Show-Toast -Message "Scan complete: $($result.Summary.TotalArtifacts) artifacts found ($($result.Summary.SignedArtifacts) signed)." -Type 'Success'
+                    # Build per-machine feedback so user sees which machines succeeded/failed
+                    $toastMsg = "Scan complete: $($result.Summary.TotalArtifacts) artifacts found ($($result.Summary.SignedArtifacts) signed)."
+                    $toastType = 'Success'
+                    if ($result.Summary.MachineResults -and $result.Summary.MachineResults.Count -gt 0) {
+                        $failed = @($result.Summary.MachineResults.GetEnumerator() | Where-Object { -not $_.Value.Success })
+                        $succeeded = @($result.Summary.MachineResults.GetEnumerator() | Where-Object { $_.Value.Success })
+                        if ($failed.Count -gt 0) {
+                            $failedNames = ($failed | ForEach-Object { $_.Key }) -join ', '
+                            $succeededNames = ($succeeded | ForEach-Object { "$($_.Key)($($_.Value.ArtifactCount))" }) -join ', '
+                            $toastMsg = "Scan partial: $($result.Summary.TotalArtifacts) artifacts from $($succeeded.Count) machine(s). "
+                            if ($succeededNames) { $toastMsg += "OK: $succeededNames. " }
+                            $toastMsg += "FAILED: $failedNames"
+                            # Show failure reasons in a message box so user knows WHY
+                            $failDetails = ($failed | ForEach-Object {
+                                $reason = if ($_.Value.Error) { $_.Value.Error } else { 'No response (check WinRM/firewall)' }
+                                "  $($_.Key): $reason"
+                            }) -join "`n"
+                            [System.Windows.MessageBox]::Show(
+                                "Scan completed but $($failed.Count) machine(s) failed:`n`n$failDetails`n`nCommon causes:`n- WinRM not enabled (run Enable-PSRemoting on target)`n- Firewall blocking port 5985/5986`n- No credential stored for machine's tier`n- Machine offline",
+                                'Partial Scan Results',
+                                'OK',
+                                'Warning'
+                            )
+                            $toastType = 'Warning'
+                        }
+                    }
+                    Show-Toast -Message $toastMsg -Type $toastType
                 }
                 else {
                     $errorMsg = if ($syncHash.Result) { $syncHash.Result.Error } else { "Unknown error" }
@@ -966,6 +998,83 @@ function global:Invoke-SelectMachinesForScan {
     if ($chkRemote) { $chkRemote.IsChecked = $true }
 
     Show-Toast -Message "Selected $($script:SelectedScanMachines.Count) machines for scanning" -Type 'Success'
+}
+
+function global:Invoke-RemoveScanMachines {
+    <#
+    .SYNOPSIS
+        Removes selected machines from the Scanner machine list.
+        Supports Shift+Click and Ctrl+Click multi-select (SelectionMode=Extended).
+    #>
+    param([System.Windows.Window]$Window)
+
+    $machineList = $Window.FindName('ScanMachineList')
+    if (-not $machineList -or $machineList.SelectedItems.Count -eq 0) {
+        Show-Toast -Message 'No machines selected. Use Ctrl+Click or Shift+Click to select machines to remove.' -Type 'Info'
+        return
+    }
+
+    # Collect hostnames to remove (copy since SelectedItems changes during removal)
+    $toRemove = @($machineList.SelectedItems)
+
+    # Remove from the backing data
+    $script:SelectedScanMachines = @($script:SelectedScanMachines | Where-Object {
+        $hostname = if ($_.PSObject.Properties.Name -contains 'Hostname') { $_.Hostname }
+                    elseif ($_.PSObject.Properties.Name -contains 'Name') { $_.Name }
+                    else { "$_" }
+        $hostname -notin $toRemove
+    })
+
+    # Update ListBox
+    if ($script:SelectedScanMachines.Count -gt 0) {
+        $machineList.ItemsSource = @($script:SelectedScanMachines | ForEach-Object {
+            if ($_.PSObject.Properties.Name -contains 'Hostname') { $_.Hostname }
+            elseif ($_.PSObject.Properties.Name -contains 'Name') { $_.Name }
+            else { "$_" }
+        })
+    } else {
+        $machineList.ItemsSource = $null
+    }
+
+    # Update count
+    $machineCount = $Window.FindName('ScanMachineCount')
+    if ($machineCount) { $machineCount.Text = "$($script:SelectedScanMachines.Count)" }
+
+    # Uncheck remote scan if no machines left
+    if ($script:SelectedScanMachines.Count -eq 0) {
+        $chkRemote = $Window.FindName('ChkScanRemote')
+        if ($chkRemote) { $chkRemote.IsChecked = $false }
+    }
+
+    Show-Toast -Message "Removed $($toRemove.Count) machine(s). $($script:SelectedScanMachines.Count) remaining." -Type 'Info'
+}
+
+function global:Invoke-ClearScanMachines {
+    <#
+    .SYNOPSIS
+        Clears all machines from the Scanner machine list.
+    #>
+    param([System.Windows.Window]$Window)
+
+    if ($script:SelectedScanMachines.Count -eq 0) {
+        Show-Toast -Message 'Machine list is already empty.' -Type 'Info'
+        return
+    }
+
+    $removedCount = $script:SelectedScanMachines.Count
+    $script:SelectedScanMachines = @()
+
+    $machineList = $Window.FindName('ScanMachineList')
+    if ($machineList) { $machineList.ItemsSource = $null }
+
+    $machineCount = $Window.FindName('ScanMachineCount')
+    if ($machineCount) { $machineCount.Text = "0" }
+
+    # Uncheck remote scan
+    $chkRemote = $Window.FindName('ChkScanRemote')
+    if ($chkRemote) { $chkRemote.IsChecked = $false }
+
+    Show-Toast -Message "Cleared $removedCount machine(s) from scan list." -Type 'Info'
 }
 
 # Deduplicates scan artifacts by selected mode (Smart, Publisher, PublisherProduct, Hash)

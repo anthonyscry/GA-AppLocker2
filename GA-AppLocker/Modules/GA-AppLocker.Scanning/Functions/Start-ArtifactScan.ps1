@@ -176,32 +176,52 @@ function Start-ArtifactScan {
 
                 Write-ScanLog -Message "Scanning Tier $tier machines ($($tierMachines.Count) hosts)..."
 
-                # Get credential for this tier
+                # Get credential for this tier with fallback chain:
+                # 1. Try exact tier match
+                # 2. Try other tiers (domain admin cred often works for all)
+                # 3. Fall back to implicit Windows auth (current user context)
+                $credential = $null
+                $credSource = 'none'
+                
                 $credResult = Get-CredentialForTier -Tier $tier
-                $credential = if ($credResult.Success) { $credResult.Data } else { $null }
-
-                if (-not $credential) {
-                    Write-ScanLog -Level Warning -Message "No credential available for Tier $tier, skipping remote scan"
-                    foreach ($machine in $tierMachines) {
-                        $machineResults[$machine.Hostname] = @{
-                            Success = $false
-                            Error   = 'No credential available'
-                            Type    = 'Remote'
+                if ($credResult.Success) {
+                    $credential = $credResult.Data
+                    $credSource = "Tier $tier"
+                }
+                else {
+                    # Fallback: try other tiers (higher privilege first: T0 → T1 → T2)
+                    $fallbackTiers = @(0, 1, 2) | Where-Object { $_ -ne $tier }
+                    foreach ($fallbackTier in $fallbackTiers) {
+                        $fallbackResult = Get-CredentialForTier -Tier $fallbackTier
+                        if ($fallbackResult.Success) {
+                            $credential = $fallbackResult.Data
+                            $credSource = "Tier $fallbackTier (fallback)"
+                            Write-ScanLog -Level Warning -Message "No credential for Tier $tier, using Tier $fallbackTier credential as fallback"
+                            break
                         }
                     }
-                    continue
+                }
+
+                if ($credential) {
+                    Write-ScanLog -Message "Using credential: $credSource for $($tierMachines.Count) machine(s)"
+                }
+                else {
+                    # Last resort: try without explicit credential (uses current Windows identity)
+                    Write-ScanLog -Level Warning -Message "No stored credentials found for Tier $tier (or any tier). Attempting with current Windows identity."
+                    $credSource = 'implicit (current user)'
                 }
 
                 # Scan machines in this tier
                 $computerNames = $tierMachines | Select-Object -ExpandProperty Hostname
 
                 $remoteParams = @{
-                    ComputerName = $computerNames
-                    Credential   = $credential
-                    Recurse      = $true
+                    ComputerName  = $computerNames
+                    Recurse       = $true
                     ThrottleLimit = $ThrottleLimit
-                    BatchSize    = $BatchSize
+                    BatchSize     = $BatchSize
                 }
+                # Only pass -Credential if we have an explicit one (null = use current Windows identity)
+                if ($credential) { $remoteParams.Credential = $credential }
                 if ($Paths) { $remoteParams.Paths = $Paths }
                 if ($SkipDllScanning) { $remoteParams.SkipDllScanning = $true }
 

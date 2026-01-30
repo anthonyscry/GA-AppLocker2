@@ -266,6 +266,12 @@ function global:Set-ActivePanel {
     # Log navigation
     Write-Log -Message "Navigated to: $PanelName"
     
+    # Auto-refresh AD Discovery on first navigation (don't make user click Refresh manually)
+    if ($PanelName -eq 'PanelDiscovery' -and $script:DiscoveredMachines.Count -eq 0) {
+        Write-Log -Message 'Auto-triggering domain refresh on first Discovery panel visit'
+        Invoke-DomainRefresh -Window $Window
+    }
+    
     # Auto-save session state on panel change
     Save-CurrentSessionState
 }

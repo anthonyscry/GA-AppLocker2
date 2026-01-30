@@ -70,7 +70,7 @@ function Initialize-DiscoveryPanel {
             } else {
                 $filtered = @($script:DiscoveredMachines | Where-Object {
                     $_.Hostname -like "*$text*" -or
-                    $_.Type -like "*$text*" -or
+                    $_.MachineType -like "*$text*" -or
                     $_.OperatingSystem -like "*$text*" -or
                     $_.DistinguishedName -like "*$text*"
                 })
@@ -122,7 +122,7 @@ function Initialize-DiscoveryPanel {
                 } elseif ($filterType -eq 'Online') {
                     $filtered = @($script:DiscoveredMachines | Where-Object { $_.IsOnline -eq $true })
                 } else {
-                    $filtered = @($script:DiscoveredMachines | Where-Object { $_.Type -eq $filterType })
+                    $filtered = @($script:DiscoveredMachines | Where-Object { $_.MachineType -eq $filterType })
                 }
 
                 Update-MachineDataGrid -Window $script:MainWindow -Machines $filtered

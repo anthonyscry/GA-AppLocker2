@@ -2,6 +2,22 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.3] - 2026-01-29
+
+### Remote Scanning & UX Fixes (lab.local continued testing)
+
+- **Credential fallback chain for remote scans** — `Start-ArtifactScan` silently skipped entire tier groups when no stored credential matched (e.g., T1 servers skipped if only T0 credential existed). Now implements 3-level fallback: (1) exact tier credential, (2) try other tiers in order T0→T1→T2, (3) fall back to implicit Windows auth (no `-Credential` parameter). All lab machines now scan regardless of credential configuration.
+
+- **Scan failure feedback UI** — `Invoke-Command` with `ErrorAction SilentlyContinue` silently dropped WinRM failures. Users saw "Scan complete: X artifacts" with no indication machines were skipped. Now shows a `MessageBox` listing failed machines with reasons and troubleshooting tips (WinRM, firewall, credentials). Toast changes from 'Success' to 'Warning' when partial failures occur.
+
+- **AD Discovery auto-refresh on first visit** — `Initialize-DiscoveryPanel` only wired buttons but never loaded data. Users saw an empty panel until manually clicking Refresh. Now auto-triggers domain discovery when navigating to the Discovery panel for the first time.
+
+- **Scanner machine management buttons** — Scanner Machines tab had "Select from AD Discovery" but no way to remove machines. Added "Remove Selected" and "Clear All" buttons. Also added `SelectionMode="Extended"` for Shift+Click and Ctrl+Click multi-select.
+
+- **AD Discovery filter fix** — Filter buttons and text search used `$_.Type` but machine objects from `Get-ComputersByOU` have `$_.MachineType`. Changed to correct property name.
+
+---
+
 ## [1.2.2] - 2026-01-29
 
 ### Fixes from Lab Testing (lab.local — DC01, SRV01, SRV02)
