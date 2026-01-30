@@ -194,11 +194,17 @@ function Get-LocalArtifacts {
             
             # Update progress every 100 files or at end (unified across all paths)
             $fileIndex++
-            if ($SyncHash -and (($fileIndex % 100 -eq 0) -or ($fileIndex -eq $totalFiles))) {
-                # Progress range: 36 to 88 (52% span for file processing)
-                $pct = [math]::Min(88, 36 + [int](52 * $fileIndex / [math]::Max(1, $totalFiles)))
-                $SyncHash.Progress = $pct
-                $SyncHash.StatusText = "Processing: $fileIndex / $totalFiles files ($($stats.FilesProcessed) artifacts)"
+            if (($fileIndex % 100 -eq 0) -or ($fileIndex -eq $totalFiles)) {
+                if ($SyncHash) {
+                    # Progress range: 36 to 88 (52% span for file processing)
+                    $pct = [math]::Min(88, 36 + [int](52 * $fileIndex / [math]::Max(1, $totalFiles)))
+                    $SyncHash.Progress = $pct
+                    $SyncHash.StatusText = "Processing: $fileIndex / $totalFiles files ($($stats.FilesProcessed) artifacts)"
+                }
+                # Log every 500 files so tail -Wait shows progress
+                if (($fileIndex % 500 -eq 0) -or ($fileIndex -eq $totalFiles)) {
+                    Write-ScanLog -Message "Local scan progress: $fileIndex / $totalFiles files ($($stats.FilesProcessed) artifacts, $($stats.Errors) errors)"
+                }
             }
         }
         #endregion
