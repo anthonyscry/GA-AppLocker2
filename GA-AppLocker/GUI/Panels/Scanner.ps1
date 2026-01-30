@@ -248,8 +248,10 @@ function global:Invoke-StartArtifactScan {
         return
     }
 
-    if ($scanRemote -and $script:SelectedScanMachines.Count -eq 0) {
-        [System.Windows.MessageBox]::Show('Remote scan selected but no machines are selected. Go to AD Discovery first or select Local scan.', 'No Machines', 'OK', 'Warning')
+    if ($scanRemote -and (-not $script:SelectedScanMachines -or $script:SelectedScanMachines.Count -eq 0)) {
+        [System.Windows.MessageBox]::Show(
+            "Remote scan selected but no machines have been added.`n`nTo add machines:`n1. Go to AD Discovery panel`n2. Select machines from the OU tree`n3. Click 'Add to Scanner'`n`nOr uncheck 'Remote' and use 'Local' scan only.",
+            'No Machines Selected', 'OK', 'Warning')
         return
     }
 
