@@ -74,7 +74,7 @@ function Get-OUTree {
                     DistinguishedName = $ou.DistinguishedName
                     CanonicalName     = $ou.CanonicalName
                     Path              = $ou.CanonicalName
-                    Depth             = ($ou.DistinguishedName -split ',OU=' ).Count - 1
+                    Depth             = ([regex]::Matches($ou.DistinguishedName, 'OU=')).Count
                     ComputerCount     = 0
                     MachineType       = Get-MachineTypeFromOU -OUPath $ou.DistinguishedName
                 }

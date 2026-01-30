@@ -339,7 +339,9 @@ function global:Invoke-StartArtifactScan {
                     throw "Module not found at: $manifestPath"
                 }
             
-                $SyncHash.StatusText = "Scanning files..."
+                $machineCount = if ($SyncHash.Params.Machines) { $SyncHash.Params.Machines.Count } else { 0 }
+                $localText = if ($SyncHash.Params.ScanLocal) { 'local + ' } else { '' }
+                $SyncHash.StatusText = "Scanning ${localText}${machineCount} remote machine(s)..."
                 $SyncHash.Progress = 25
             
                 # Execute the scan - clone params and add SyncHash for progress reporting

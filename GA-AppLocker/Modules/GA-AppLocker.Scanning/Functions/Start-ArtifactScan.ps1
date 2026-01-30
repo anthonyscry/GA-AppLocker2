@@ -181,11 +181,23 @@ function Start-ArtifactScan {
                 if ($machineTypeTiers.ContainsKey($type)) { $machineTypeTiers[$type] } else { 2 }
             }
 
+            $tierIndex = 0
+            $totalTiers = @($machinesByTier).Count
+
             foreach ($tierGroup in $machinesByTier) {
                 $tier = [int]$tierGroup.Name
                 $tierMachines = $tierGroup.Group
+                $tierIndex++
 
                 Write-ScanLog -Message "Scanning Tier $tier machines ($($tierMachines.Count) hosts)..."
+                
+                # Update progress for UI — show which machines are being scanned
+                if ($SyncHash) {
+                    $machineNames = ($tierMachines | ForEach-Object { $_.Hostname }) -join ', '
+                    $SyncHash.StatusText = "Scanning Tier $tier ($tierIndex/$totalTiers): $machineNames"
+                    # Scale remote progress from 30% to 85% across tier groups
+                    $SyncHash.Progress = [Math]::Min(85, 30 + [int](($tierIndex - 1) / [Math]::Max(1, $totalTiers) * 55))
+                }
 
                 # Get credential for this tier with fallback chain:
                 # 1. Try exact tier match
@@ -248,6 +260,19 @@ function Start-ArtifactScan {
                             Error         = $machineInfo.Error
                             Type          = 'Remote'
                         }
+                    }
+                    
+                    # Update progress after tier completes
+                    if ($SyncHash) {
+                        $successCount = @($remoteResult.PerMachine.Values | Where-Object { $_.Success }).Count
+                        $SyncHash.StatusText = "Tier $tier done: $($remoteResult.Data.Count) artifacts from $successCount/$($computerNames.Count) machines"
+                        $SyncHash.Progress = [Math]::Min(85, 30 + [int]($tierIndex / [Math]::Max(1, $totalTiers) * 55))
+                    }
+                }
+                else {
+                    # Remote scan returned failure — update progress to show which tier failed
+                    if ($SyncHash) {
+                        $SyncHash.StatusText = "Tier $tier scan failed: $($remoteResult.Error)"
                     }
                 }
 

@@ -260,13 +260,22 @@ function global:Invoke-DomainRefresh {
             }
 
             # Update OU tree
-            if ($Result.OUResult.Success -and $treeView) {
+            if ($Result.OUResult -and $Result.OUResult.Success -and $treeView) {
                 $script:DiscoveredOUs = $Result.OUResult.Data
                 Update-OUTreeView -TreeView $treeView -OUs $Result.OUResult.Data
             }
+            elseif ($treeView) {
+                # Clear "Loading..." placeholder and show error or empty state
+                $treeView.Items.Clear()
+                $ouErrorItem = [System.Windows.Controls.TreeViewItem]::new()
+                $ouErrMsg = if ($Result.OUResult -and $Result.OUResult.Error) { $Result.OUResult.Error } else { 'OU enumeration returned no data' }
+                $ouErrorItem.Header = $ouErrMsg
+                $ouErrorItem.Foreground = [System.Windows.Media.Brushes]::OrangeRed
+                $treeView.Items.Add($ouErrorItem)
+            }
 
             # Update machine grid
-            if ($Result.ComputerResult.Success) {
+            if ($Result.ComputerResult -and $Result.ComputerResult.Success) {
                 $script:DiscoveredMachines = $Result.ComputerResult.Data
                 Update-MachineDataGrid -Window $Window -Machines $Result.ComputerResult.Data
                 Update-WorkflowBreadcrumb -Window $Window
@@ -277,10 +286,10 @@ function global:Invoke-DomainRefresh {
             }
         }
         else {
-            $errorMsg = $Result.DomainResult.Error
+            $errorMsg = if ($Result.DomainResult -and $Result.DomainResult.Error) { $Result.DomainResult.Error } else { 'Unknown error' }
             if ($domainLabel) {
                 # Show short error in label
-                $shortError = if ($errorMsg.Length -gt 50) { $errorMsg.Substring(0, 50) + '...' } else { $errorMsg }
+                $shortError = if ($errorMsg -and $errorMsg.Length -gt 50) { $errorMsg.Substring(0, 50) + '...' } else { $errorMsg }
                 $domainLabel.Text = "Domain: Error - $shortError"
                 $domainLabel.Foreground = [System.Windows.Media.Brushes]::OrangeRed
             }
@@ -303,7 +312,7 @@ function global:Invoke-DomainRefresh {
         param($ErrorMessage)
         if ($domainLabel) {
             # Show short error in label
-            $shortError = if ($ErrorMessage.Length -gt 50) { $ErrorMessage.Substring(0, 50) + '...' } else { $ErrorMessage }
+            $shortError = if ($ErrorMessage -and $ErrorMessage.Length -gt 50) { $ErrorMessage.Substring(0, 50) + '...' } else { $ErrorMessage }
             $domainLabel.Text = "Domain: Error - $shortError"
             $domainLabel.Foreground = [System.Windows.Media.Brushes]::OrangeRed
         }

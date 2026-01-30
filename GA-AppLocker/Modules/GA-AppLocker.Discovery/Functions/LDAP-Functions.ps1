@@ -311,7 +311,7 @@ function Get-OUTreeViaLdap {
             $name = $entry.Attributes["name"][0]
             $ouObject = [PSCustomObject]@{
                 Name = $name; DistinguishedName = $dn; CanonicalName = $dn; Path = $dn
-                Depth = ($dn -split ",OU=").Count - 1; ComputerCount = 0
+                Depth = ([regex]::Matches($dn, 'OU=')).Count; ComputerCount = 0
                 MachineType = Get-MachineTypeFromOU -OUPath $dn
             }
             if ($IncludeComputerCount) {
@@ -378,21 +378,34 @@ function Get-ComputersByOUViaLdap {
         $scope = if ($IncludeNestedOUs) { "Subtree" } else { "OneLevel" }
         
         foreach ($ouDN in $OUDistinguishedNames) {
-            $computerEntries = Get-LdapSearchResult -Connection $connection -SearchBase $ouDN -Filter "(objectClass=computer)" -Properties @("name", "dNSHostName", "operatingSystem", "operatingSystemVersion", "distinguishedName") -Scope $scope
+            $computerEntries = Get-LdapSearchResult -Connection $connection -SearchBase $ouDN -Filter "(objectClass=computer)" -Properties @("name", "dNSHostName", "operatingSystem", "operatingSystemVersion", "distinguishedName", "lastLogonTimestamp", "description") -Scope $scope
             
             foreach ($entry in $computerEntries) {
                 $hostName = $entry.Attributes["name"][0]
                 $dnsHost = if ($entry.Attributes["dNSHostName"]) { $entry.Attributes["dNSHostName"][0] } else { $hostName }
                 $os = if ($entry.Attributes["operatingSystem"]) { $entry.Attributes["operatingSystem"][0] } else { "Unknown" }
                 $osVer = if ($entry.Attributes["operatingSystemVersion"]) { $entry.Attributes["operatingSystemVersion"][0] } else { "" }
+                $desc = if ($entry.Attributes["description"]) { $entry.Attributes["description"][0] } else { $null }
+                
+                # lastLogonTimestamp is a Windows FILETIME (100-nanosecond intervals since 1601-01-01)
+                $lastLogon = $null
+                if ($entry.Attributes["lastLogonTimestamp"]) {
+                    try {
+                        $fileTime = [long]$entry.Attributes["lastLogonTimestamp"][0]
+                        if ($fileTime -gt 0) {
+                            $lastLogon = [DateTime]::FromFileTime($fileTime)
+                        }
+                    } catch { }
+                }
                 
                 $computer = [PSCustomObject]@{
                     Name = $hostName; Hostname = $hostName; DNSHostName = $dnsHost
                     DistinguishedName = $entry.DistinguishedName
                     OU = ($entry.DistinguishedName -split ",", 2)[1]
                     OperatingSystem = $os; OperatingSystemVersion = $osVer
+                    LastLogon = $lastLogon; Description = $desc
                     MachineType = Get-MachineTypeFromOU -OUPath $entry.DistinguishedName
-                    IsOnline = $false; WinRMStatus = "Unknown"
+                    IsOnline = $null; WinRMStatus = $null
                 }
                 [void]$allComputers.Add($computer)
             }

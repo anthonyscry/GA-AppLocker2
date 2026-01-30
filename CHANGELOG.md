@@ -2,6 +2,22 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.9] - 2026-01-30
+
+### Bug Fixes
+
+- **OU tree showed no children (only root node)** — Depth calculation `($dn -split ',OU=').Count - 1` gave top-level OUs Depth 0, same as the root domain object. `Add-ChildOUsToTreeItem` searched for children at `parentDepth + 1 = 1` and found nothing. Fixed to `([regex]::Matches($dn, 'OU=')).Count` which correctly counts OU segments (top-level = 1, nested = 2, etc.). Fixed in both AD module and LDAP paths.
+
+- **OU tree stuck at "Loading..." when enumeration failed** — If `Get-OUTree` returned `Success=$false`, the `$onComplete` handler had no `else` clause for the OU result, so the XAML placeholder was never cleared. Now shows the actual error message in the tree.
+
+- **Last Logon column blank via LDAP** — `Get-ComputersByOUViaLdap` did not query `lastLogonTimestamp` and did not include a `LastLogon` property on the computer object. Added `lastLogonTimestamp` and `description` to the LDAP query, parsing Windows FILETIME to DateTime. Also added `Description` property.
+
+- **"Domain: Not connected" label** — Null-safety issue: `$errorMsg.Length` could fail if `$Result.DomainResult.Error` was null, silently preventing the domain label from updating. Added null guards and a fallback `'Unknown error'` default.
+
+- **Scan progress stuck at 25% with no machine visibility** — `Start-ArtifactScan` never updated the SyncHash during remote scanning. The runspace set progress to 25% ("Scanning files...") and then nothing until 90% when all machines finished. Now shows per-tier progress with machine names (e.g., "Scanning Tier 1 (1/2): SRV01, SRV02") and completion status per tier. Progress scales from 30–85% across tier groups.
+
+---
+
 ## [1.2.8] - 2026-01-30
 
 ### Bug Fixes
