@@ -410,7 +410,7 @@
                                    FontSize="20"
                                    FontWeight="Bold"
                                    Foreground="{StaticResource ForegroundBrush}"/>
-                        <TextBlock x:Name="SidebarSubtitle" Text="Dashboard v1.2.6"
+                        <TextBlock x:Name="SidebarSubtitle" Text="Dashboard v1.2.7"
                                    FontSize="11"
                                    Foreground="{StaticResource MutedBrush}"
                                    Margin="0,2,0,0"/>
@@ -1727,6 +1727,15 @@
                                             <Button x:Name="BtnReviewRule" Content="Review" 
                                                     Style="{StaticResource ButtonStyle}" MinWidth="60" Padding="8,4" Margin="0,0,4,0"
                                                     Background="{StaticResource ActiveBrush}" Tag="ReviewRule"/>
+                                            <Border Width="1" Background="#555" Margin="8,2" VerticalAlignment="Stretch"/>
+                                            <Button x:Name="BtnChangeAction" Content="Action" 
+                                                    Style="{StaticResource ButtonStyle}" MinWidth="55" Padding="8,4" Margin="0,0,4,0"
+                                                    Background="#4A148C" Tag="ChangeRuleAction"
+                                                    ToolTip="Change Allow/Deny action on selected rules"/>
+                                            <Button x:Name="BtnChangeGroup" Content="Group" 
+                                                    Style="{StaticResource ButtonStyle}" MinWidth="55" Padding="8,4" Margin="0,0,4,0"
+                                                    Background="#0D47A1" Tag="ChangeRuleGroup"
+                                                    ToolTip="Change target group on selected rules"/>
                                         </StackPanel>
                                         
                                         <!-- Right: Details -->

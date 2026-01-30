@@ -178,6 +178,8 @@ function Add-RulesToIndex {
                 RuleType       = $rule.RuleType
                 CollectionType = $rule.CollectionType
                 Status         = $rule.Status
+                Action         = if ($rule.Action) { $rule.Action } else { 'Allow' }
+                UserOrGroupSid = if ($rule.UserOrGroupSid) { $rule.UserOrGroupSid } else { 'S-1-1-0' }
                 Name           = $rule.Name
                 Hash           = $rule.Hash
                 PublisherName  = $rule.PublisherName

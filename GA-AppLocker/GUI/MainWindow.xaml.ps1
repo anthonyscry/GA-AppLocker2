@@ -156,6 +156,8 @@ function global:Invoke-ButtonAction {
         'InitializeAll' { Invoke-InitializeAll -Window $win }
         # Rules panel - Common Deny Rules
         'AddCommonDenyRules' { Invoke-AddCommonDenyRules -Window $win }
+        'ChangeRuleAction' { Invoke-ChangeSelectedRulesAction -Window $win }
+        'ChangeRuleGroup' { Invoke-ChangeSelectedRulesGroup -Window $win }
         # Dashboard Quick Actions
         'ApproveTrustedVendors' { Invoke-ApproveTrustedVendors -Window $win }
         'RemoveDuplicateRules' { Invoke-RemoveDuplicateRules -Window $win }

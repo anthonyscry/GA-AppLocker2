@@ -31,7 +31,8 @@ function Initialize-RulesPanel {
         'BtnLaunchRuleWizard', 'BtnCreateManualRule', 'BtnExportRulesXml', 'BtnExportRulesCsv',
         'BtnImportRulesXml', 'BtnRefreshRules', 'BtnApproveRule', 'BtnRejectRule', 'BtnReviewRule',
         'BtnDeleteRule', 'BtnViewRuleDetails', 'BtnViewRuleHistory', 'BtnAddRuleToPolicy',
-        'BtnApproveTrustedRules', 'BtnRemoveDuplicateRules', 'BtnAddCommonDenyRules'
+        'BtnApproveTrustedRules', 'BtnRemoveDuplicateRules', 'BtnAddCommonDenyRules',
+        'BtnChangeAction', 'BtnChangeGroup'
     )
 
     foreach ($btnName in $actionButtons) {
@@ -1225,6 +1226,224 @@ function global:Invoke-AddCommonDenyRules {
     if ($errors.Count -gt 0) {
         Write-Log -Level Warning -Message "Errors creating deny rules: $($errors -join '; ')"
         Show-Toast -Message "$($errors.Count) rule(s) failed to create." -Type 'Warning'
+    }
+}
+
+function global:Invoke-ChangeSelectedRulesAction {
+    <#
+    .SYNOPSIS
+        Changes the Action (Allow/Deny) of selected rules in the DataGrid.
+    #>
+    param([System.Windows.Window]$Window)
+
+    $selectedItems = Get-SelectedRules -Window $Window
+    if ($selectedItems.Count -eq 0) {
+        Show-Toast -Message 'Please select one or more rules first.' -Type 'Warning'
+        return
+    }
+
+    # Build a small WPF dialog
+    $dialogXaml = @"
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Change Action" Width="340" Height="200"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Background="#1E1E1E">
+    <StackPanel Margin="20">
+        <TextBlock Text="Set action for $($selectedItems.Count) selected rule(s):"
+                   Foreground="#E0E0E0" FontSize="14" Margin="0,0,0,15"/>
+        <RadioButton x:Name="RbAllow" Content="Allow" Foreground="#E0E0E0" FontSize="13"
+                     IsChecked="True" Margin="0,0,0,8"/>
+        <RadioButton x:Name="RbDeny" Content="Deny" Foreground="#E0E0E0" FontSize="13"
+                     Margin="0,0,0,15"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="BtnOK" Content="Apply" Width="80" Padding="5"
+                    Background="#1565C0" Foreground="White" Margin="0,0,8,0"/>
+            <Button x:Name="BtnCancel" Content="Cancel" Width="80" Padding="5"
+                    Background="#424242" Foreground="White"/>
+        </StackPanel>
+    </StackPanel>
+</Window>
+"@
+
+    $reader = [System.Xml.XmlReader]::Create([System.IO.StringReader]::new($dialogXaml))
+    $dialog = [System.Windows.Markup.XamlReader]::Load($reader)
+    $dialog.Owner = $Window
+
+    $rbAllow = $dialog.FindName('RbAllow')
+    $rbDeny = $dialog.FindName('RbDeny')
+
+    $dialog.FindName('BtnOK').Add_Click({
+        $dialog.Tag = if ($rbDeny.IsChecked) { 'Deny' } else { 'Allow' }
+        $dialog.DialogResult = $true
+    })
+    $dialog.FindName('BtnCancel').Add_Click({
+        $dialog.DialogResult = $false
+    })
+
+    $dialogResult = $dialog.ShowDialog()
+    if (-not $dialogResult) { return }
+
+    $newAction = $dialog.Tag
+
+    Show-LoadingOverlay -Message "Changing action to '$newAction'..." -SubMessage "$($selectedItems.Count) rule(s)"
+
+    try {
+        $dataPath = Get-AppLockerDataPath
+        $rulePath = Join-Path $dataPath 'Rules'
+        $updated = 0
+
+        foreach ($item in $selectedItems) {
+            try {
+                $ruleFile = Join-Path $rulePath "$($item.Id).json"
+                if (Test-Path $ruleFile) {
+                    $rule = Get-Content -Path $ruleFile -Raw | ConvertFrom-Json
+                    $rule.Action = $newAction
+                    $rule.ModifiedDate = Get-Date
+                    $rule | ConvertTo-Json -Depth 10 | Set-Content -Path $ruleFile -Encoding UTF8
+                    $updated++
+
+                }
+            } catch { }
+        }
+
+        # Rebuild index so it picks up the new Action values from disk
+        if ($updated -gt 0) {
+            try { Reset-RulesIndexCache; Rebuild-RulesIndex | Out-Null } catch { }
+        }
+    }
+    finally {
+        Hide-LoadingOverlay
+    }
+
+    Reset-RulesSelectionState -Window $Window
+    Update-RulesDataGrid -Window $Window
+    Update-DashboardStats -Window $Window
+
+    if ($updated -gt 0) {
+        Show-Toast -Message "Changed $updated rule(s) to '$newAction'." -Type 'Success'
+    }
+}
+
+function global:Invoke-ChangeSelectedRulesGroup {
+    <#
+    .SYNOPSIS
+        Changes the target group (UserOrGroupSid) of selected rules in the DataGrid.
+    #>
+    param([System.Windows.Window]$Window)
+
+    $selectedItems = Get-SelectedRules -Window $Window
+    if ($selectedItems.Count -eq 0) {
+        Show-Toast -Message 'Please select one or more rules first.' -Type 'Warning'
+        return
+    }
+
+    # Build WPF dialog with group ComboBox matching the manual rule groups
+    $dialogXaml = @"
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Change Target Group" Width="380" Height="220"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Background="#1E1E1E">
+    <StackPanel Margin="20">
+        <TextBlock Text="Set target group for $($selectedItems.Count) selected rule(s):"
+                   Foreground="#E0E0E0" FontSize="14" Margin="0,0,0,15"/>
+        <ComboBox x:Name="CboGroup" FontSize="13" Margin="0,0,0,20" Padding="5">
+            <ComboBoxItem Content="Everyone" IsSelected="True" Tag="S-1-1-0"/>
+            <ComboBoxItem Content="Administrators" Tag="S-1-5-32-544"/>
+            <ComboBoxItem Content="Users" Tag="S-1-5-32-545"/>
+            <ComboBoxItem Content="Authenticated Users" Tag="S-1-5-11"/>
+            <ComboBoxItem Content="Domain Users" Tag="S-1-5-21-*-513"/>
+            <ComboBoxItem Content="Domain Admins" Tag="S-1-5-21-*-512"/>
+            <ComboBoxItem Content="AppLocker-Users" Tag="RESOLVE:AppLocker-Users"/>
+            <ComboBoxItem Content="AppLocker-Admins" Tag="RESOLVE:AppLocker-Admins"/>
+            <ComboBoxItem Content="AppLocker-Exempt" Tag="RESOLVE:AppLocker-Exempt"/>
+            <ComboBoxItem Content="AppLocker-Audit" Tag="RESOLVE:AppLocker-Audit"/>
+            <ComboBoxItem Content="AppLocker-Installers" Tag="RESOLVE:AppLocker-Installers"/>
+            <ComboBoxItem Content="AppLocker-Developers" Tag="RESOLVE:AppLocker-Developers"/>
+        </ComboBox>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="BtnOK" Content="Apply" Width="80" Padding="5"
+                    Background="#1565C0" Foreground="White" Margin="0,0,8,0"/>
+            <Button x:Name="BtnCancel" Content="Cancel" Width="80" Padding="5"
+                    Background="#424242" Foreground="White"/>
+        </StackPanel>
+    </StackPanel>
+</Window>
+"@
+
+    $reader = [System.Xml.XmlReader]::Create([System.IO.StringReader]::new($dialogXaml))
+    $dialog = [System.Windows.Markup.XamlReader]::Load($reader)
+    $dialog.Owner = $Window
+
+    $cboGroup = $dialog.FindName('CboGroup')
+
+    $dialog.FindName('BtnOK').Add_Click({
+        $selected = $cboGroup.SelectedItem
+        if ($selected) {
+            $dialog.Tag = @{
+                Sid = $selected.Tag.ToString()
+                Name = $selected.Content.ToString()
+            }
+            $dialog.DialogResult = $true
+        }
+    })
+    $dialog.FindName('BtnCancel').Add_Click({
+        $dialog.DialogResult = $false
+    })
+
+    $dialogResult = $dialog.ShowDialog()
+    if (-not $dialogResult) { return }
+
+    $groupInfo = $dialog.Tag
+    $targetSid = $groupInfo.Sid
+    $groupName = $groupInfo.Name
+
+    # Resolve RESOLVE: prefix tags
+    if ($targetSid -like 'RESOLVE:*') {
+        try {
+            $targetSid = Resolve-GroupSid -GroupName $targetSid
+        } catch {
+            $targetSid = "UNRESOLVED:$($groupInfo.Name)"
+        }
+    }
+
+    Show-LoadingOverlay -Message "Changing target group to '$groupName'..." -SubMessage "$($selectedItems.Count) rule(s)"
+
+    try {
+        $dataPath = Get-AppLockerDataPath
+        $rulePath = Join-Path $dataPath 'Rules'
+        $updated = 0
+
+        foreach ($item in $selectedItems) {
+            try {
+                $ruleFile = Join-Path $rulePath "$($item.Id).json"
+                if (Test-Path $ruleFile) {
+                    $rule = Get-Content -Path $ruleFile -Raw | ConvertFrom-Json
+                    $rule.UserOrGroupSid = $targetSid
+                    $rule.ModifiedDate = Get-Date
+                    $rule | ConvertTo-Json -Depth 10 | Set-Content -Path $ruleFile -Encoding UTF8
+                    $updated++
+
+                }
+            } catch { }
+        }
+
+        # Rebuild index so it picks up the new UserOrGroupSid values from disk
+        if ($updated -gt 0) {
+            try { Reset-RulesIndexCache; Rebuild-RulesIndex | Out-Null } catch { }
+        }
+    }
+    finally {
+        Hide-LoadingOverlay
+    }
+
+    Reset-RulesSelectionState -Window $Window
+    Update-RulesDataGrid -Window $Window
+    Update-DashboardStats -Window $Window
+
+    if ($updated -gt 0) {
+        Show-Toast -Message "Changed $updated rule(s) to group '$groupName' ($targetSid)." -Type 'Success'
     }
 }
 

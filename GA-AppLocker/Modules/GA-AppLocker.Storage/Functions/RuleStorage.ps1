@@ -208,6 +208,8 @@ function Rebuild-RulesIndex {
                         RuleType = $rule.RuleType
                         CollectionType = $rule.CollectionType
                         Status = if ($rule.Status) { $rule.Status } else { 'Pending' }
+                        Action = if ($rule.Action) { $rule.Action } else { 'Allow' }
+                        UserOrGroupSid = if ($rule.UserOrGroupSid) { $rule.UserOrGroupSid } else { 'S-1-1-0' }
                         Name = $rule.Name
                         Hash = $rule.Hash
                         PublisherName = $rule.PublisherName
@@ -477,6 +479,8 @@ function Add-Rule {
             RuleType = $Rule.RuleType
             CollectionType = $Rule.CollectionType
             Status = if ($Rule.Status) { $Rule.Status } else { 'Pending' }
+            Action = if ($Rule.Action) { $Rule.Action } else { 'Allow' }
+            UserOrGroupSid = if ($Rule.UserOrGroupSid) { $Rule.UserOrGroupSid } else { 'S-1-1-0' }
             Name = $Rule.Name
             Hash = $Rule.Hash
             PublisherName = $Rule.PublisherName
@@ -556,6 +560,8 @@ function Update-Rule {
         $indexEntry.Status = if ($UpdatedRule.Status) { $UpdatedRule.Status } else { $indexEntry.Status }
         $indexEntry.Name = if ($UpdatedRule.Name) { $UpdatedRule.Name } else { $indexEntry.Name }
         $indexEntry.GroupVendor = if ($UpdatedRule.GroupVendor) { $UpdatedRule.GroupVendor } else { $indexEntry.GroupVendor }
+        if ($UpdatedRule.Action) { $indexEntry.Action = $UpdatedRule.Action }
+        if ($UpdatedRule.UserOrGroupSid) { $indexEntry.UserOrGroupSid = $UpdatedRule.UserOrGroupSid }
         
         Save-JsonIndex
         

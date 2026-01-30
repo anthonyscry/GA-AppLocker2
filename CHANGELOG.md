@@ -2,6 +2,20 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.7] - 2026-01-30
+
+### Bug Fix
+
+- **Action column was blank in Rules DataGrid** — The JSON index entries created by `Rebuild-RulesIndex`, `Add-Rule`, and `Add-RulesToIndex` did not include `Action` or `UserOrGroupSid` fields. Since `Get-AllRules` reads from the index (not individual files), these columns displayed as blank in the UI. Added both fields to all 3 index entry creation points, and `Update-Rule` now syncs both fields to the index.
+
+### New Features
+
+- **Bulk Change Action** — New "Action" button in the Rules panel status actions bar. Select one or more rules (Shift+Click / Ctrl+Click), click "Action", and set all selected rules to Allow or Deny via a dialog.
+
+- **Bulk Change Group** — New "Group" button in the Rules panel status actions bar. Select one or more rules, click "Group", and reassign all selected rules to a different target group (Everyone, Administrators, Users, Domain Users, AppLocker-* AD groups, etc.) via a dropdown dialog with `RESOLVE:` prefix SID resolution.
+
+---
+
 ## [1.2.6] - 2026-01-30
 
 ### New Features
