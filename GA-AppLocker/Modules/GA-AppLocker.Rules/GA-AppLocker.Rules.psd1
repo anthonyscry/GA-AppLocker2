@@ -23,9 +23,9 @@
         'New-PathRule',
         'ConvertFrom-Artifact',
         'Get-Rule',
-        'Get-AllRules',
-        'Remove-Rule',
-        # NOTE: Remove-RulesBulk is now in GA-AppLocker.Storage module for proper index sync
+        # NOTE: Get-AllRules is exported from GA-AppLocker.Storage module (avoids shadowing)
+        # NOTE: Remove-Rule is exported from GA-AppLocker.Storage module (handles index cleanup)
+        # NOTE: Remove-RulesBulk is in GA-AppLocker.Storage module for proper index sync
         'Export-RulesToXml',
         'Set-RuleStatus',
         'Get-SuggestedGroup',
@@ -39,7 +39,7 @@
         'Approve-TrustedVendorRules',
         # Batch Rule Generation (10x faster)
         'Invoke-BatchRuleGeneration',
-        'Get-BatchPreview',
+        # NOTE: Get-BatchPreview is exported from GA-AppLocker.Storage module
         # Deduplication
         'Remove-DuplicateRules',
         'Find-DuplicateRules',

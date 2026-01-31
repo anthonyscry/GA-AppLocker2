@@ -78,10 +78,14 @@ function script:Write-ScanLog {
 function script:Get-FileArtifact {
     <#
     .SYNOPSIS
-        Extracts artifact information from a file.
+        Extracts artifact information from a file (sequential / single-file path).
 
     .DESCRIPTION
-        Extracts artifact information from a file.
+        Extracts artifact information from a file. Used for small file counts.
+        IMPORTANT: The RunspacePool scriptblock in Get-LocalArtifacts.ps1 duplicates
+        this logic for parallel execution. If you change artifact fields, hash logic,
+        or signature extraction here, you MUST also update the $processBlock scriptblock
+        in Get-LocalArtifacts.ps1 to stay in sync.
     #>
     param(
         [Parameter(Mandatory)]
@@ -158,6 +162,14 @@ function script:Get-FileArtifact {
             # Metadata
             CollectedDate    = Get-Date
             ArtifactType     = Get-ArtifactType -Extension $file.Extension
+            CollectionType   = switch ((Get-ArtifactType -Extension $file.Extension)) {
+                'EXE'     { 'Exe' }
+                'DLL'     { 'Dll' }
+                { $_ -in 'MSI','MSP' } { 'Msi' }
+                { $_ -in 'PS1','BAT','CMD','VBS','JS','WSF' } { 'Script' }
+                'APPX'    { 'Appx' }
+                default   { 'Exe' }
+            }
         }
     }
     catch {

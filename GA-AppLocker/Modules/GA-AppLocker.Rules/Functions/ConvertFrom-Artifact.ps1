@@ -88,7 +88,7 @@ function ConvertFrom-Artifact {
     )
 
     begin {
-        $allArtifacts = @()
+        $allArtifacts = [System.Collections.Generic.List[PSCustomObject]]::new()
         $result = [PSCustomObject]@{
             Success = $false
             Data    = @()
@@ -99,7 +99,7 @@ function ConvertFrom-Artifact {
 
     process {
         foreach ($art in $Artifact) {
-            $allArtifacts += $art
+            $allArtifacts.Add($art)
         }
     }
 
@@ -107,7 +107,7 @@ function ConvertFrom-Artifact {
         try {
             Write-RuleLog -Message "Converting $($allArtifacts.Count) artifacts to rules..."
 
-            $rules = @()
+            $rules = [System.Collections.Generic.List[PSCustomObject]]::new()
             $publisherGroups = @{}
             $hashRules = @()
             $pathRules = @()
@@ -227,7 +227,7 @@ function ConvertFrom-Artifact {
                                 -Save:$Save
 
                             if ($pubResult.Success) {
-                                $rules += $pubResult.Data
+                                $rules.Add($pubResult.Data)
                             }
                         }
                     }
@@ -257,7 +257,7 @@ function ConvertFrom-Artifact {
                             -Save:$Save
 
                         if ($hashResult.Success) {
-                            $rules += $hashResult.Data
+                            $rules.Add($hashResult.Data)
                         }
                     }
                     'Path' {
@@ -272,7 +272,7 @@ function ConvertFrom-Artifact {
                             -Save:$Save
 
                         if ($pathResult.Success) {
-                            $rules += $pathResult.Data
+                            $rules.Add($pathResult.Data)
                         }
                     }
                 }
@@ -310,7 +310,7 @@ function ConvertFrom-Artifact {
                             -Save:$Save
 
                         if ($pubResult.Success) {
-                            $rules += $pubResult.Data
+                            $rules.Add($pubResult.Data)
                         }
                     }
                 }

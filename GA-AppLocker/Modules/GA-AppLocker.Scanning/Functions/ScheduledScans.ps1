@@ -457,6 +457,18 @@ function script:Register-ScheduledScanTask {
         }
 
         # Create the runner script
+        # Resolve module base path dynamically from the currently loaded module
+        $currentModuleBase = $null
+        $loadedMod = Get-Module -Name 'GA-AppLocker' -ErrorAction SilentlyContinue
+        if ($loadedMod) {
+            $currentModuleBase = Join-Path $loadedMod.ModuleBase 'GA-AppLocker.psd1'
+        }
+        # Fallback: derive from this script's location (Modules\GA-AppLocker.Scanning\Functions\)
+        if (-not $currentModuleBase -or -not (Test-Path $currentModuleBase)) {
+            $currentModuleBase = Join-Path (Split-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) -Parent) 'GA-AppLocker.psd1'
+        }
+        $escapedModuleBase = $currentModuleBase -replace "'", "''"
+
         $runnerScript = @"
 # GA-AppLocker Scheduled Scan Runner
 # Auto-generated - Do not edit
@@ -467,8 +479,7 @@ try {
     # Find GA-AppLocker module
     `$modulePath = `$null
     `$searchPaths = @(
-        'C:\Projects\GA-AppLocker3\GA-AppLocker\GA-AppLocker.psd1',
-        'C:\Projects\GA-AppLocker2\GA-AppLocker\GA-AppLocker.psd1',
+        '$escapedModuleBase',
         "`$env:ProgramFiles\GA-AppLocker\GA-AppLocker.psd1",
         "`$env:LOCALAPPDATA\GA-AppLocker\Module\GA-AppLocker.psd1"
     )
@@ -501,6 +512,25 @@ catch {
 
         $runnerScript | Set-Content -Path $scriptPath -Encoding UTF8
 
+        # Restrict ACL on runner script to current user and SYSTEM only
+        try {
+            $acl = New-Object System.Security.AccessControl.FileSecurity
+            $acl.SetAccessRuleProtection($true, $false)  # Disable inheritance
+            $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+            $userRule = New-Object System.Security.AccessControl.FileSystemAccessRule(
+                $currentUser, 'FullControl', 'Allow')
+            $systemRule = New-Object System.Security.AccessControl.FileSystemAccessRule(
+                'NT AUTHORITY\SYSTEM', 'FullControl', 'Allow')
+            $acl.AddAccessRule($userRule)
+            $acl.AddAccessRule($systemRule)
+            [System.IO.File]::SetAccessControl($scriptPath, $acl)
+        }
+        catch {
+            if (Get-Command -Name 'Write-AppLockerLog' -ErrorAction SilentlyContinue) {
+                Write-AppLockerLog -Level Warning -Message "Could not restrict runner script ACL: $($_.Exception.Message)"
+            }
+        }
+
         # Parse time
         $timeParts = $ScheduledScan.Time -split ':'
         $hour = [int]$timeParts[0]
@@ -519,7 +549,7 @@ catch {
 
         # Create action
         $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
-            -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" `"$($ScheduledScan.Id)`""
+            -Argument "-NoProfile -ExecutionPolicy RemoteSigned -File `"$scriptPath`" `"$($ScheduledScan.Id)`""
 
         # Create principal (run as current user)
         $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive

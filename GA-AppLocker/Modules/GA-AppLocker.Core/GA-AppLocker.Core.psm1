@@ -25,7 +25,14 @@
 #region ===== MODULE CONFIGURATION =====
 # Application-wide constants
 $script:APP_NAME = 'GA-AppLocker'
-$script:APP_VERSION = '1.0.0'
+# Derive version from the module manifest instead of hardcoding
+$script:APP_VERSION = try {
+    $manifestPath = Join-Path (Split-Path $PSScriptRoot -Parent) 'GA-AppLocker.psd1'
+    if (Test-Path $manifestPath) {
+        $manifestData = Import-PowerShellDataFile -Path $manifestPath
+        $manifestData.ModuleVersion
+    } else { '0.0.0' }
+} catch { '0.0.0' }
 
 # Default data path - can be overridden via config
 $script:DEFAULT_DATA_PATH = Join-Path $env:LOCALAPPDATA $script:APP_NAME

@@ -90,32 +90,6 @@ function Start-AppLockerDashboard {
     $modVer = (Get-Module GA-AppLocker).Version
     Write-AppLockerLog -Message "Starting $script:APP_TITLE v$modVer"
 
-    #region --- Clear Previous Session Rules ---
-    # Wipe rules from previous sessions so the app starts clean and loads fast
-    try {
-        $dataPath = Get-AppLockerDataPath
-        $rulesPath = Join-Path $dataPath 'Rules'
-        if (Test-Path $rulesPath) {
-            $ruleFiles = Get-ChildItem -Path $rulesPath -Filter '*.json' -ErrorAction SilentlyContinue
-            $fileCount = if ($ruleFiles) { @($ruleFiles).Count } else { 0 }
-            if ($fileCount -gt 0) {
-                Remove-Item -Path (Join-Path $rulesPath '*.json') -Force -ErrorAction SilentlyContinue
-                Write-AppLockerLog -Message "Cleared $fileCount rule(s) from previous session"
-            }
-        }
-        # Delete the rules-index.json file so Storage module starts empty
-        $indexFile = Join-Path $dataPath 'rules-index.json'
-        if (Test-Path $indexFile) {
-            Remove-Item -Path $indexFile -Force -ErrorAction SilentlyContinue
-        }
-        # Reset the in-memory index cache so it doesn't hold stale data
-        try { Reset-RulesIndexCache } catch { }
-    }
-    catch {
-        Write-AppLockerLog -Level Warning -Message "Failed to clear previous rules: $($_.Exception.Message)"
-    }
-    #endregion
-
     #region --- Prerequisites Check ---
     if (-not $SkipPrerequisites) {
         Write-AppLockerLog -Message 'Validating prerequisites...'
@@ -432,10 +406,13 @@ Export-ModuleMember -Function @(
     'Test-PolicyCompliance',
     # Policy - Comparison & Snapshots
     'Compare-Policies',
+    'Compare-RuleProperties',
     'Get-PolicyDiffReport',
     'New-PolicySnapshot',
     'Get-PolicySnapshots',
+    'Get-PolicySnapshot',
     'Restore-PolicySnapshot',
+    'Remove-PolicySnapshot',
     'Invoke-PolicySnapshotCleanup',
     # Deployment module
     'New-DeploymentJob',

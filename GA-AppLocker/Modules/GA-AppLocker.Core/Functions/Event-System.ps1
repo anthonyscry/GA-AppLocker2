@@ -17,11 +17,11 @@
 #>
 
 #region ===== EVENT STORAGE =====
-# Event handlers registry - using global scope with unique prefix to ensure
-# state is shared across module boundaries when called from external scripts/tests
-# This is necessary because nested modules create isolated script scopes
+# Event handlers registry - using script scope within the Core module.
+# Event-System.ps1 is dot-sourced into GA-AppLocker.Core.psm1, so $script:
+# scopes to the Core module and is accessible from all functions in this file.
 
-$global:GA_AppLocker_EventHistoryMaxSize = 100
+$script:GA_AppLocker_EventHistoryMaxSize = 100
 
 # Standard event names
 $script:StandardEvents = @(
@@ -43,11 +43,11 @@ $script:StandardEvents = @(
 
 # Helper function to ensure storage is initialized (called at start of each public function)
 function Initialize-EventStorage {
-    if ($null -eq $global:GA_AppLocker_EventHandlers) {
-        $global:GA_AppLocker_EventHandlers = [hashtable]::Synchronized(@{})
+    if ($null -eq $script:GA_AppLocker_EventHandlers) {
+        $script:GA_AppLocker_EventHandlers = [hashtable]::Synchronized(@{})
     }
-    if ($null -eq $global:GA_AppLocker_EventHistory) {
-        $global:GA_AppLocker_EventHistory = [System.Collections.Generic.List[PSCustomObject]]::new()
+    if ($null -eq $script:GA_AppLocker_EventHistory) {
+        $script:GA_AppLocker_EventHistory = [System.Collections.Generic.List[PSCustomObject]]::new()
     }
 }
 #endregion
@@ -105,8 +105,8 @@ function Register-AppLockerEvent {
 
     Initialize-EventStorage
     
-    if (-not $global:GA_AppLocker_EventHandlers.ContainsKey($EventName)) {
-        $global:GA_AppLocker_EventHandlers[$EventName] = [System.Collections.Generic.List[PSCustomObject]]::new()
+    if (-not $script:GA_AppLocker_EventHandlers.ContainsKey($EventName)) {
+        $script:GA_AppLocker_EventHandlers[$EventName] = [System.Collections.Generic.List[PSCustomObject]]::new()
     }
 
     $handlerEntry = [PSCustomObject]@{
@@ -116,13 +116,13 @@ function Register-AppLockerEvent {
         RegisteredAt = [DateTime]::UtcNow
     }
 
-    $global:GA_AppLocker_EventHandlers[$EventName].Add($handlerEntry)
+    $script:GA_AppLocker_EventHandlers[$EventName].Add($handlerEntry)
     
     # Sort by priority
-    $sorted = $global:GA_AppLocker_EventHandlers[$EventName] | Sort-Object Priority
-    $global:GA_AppLocker_EventHandlers[$EventName] = [System.Collections.Generic.List[PSCustomObject]]::new()
+    $sorted = $script:GA_AppLocker_EventHandlers[$EventName] | Sort-Object Priority
+    $script:GA_AppLocker_EventHandlers[$EventName] = [System.Collections.Generic.List[PSCustomObject]]::new()
     foreach ($h in $sorted) {
-        $global:GA_AppLocker_EventHandlers[$EventName].Add($h)
+        $script:GA_AppLocker_EventHandlers[$EventName].Add($h)
     }
 
     return $HandlerId
@@ -182,12 +182,12 @@ function Publish-AppLockerEvent {
     }
 
     # Add to history (circular buffer)
-    $global:GA_AppLocker_EventHistory.Add($eventRecord)
-    if ($global:GA_AppLocker_EventHistory.Count -gt $global:GA_AppLocker_EventHistoryMaxSize) {
-        $global:GA_AppLocker_EventHistory.RemoveAt(0)
+    $script:GA_AppLocker_EventHistory.Add($eventRecord)
+    if ($script:GA_AppLocker_EventHistory.Count -gt $script:GA_AppLocker_EventHistoryMaxSize) {
+        $script:GA_AppLocker_EventHistory.RemoveAt(0)
     }
 
-    $handlers = $global:GA_AppLocker_EventHandlers[$EventName]
+    $handlers = $script:GA_AppLocker_EventHandlers[$EventName]
     if (-not $handlers -or $handlers.Count -eq 0) {
         return [PSCustomObject]@{
             Success = $true
@@ -267,12 +267,12 @@ function Unregister-AppLockerEvent {
 
     Initialize-EventStorage
     
-    if (-not $global:GA_AppLocker_EventHandlers.ContainsKey($EventName)) {
+    if (-not $script:GA_AppLocker_EventHandlers.ContainsKey($EventName)) {
         return 0
     }
 
     if ($HandlerId) {
-        $handlers = $global:GA_AppLocker_EventHandlers[$EventName]
+        $handlers = $script:GA_AppLocker_EventHandlers[$EventName]
         $toRemove = $handlers | Where-Object { $_.Id -eq $HandlerId }
         if ($toRemove) {
             [void]$handlers.Remove($toRemove)
@@ -281,8 +281,8 @@ function Unregister-AppLockerEvent {
         return 0
     }
     else {
-        $count = $global:GA_AppLocker_EventHandlers[$EventName].Count
-        $global:GA_AppLocker_EventHandlers.Remove($EventName)
+        $count = $script:GA_AppLocker_EventHandlers[$EventName].Count
+        $script:GA_AppLocker_EventHandlers.Remove($EventName)
         return $count
     }
 }
@@ -317,10 +317,10 @@ function Get-AppLockerEventHandlers {
     
     $results = [System.Collections.Generic.List[PSCustomObject]]::new()
 
-    $events = if ($EventName) { @($EventName) } else { $global:GA_AppLocker_EventHandlers.Keys }
+    $events = if ($EventName) { @($EventName) } else { $script:GA_AppLocker_EventHandlers.Keys }
 
     foreach ($evt in $events) {
-        $handlers = $global:GA_AppLocker_EventHandlers[$evt]
+        $handlers = $script:GA_AppLocker_EventHandlers[$evt]
         if ($handlers) {
             foreach ($h in $handlers) {
                 $results.Add([PSCustomObject]@{
@@ -372,7 +372,7 @@ function Get-AppLockerEventHistory {
 
     Initialize-EventStorage
     
-    $events = $global:GA_AppLocker_EventHistory
+    $events = $script:GA_AppLocker_EventHistory
     
     if ($EventName) {
         $events = $events | Where-Object { $_.EventName -eq $EventName }
@@ -402,8 +402,8 @@ function Clear-AppLockerEventHistory {
 
     Initialize-EventStorage
     
-    $count = $global:GA_AppLocker_EventHistory.Count
-    $global:GA_AppLocker_EventHistory.Clear()
+    $count = $script:GA_AppLocker_EventHistory.Count
+    $script:GA_AppLocker_EventHistory.Clear()
     return $count
 }
 

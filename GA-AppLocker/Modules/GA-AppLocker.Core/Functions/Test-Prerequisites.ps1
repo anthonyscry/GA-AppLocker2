@@ -102,19 +102,25 @@ function Test-Prerequisites {
     }
 
     try {
-        $computerSystem = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
-        if ($computerSystem.PartOfDomain) {
-            $domainCheck.Passed = $true
-            $domainCheck.Message = "Domain: $($computerSystem.Domain)"
-        }
-        else {
-            $domainCheck.Message = 'Machine is not domain-joined'
-            $result.AllPassed = $false
-        }
+        # Use .NET instead of Get-CimInstance to avoid WMI timeout on WPF STA thread
+        $domainName = [System.DirectoryServices.ActiveDirectory.Domain]::GetComputerDomain().Name
+        $domainCheck.Passed = $true
+        $domainCheck.Message = "Domain: $domainName"
+    }
+    catch [System.DirectoryServices.ActiveDirectory.ActiveDirectoryObjectNotFoundException] {
+        $domainCheck.Message = 'Machine is not domain-joined'
+        $result.AllPassed = $false
     }
     catch {
-        $domainCheck.Message = "Unable to determine: $($_.Exception.Message)"
-        $result.AllPassed = $false
+        # Fallback: check environment variable
+        if ($env:USERDNSDOMAIN) {
+            $domainCheck.Passed = $true
+            $domainCheck.Message = "Domain: $env:USERDNSDOMAIN"
+        }
+        else {
+            $domainCheck.Message = "Unable to determine domain membership: $($_.Exception.Message)"
+            $result.AllPassed = $false
+        }
     }
     $result.Checks += $domainCheck
     #endregion

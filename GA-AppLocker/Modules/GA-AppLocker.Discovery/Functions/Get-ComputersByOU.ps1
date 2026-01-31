@@ -140,6 +140,35 @@ function Get-CachedTierMapping {
     return $script:CachedTierMapping
 }
 
+function Get-MachineTypeFromOU {
+    <#
+    .SYNOPSIS
+        Determines machine type from OU distinguished name using config-based tier mapping.
+    #>
+    param([string]$OUPath)
+
+    $dnLower = $OUPath.ToLower()
+
+    # Use cached tier mapping for consistency with Get-MachineTypeFromComputer
+    $tierMapping = Get-CachedTierMapping
+
+    $tier0Patterns = if ($tierMapping.Tier0Patterns) { $tierMapping.Tier0Patterns } else { @('domain controllers') }
+    $tier1Patterns = if ($tierMapping.Tier1Patterns) { $tierMapping.Tier1Patterns } else { @('ou=server', 'ou=srv') }
+    $tier2Patterns = if ($tierMapping.Tier2Patterns) { $tierMapping.Tier2Patterns } else { @('ou=workstation', 'ou=desktop', 'ou=laptop') }
+
+    foreach ($pattern in $tier0Patterns) {
+        if ($dnLower -match [regex]::Escape($pattern)) { return 'DomainController' }
+    }
+    foreach ($pattern in $tier1Patterns) {
+        if ($dnLower -match [regex]::Escape($pattern)) { return 'Server' }
+    }
+    foreach ($pattern in $tier2Patterns) {
+        if ($dnLower -match [regex]::Escape($pattern)) { return 'Workstation' }
+    }
+
+    return 'Unknown'
+}
+
 function Get-MachineTypeFromComputer {
     param($Computer)
 

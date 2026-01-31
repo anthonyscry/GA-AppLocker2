@@ -118,21 +118,6 @@ function Get-OUTree {
 }
 
 #region ===== HELPER FUNCTIONS =====
-function Get-MachineTypeFromOU {
-    param([string]$OUPath)
-
-    $pathLower = $OUPath.ToLower()
-
-    if ($pathLower -match 'domain controllers') {
-        return 'DomainController'
-    }
-    elseif ($pathLower -match 'server|srv') {
-        return 'Server'
-    }
-    elseif ($pathLower -match 'workstation|desktop|laptop|ws') {
-        return 'Workstation'
-    }
-
-    return 'Unknown'
-}
+# Get-MachineTypeFromOU is defined in Get-ComputersByOU.ps1 (single canonical implementation
+# using config-based tier mapping). Both files are dot-sourced into the same module scope.
 #endregion

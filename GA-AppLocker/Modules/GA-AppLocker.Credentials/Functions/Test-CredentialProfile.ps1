@@ -69,8 +69,15 @@ function Test-CredentialProfile {
             ErrorMessage = $null
         }
 
-        # Ping test
-        $pingResult = Test-Connection -ComputerName $ComputerName -Count 1 -Quiet -ErrorAction SilentlyContinue
+        # Ping test using WMI Win32_PingStatus (consistent with Test-PingConnectivity, avoids
+        # Test-Connection which can be unreliable in constrained environments)
+        try {
+            $ping = Get-WmiObject -Class Win32_PingStatus -Filter "Address='$ComputerName' AND Timeout=2000" -ErrorAction Stop
+            $pingResult = ($null -ne $ping -and $ping.StatusCode -eq 0)
+        }
+        catch {
+            $pingResult = $false
+        }
         $testResult.PingSuccess = $pingResult
 
         if (-not $pingResult) {

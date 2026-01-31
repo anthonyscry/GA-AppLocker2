@@ -9,7 +9,7 @@
     RootModule = 'GA-AppLocker.psm1'
 
     # Version number of this module
-    ModuleVersion = '1.2.25'
+    ModuleVersion = '1.2.26'
 
     # ID used to uniquely identify this module
     GUID = 'f1e2d3c4-b5a6-7890-1234-567890abcdef'
@@ -56,7 +56,7 @@ Features:
         'Modules\GA-AppLocker.Policy\GA-AppLocker.Policy.psd1',
         'Modules\GA-AppLocker.Deployment\GA-AppLocker.Deployment.psd1',
         'Modules\GA-AppLocker.Validation\GA-AppLocker.Validation.psd1',
-        'Modules\GA-AppLocker.Setup\GA-AppLocker.Setup.psm1'
+        'Modules\GA-AppLocker.Setup\GA-AppLocker.Setup.psd1'
     )
 
     # Functions to export from this module (re-export from nested modules + GUI)
@@ -167,9 +167,7 @@ Features:
         'Get-RuleIndexWatcherStatus',
         'Set-RuleIndexWatcherDebounce',
         'Invoke-RuleIndexRebuild',
-        # Storage - Index Maintenance
-        'Reset-RulesIndexCache',
-        'Rebuild-RulesIndex',
+        # Storage - Maintenance
         'Remove-OrphanedRuleFiles',
         # Storage - Repository Pattern
         'Get-RuleFromRepository',
@@ -202,10 +200,13 @@ Features:
         'Test-PolicyCompliance',
         # Policy - Comparison & Snapshots
         'Compare-Policies',
+        'Compare-RuleProperties',
         'Get-PolicyDiffReport',
         'New-PolicySnapshot',
         'Get-PolicySnapshots',
+        'Get-PolicySnapshot',
         'Restore-PolicySnapshot',
+        'Remove-PolicySnapshot',
         'Invoke-PolicySnapshotCleanup',
         # Deployment module
         'New-DeploymentJob',

@@ -101,11 +101,20 @@ function Backup-AppLockerData {
             $backupManifest.Contents += @{ Type = 'Policies'; Folder = 'Policies'; FileCount = $policyFiles.Count }
         }
 
-        # Backup Configuration
+        # Backup Configuration (check both legacy config.json and current Settings\settings.json)
         $configPath = Join-Path $dataPath 'config.json'
         if (Test-Path $configPath) {
             Copy-Item $configPath (Join-Path $tempDir 'config.json') -Force
             $backupManifest.Contents += @{ Type = 'Config'; File = 'config.json' }
+        }
+        $settingsPath = Join-Path $dataPath 'Settings\settings.json'
+        if (Test-Path $settingsPath) {
+            $settingsDir = Join-Path $tempDir 'Settings'
+            if (-not (Test-Path $settingsDir)) {
+                New-Item -Path $settingsDir -ItemType Directory -Force | Out-Null
+            }
+            Copy-Item $settingsPath (Join-Path $settingsDir 'settings.json') -Force
+            $backupManifest.Contents += @{ Type = 'Settings'; File = 'Settings\settings.json' }
         }
 
         # Backup Credentials (encrypted)
@@ -325,6 +334,16 @@ function Restore-AppLockerData {
         if (Test-Path $configBackup) {
             Copy-Item $configBackup (Join-Path $dataPath 'config.json') -Force
             $restoredItems += 'Configuration'
+        }
+        # Restore Settings (Settings\settings.json)
+        $settingsBackup = Join-Path $tempDir 'Settings\settings.json'
+        if (Test-Path $settingsBackup) {
+            $settingsTarget = Join-Path $dataPath 'Settings'
+            if (-not (Test-Path $settingsTarget)) {
+                New-Item -Path $settingsTarget -ItemType Directory -Force | Out-Null
+            }
+            Copy-Item $settingsBackup (Join-Path $settingsTarget 'settings.json') -Force
+            $restoredItems += 'Settings'
         }
 
         # Restore Credentials

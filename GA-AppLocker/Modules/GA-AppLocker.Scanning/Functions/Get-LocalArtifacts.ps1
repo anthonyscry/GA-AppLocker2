@@ -213,7 +213,10 @@ function Get-LocalArtifacts {
                 $SyncHash.Progress = $processingStart
             }
             
-            # Self-contained scriptblock — runspaces cannot access module script: scope
+            # Self-contained scriptblock -- runspaces cannot access module script: scope.
+            # IMPORTANT: This duplicates the file-processing logic from Get-FileArtifact
+            # in GA-AppLocker.Scanning.psm1 for parallel execution. If you change artifact
+            # fields, hash logic, or signature extraction here, update Get-FileArtifact too.
             $processBlock = {
                 param([string[]]$FilePaths, [string]$ComputerName)
                 

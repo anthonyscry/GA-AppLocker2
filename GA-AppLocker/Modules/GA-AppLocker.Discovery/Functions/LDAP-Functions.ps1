@@ -104,8 +104,17 @@ function Get-LdapConnection {
                 Write-AppLockerLog -Level Error -Message "LDAP connection failed: Credential has empty username."
                 return $null
             }
-            # Warn about Basic auth without SSL
+            # Check RequireSSL config for Basic auth without SSL
             if (-not $UseSSL) {
+                $requireSSL = $false
+                try {
+                    $config = Get-AppLockerConfig
+                    if ($config.RequireSSL -eq $true) { $requireSSL = $true }
+                } catch { }
+                if ($requireSSL) {
+                    Write-AppLockerLog -Level Error -Message "LDAP: RequireSSL is enabled in config but SSL is not active. Refusing Basic auth without SSL."
+                    return $null
+                }
                 Write-AppLockerLog -Level Warning -Message "LDAP: Using Basic authentication without SSL. Credentials transmitted base64-encoded. Consider enabling SSL (-UseSSL) for production deployments."
             }
             $connection.Credential = $netCred

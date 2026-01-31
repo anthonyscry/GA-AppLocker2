@@ -86,25 +86,28 @@ function Write-AuditLog {
             NewValue = $NewValue
         }
 
-        # Load existing audit log or create new
-        $auditLog = @()
-        if (Test-Path $auditPath) {
-            $content = Get-Content $auditPath -Raw -ErrorAction SilentlyContinue
-            if ($content) {
-                $auditLog = @($content | ConvertFrom-Json)
+        # JSONL format: one JSON object per line, append-only for O(1) writes
+        $jsonLine = ($entry | ConvertTo-Json -Depth 5 -Compress) + "`r`n"
+        [System.IO.File]::AppendAllText($auditPath, $jsonLine)
+
+        # Periodic truncation: enforce 10K entry cap every 100 writes
+        # Check line count only occasionally to avoid perf hit on every write
+        $lineCount = 0
+        try {
+            $reader = [System.IO.File]::OpenText($auditPath)
+            try {
+                while ($null -ne $reader.ReadLine()) { $lineCount++ }
             }
+            finally { $reader.Close() }
         }
+        catch { $lineCount = 0 }
 
-        # Add new entry
-        $auditLog = @($auditLog) + $entry
-
-        # Keep last 10000 entries to prevent unbounded growth
-        if ($auditLog.Count -gt 10000) {
-            $auditLog = $auditLog | Select-Object -Last 10000
+        if ($lineCount -gt 10000) {
+            # Read all lines, keep last 10000, rewrite
+            $allLines = [System.IO.File]::ReadAllLines($auditPath)
+            $keepLines = $allLines[($allLines.Count - 10000)..($allLines.Count - 1)]
+            [System.IO.File]::WriteAllLines($auditPath, $keepLines)
         }
-
-        # Save
-        $auditLog | ConvertTo-Json -Depth 10 | Set-Content $auditPath -Force
 
         return @{
             Success = $true
@@ -175,6 +178,8 @@ function Get-AuditLog {
             }
         }
 
+        # Read JSONL format (one JSON object per line) with fallback for legacy JSON array
+        $auditLog = @()
         $content = Get-Content $auditPath -Raw -ErrorAction SilentlyContinue
         if (-not $content) {
             return @{
@@ -184,7 +189,22 @@ function Get-AuditLog {
             }
         }
 
-        $auditLog = @($content | ConvertFrom-Json)
+        $trimmed = $content.TrimStart()
+        if ($trimmed.StartsWith('[')) {
+            # Legacy JSON array format -- read normally
+            $auditLog = @($content | ConvertFrom-Json)
+        }
+        else {
+            # JSONL format -- parse line by line
+            $lines = [System.IO.File]::ReadAllLines($auditPath)
+            $parsed = [System.Collections.Generic.List[PSCustomObject]]::new()
+            foreach ($line in $lines) {
+                if (-not [string]::IsNullOrWhiteSpace($line)) {
+                    try { $parsed.Add(($line | ConvertFrom-Json)) } catch { }
+                }
+            }
+            $auditLog = $parsed.ToArray()
+        }
 
         # Apply filters
         if ($Category) {
@@ -333,22 +353,20 @@ function Clear-AuditLog {
             }
         }
 
-        $content = Get-Content $auditPath -Raw -ErrorAction SilentlyContinue
-        if (-not $content) {
-            return @{
-                Success = $true
-                Data = @{ Removed = 0; Remaining = 0 }
-                Error = $null
-            }
+        # Read entries (supports both JSONL and legacy JSON array)
+        $getResult = Get-AuditLog -Last 999999
+        if (-not $getResult.Success) {
+            return $getResult
         }
-
-        $auditLog = @($content | ConvertFrom-Json)
+        $auditLog = @($getResult.Data)
         $originalCount = $auditLog.Count
 
         $cutoffDate = (Get-Date).AddDays(-$DaysToKeep)
         $auditLog = @($auditLog | Where-Object { [datetime]$_.Timestamp -gt $cutoffDate })
 
-        $auditLog | ConvertTo-Json -Depth 10 | Set-Content $auditPath -Force
+        # Rewrite as JSONL
+        $lines = $auditLog | ForEach-Object { ($_ | ConvertTo-Json -Depth 5 -Compress) }
+        [System.IO.File]::WriteAllLines($auditPath, $lines)
 
         # Audit the cleanup itself
         Write-AuditLog -Action 'AuditLogCleanup' -Category 'System' `
@@ -383,7 +401,7 @@ function Get-AuditLogPath {
     $dataPath = if (Get-Command -Name 'Get-AppLockerDataPath' -ErrorAction SilentlyContinue) {
         Get-AppLockerDataPath
     } else {
-        Join-Path $env:APPDATA 'GA-AppLocker'
+        Join-Path $env:LOCALAPPDATA 'GA-AppLocker'
     }
     return Join-Path $dataPath 'AuditTrail\audit-log.json'
 }
