@@ -4,7 +4,7 @@
 
 GA-AppLocker is a PowerShell 5.1 WPF application for enterprise AppLocker policy management in air-gapped, classified, or highly secure environments. Complete workflow: AD Discovery → Artifact Scanning → Rule Generation → Policy Building → GPO Deployment.
 
-**Version:** 1.2.26 | **Tests:** 397/397 passing (100%) | **Exported Commands:** ~200
+**Version:** 1.2.27 | **Tests:** 397/397 passing (100%) | **Exported Commands:** ~200
 
 ## Quick Start
 
@@ -262,6 +262,7 @@ All rule modifications auto-sync the JSON index:
 
 | Version | Date | Key Changes |
 |---------|------|-------------|
+| 1.2.27 | Jan 31, 2026 | Auto-export per-host CSV artifact files after every scan ({HostName}_artifacts_{date}.csv in Scans folder) |
 | 1.2.26 | Jan 31, 2026 | Code quality sweep (17 fixes): Remove destructive startup rule deletion, fix .psd1/.psm1 export mismatches (missing Policy exports, duplicate Storage entries, phantom Rules exports), fix scheduled scan hardcoded dev paths, consolidate Get-MachineTypeFromOU (config-based tier mapping), fix Backup-AppLockerData settings path, fix AuditTrail APPDATA fallback, Event System global->script scope, Test-Prerequisites .NET domain check (no Get-CimInstance), Test-CredentialProfile WMI ping (no Test-Connection), scanning scriptblock sync comments + CollectionType, ConvertFrom-Artifact O(1) List growth, Setup module .psd1 manifest, Remove-Rule export ambiguity (Storage only), LDAP RequireSSL config option, scheduled scan runner ACL + RemoteSigned, Write-AuditLog JSONL append-only format, dynamic APP_VERSION from manifest |
 | 1.2.25 | Jan 31, 2026 | Fix deployment error (UTF-8 BOM in exported XML + .NET file read + LDAP fallback for domain DN), AppLocker-DisableWinRM GPO for tattoo removal (reverses WinRM service, listener, UAC, firewall), Software panel remote machine textbox (enter hostnames directly instead of requiring AD Discovery) |
 | 1.2.24 | Jan 31, 2026 | Fix Software Inventory credentials (Get-DefaultCredential didn't exist, now uses tier-based fallback), auto-save software CSVs (hostname_softwarelist_ddMMMYY.csv), Deploy policy combo auto-refresh on panel nav + logging/error handling, Setup WinRM toggle button shows Enable/Disable state |
