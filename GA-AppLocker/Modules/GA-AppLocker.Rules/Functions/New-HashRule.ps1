@@ -117,12 +117,21 @@ function New-HashRule {
 
         # Generate rule name if not provided
         if ([string]::IsNullOrWhiteSpace($Name)) {
-            $Name = "$SourceFileName (Hash)"
+            if ($SourceFileName -and $SourceFileName -ne 'Unknown') {
+                $Name = "$SourceFileName (Hash)"
+            } else {
+                # No filename available — use truncated hash so it's identifiable in the UI
+                $Name = "Hash:$($cleanHash.Substring(0,12))..."
+            }
         }
 
         # Generate description if not provided
         if ([string]::IsNullOrWhiteSpace($Description)) {
-            $Description = "Hash rule for $SourceFileName (SHA256: $($cleanHash.Substring(0,8))...)"
+            if ($SourceFileName -and $SourceFileName -ne 'Unknown') {
+                $Description = "Hash rule for $SourceFileName (SHA256: $($cleanHash.Substring(0,8))...)"
+            } else {
+                $Description = "Hash rule (SHA256: $($cleanHash.Substring(0,16))...)"
+            }
         }
 
         $rule = [PSCustomObject]@{

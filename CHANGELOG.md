@@ -2,6 +2,20 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.15] - 2026-01-30
+
+### Bug Fixes
+
+- **Hash rules show "Unknown (Hash)" after XML import** — `Import-RulesFromXml` only checked `FileHash/@SourceFileName` for the filename, which is often empty in AppLocker XML exports. Now uses a robust fallback chain: `FileHash/@SourceFileName` → `FileHashRule/@Name` (stripping `(Hash)` prefixes) → `FileHashRule/@Description` (regex-extracting filenames) → `'Unknown'`. Rules previously showing "Unknown (Hash)" will now show the actual filename like "notepad.exe (Hash)".
+
+- **ConvertFrom-Artifact produces "Unknown (Hash)" when FileName is missing** — If a scan artifact had a null `FileName` property (edge case with certain file types), the rule got `SourceFileName = $null` which cascaded to "Unknown (Hash)" in the display. Now falls back to extracting the filename from `FilePath` via `[System.IO.Path]::GetFileName()`.
+
+- **New-HashRule shows "Unknown (Hash)" instead of useful identifier** — When `SourceFileName` is genuinely unknown (empty or 'Unknown'), the generated rule name is now `"Hash:ABCDEF012345..."` (truncated hash) instead of `"Unknown (Hash)"`, making rules distinguishable in the DataGrid.
+
+- **XML export writes 'Unknown' as SourceFileName** — `Build-PolicyRuleCollectionXml` wrote `SourceFileName="Unknown"` when the field was empty. Now extracts the filename from the rule's `Name` field (pattern `"filename.ext (Hash)"`) before falling back to 'Unknown', preventing the bad data from propagating through export→import cycles.
+
+---
+
 ## [1.2.14] - 2026-01-30
 
 ### Bug Fixes

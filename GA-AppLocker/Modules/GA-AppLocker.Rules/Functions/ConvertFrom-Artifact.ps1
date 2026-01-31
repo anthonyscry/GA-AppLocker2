@@ -237,9 +237,16 @@ function ConvertFrom-Artifact {
                             continue
                         }
 
+                        # Resolve filename: prefer FileName, fall back to extracting from FilePath
+                        $sourceFile = $art.FileName
+                        if ([string]::IsNullOrWhiteSpace($sourceFile) -and $art.FilePath) {
+                            $sourceFile = [System.IO.Path]::GetFileName($art.FilePath)
+                        }
+                        if ([string]::IsNullOrWhiteSpace($sourceFile)) { $sourceFile = 'Unknown' }
+
                         $hashResult = New-HashRule `
                             -Hash $art.SHA256Hash `
-                            -SourceFileName $art.FileName `
+                            -SourceFileName $sourceFile `
                             -SourceFileLength $art.SizeBytes `
                             -Action $Action `
                             -CollectionType $collectionType `

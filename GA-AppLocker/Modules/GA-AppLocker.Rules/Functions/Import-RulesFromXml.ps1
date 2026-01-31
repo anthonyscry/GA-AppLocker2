@@ -164,19 +164,60 @@ function Import-RulesFromXml {
                         # Default empty values to prevent parameter binding errors
                         $action = if (-not [string]::IsNullOrWhiteSpace($rule.Action)) { $rule.Action } else { 'Allow' }
                         $userOrGroupSid = if (-not [string]::IsNullOrWhiteSpace($rule.UserOrGroupSid)) { $rule.UserOrGroupSid } else { 'S-1-1-0' }
-                        if ([string]::IsNullOrWhiteSpace($sourceFileName)) { $sourceFileName = $rule.Name; if ([string]::IsNullOrWhiteSpace($sourceFileName)) { $sourceFileName = 'Unknown' } }
                         $fileLengthInt = 0
                         if ($sourceFileLength -and $sourceFileLength -match '^\d+$') { $fileLengthInt = [int64]$sourceFileLength }
 
+                        # Resolve SourceFileName with robust fallback chain:
+                        # 1. FileHash/@SourceFileName attribute (best — actual filename)
+                        # 2. FileHashRule/@Name attribute (often contains filename or description)
+                        # 3. FileHashRule/@Description attribute (sometimes has filename info)
+                        # Skip values that are just 'Unknown' from prior bad exports
+                        if ([string]::IsNullOrWhiteSpace($sourceFileName) -or $sourceFileName -eq 'Unknown') {
+                            $sourceFileName = $null
+                            # Try the rule Name attribute — often "filename.ext" or "(Hash) filename.ext"
+                            $ruleName = $rule.Name
+                            if (-not [string]::IsNullOrWhiteSpace($ruleName) -and $ruleName -ne 'Unknown') {
+                                # Strip common prefixes like "(Hash) " that AppLocker adds
+                                $cleaned = $ruleName -replace '^\(Hash\)\s*', ''
+                                if ($cleaned -match '\.\w{1,5}$') {
+                                    # Has a file extension — use it as the filename
+                                    $sourceFileName = $cleaned
+                                } else {
+                                    # No extension but still a useful name — keep it
+                                    $sourceFileName = $ruleName
+                                }
+                            }
+                            # Try Description as last resort
+                            if ([string]::IsNullOrWhiteSpace($sourceFileName)) {
+                                $ruleDesc = $rule.Description
+                                if (-not [string]::IsNullOrWhiteSpace($ruleDesc) -and $ruleDesc -match '([^\\/]+\.\w{1,5})') {
+                                    $sourceFileName = $Matches[1]
+                                }
+                            }
+                            if ([string]::IsNullOrWhiteSpace($sourceFileName)) { $sourceFileName = 'Unknown' }
+                        }
+
+                        # Build a meaningful display name from the resolved filename
+                        $displayName = $null
+                        if ($sourceFileName -ne 'Unknown') {
+                            $displayName = "$sourceFileName (Hash)"
+                        } elseif (-not [string]::IsNullOrWhiteSpace($rule.Name) -and $rule.Name -ne 'Unknown') {
+                            $displayName = $rule.Name
+                        }
+
                         # Create rule in memory only (no -Save)
-                        $newRule = New-HashRule -Hash $hash `
-                            -SourceFileName $sourceFileName `
-                            -SourceFileLength $fileLengthInt `
-                            -Action $action `
-                            -UserOrGroupSid $userOrGroupSid `
-                            -CollectionType $collectionType `
-                            -Status $Status `
-                            -Description "Imported from $fileName"
+                        $newRuleParams = @{
+                            Hash             = $hash
+                            SourceFileName   = $sourceFileName
+                            SourceFileLength = $fileLengthInt
+                            Action           = $action
+                            UserOrGroupSid   = $userOrGroupSid
+                            CollectionType   = $collectionType
+                            Status           = $Status
+                            Description      = "Imported from $fileName"
+                        }
+                        if ($displayName) { $newRuleParams['Name'] = $displayName }
+                        $newRule = New-HashRule @newRuleParams
 
                         if ($newRule.Success) {
                             $importedRules.Add($newRule.Data)

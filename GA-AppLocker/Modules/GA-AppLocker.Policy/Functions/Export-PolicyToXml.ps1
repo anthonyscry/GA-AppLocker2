@@ -291,7 +291,16 @@ function Build-PolicyRuleCollectionXml {
             }
             'Hash' {
                 $hash = if ($rule.Hash) { "0x$($rule.Hash.ToUpper())" } else { '0x' + ('0' * 64) }
-                $fileName = if (-not [string]::IsNullOrWhiteSpace($rule.SourceFileName)) { [System.Security.SecurityElement]::Escape($rule.SourceFileName) } else { 'Unknown' }
+                # Resolve best available filename for SourceFileName attribute
+                $fileName = $null
+                if (-not [string]::IsNullOrWhiteSpace($rule.SourceFileName) -and $rule.SourceFileName -ne 'Unknown') {
+                    $fileName = $rule.SourceFileName
+                } elseif ($rule.Name -match '^(.+)\s+\(Hash\)$') {
+                    # Extract filename from "filename.ext (Hash)" name pattern
+                    $fileName = $Matches[1]
+                }
+                if (-not $fileName) { $fileName = 'Unknown' }
+                $fileName = [System.Security.SecurityElement]::Escape($fileName)
                 $fileLength = if ($rule.SourceFileLength -and $rule.SourceFileLength -gt 0) { $rule.SourceFileLength } else { 0 }
 
                 $xml += @"
