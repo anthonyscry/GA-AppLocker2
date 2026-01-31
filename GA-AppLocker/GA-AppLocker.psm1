@@ -41,78 +41,17 @@ Add-Type -AssemblyName PresentationCore
 Add-Type -AssemblyName WindowsBase
 #endregion
 
-#region ===== LOAD NESTED MODULES =====
-# Explicitly import nested modules in dependency order
-# Core first (no dependencies), then others
-# $PSScriptRoot = C:\projects\ga-applocker2\GA-AppLocker (where this .psm1 lives)
-$modulePath = $PSScriptRoot
-
+#region ===== NESTED MODULES =====
+# Nested modules are loaded automatically by NestedModules in the .psd1 manifest.
+# They are imported in dependency order BEFORE this .psm1 runs, so all functions
+# (Write-AppLockerLog, Get-AppLockerDataPath, etc.) are already available here.
+# DO NOT manually Import-Module them — that caused double-loading and WPF deadlocks.
 try {
-    # Core module - foundation for all other modules
-    $coreModulePath = Join-Path $modulePath 'Modules\GA-AppLocker.Core\GA-AppLocker.Core.psd1'
-    if (Test-Path $coreModulePath) {
-        Import-Module $coreModulePath -ErrorAction Stop
-    }
-    
-    # Storage module - JSON backend (depends on Core)
-    $storageModulePath = Join-Path $modulePath 'Modules\GA-AppLocker.Storage\GA-AppLocker.Storage.psd1'
-    if (Test-Path $storageModulePath) {
-        Import-Module $storageModulePath -ErrorAction Stop -DisableNameChecking
-    }
-    
-    # Discovery module - depends on Core
-    $discoveryModulePath = Join-Path $modulePath 'Modules\GA-AppLocker.Discovery\GA-AppLocker.Discovery.psd1'
-    if (Test-Path $discoveryModulePath) {
-        Import-Module $discoveryModulePath -ErrorAction Stop
-    }
-    
-    # Credentials module - depends on Core
-    $credModulePath = Join-Path $modulePath 'Modules\GA-AppLocker.Credentials\GA-AppLocker.Credentials.psd1'
-    if (Test-Path $credModulePath) {
-        Import-Module $credModulePath -ErrorAction Stop
-    }
-    
-    # Scanning module - depends on Core, Discovery
-    $scanModulePath = Join-Path $modulePath 'Modules\GA-AppLocker.Scanning\GA-AppLocker.Scanning.psd1'
-    if (Test-Path $scanModulePath) {
-        Import-Module $scanModulePath -ErrorAction Stop
-    }
-    
-    # Rules module - depends on Core
-    $rulesModulePath = Join-Path $modulePath 'Modules\GA-AppLocker.Rules\GA-AppLocker.Rules.psd1'
-    if (Test-Path $rulesModulePath) {
-        Import-Module $rulesModulePath -ErrorAction Stop
-    }
-    
-    # Policy module - depends on Core, Rules
-    $policyModulePath = Join-Path $modulePath 'Modules\GA-AppLocker.Policy\GA-AppLocker.Policy.psd1'
-    if (Test-Path $policyModulePath) {
-        Import-Module $policyModulePath -ErrorAction Stop
-    }
-    
-    # Deployment module - depends on Core, Policy
-    $deployModulePath = Join-Path $modulePath 'Modules\GA-AppLocker.Deployment\GA-AppLocker.Deployment.psd1'
-    if (Test-Path $deployModulePath) {
-        Import-Module $deployModulePath -ErrorAction Stop
-    }
-    
-    # Validation module - depends on Core (policy XML validation pipeline)
-    $validationModulePath = Join-Path $modulePath 'Modules\GA-AppLocker.Validation\GA-AppLocker.Validation.psd1'
-    if (Test-Path $validationModulePath) {
-        Import-Module $validationModulePath -ErrorAction Stop
-    }
-    
-    # Setup module - import as module (not dot-source, which can cause issues)
-    $setupModulePath = Join-Path $modulePath 'Modules\GA-AppLocker.Setup\GA-AppLocker.Setup.psm1'
-    if (Test-Path $setupModulePath) {
-        Import-Module $setupModulePath -ErrorAction Stop
-    }
-    
     Write-AppLockerLog -Message 'All nested modules loaded successfully' -NoConsole
 }
 catch {
-    Write-AppLockerLog -Level Error -Message "Failed to load nested modules: $($_.Exception.Message)"
-    throw
+    # Core module not loaded — something is very wrong
+    throw "GA-AppLocker.Core nested module failed to load. Ensure NestedModules in .psd1 is correct."
 }
 #endregion
 
@@ -247,16 +186,15 @@ function Start-AppLockerDashboard {
 
         Write-AppLockerLog -Message 'Main window loaded successfully'
 
-        # Initialize window (wire up navigation, etc.)
-        if (Get-Command -Name 'Initialize-MainWindow' -ErrorAction SilentlyContinue) {
-            try {
-                Initialize-MainWindow -Window $window
-                Write-AppLockerLog -Message 'Window initialization completed'
-            }
-            catch {
-                Write-AppLockerLog -Level Error -Message "Window initialization failed: $($_.Exception.Message)"
-                Write-AppLockerLog -Level Error -Message "Stack trace: $($_.ScriptStackTrace)"
-            }
+        # Initialize window (wire up navigation, panels, etc.)
+        # Initialize-MainWindow is defined in MainWindow.xaml.ps1, dot-sourced above.
+        try {
+            Initialize-MainWindow -Window $window
+            Write-AppLockerLog -Message 'Window initialization completed'
+        }
+        catch {
+            Write-AppLockerLog -Level Error -Message "Window initialization failed: $($_.Exception.Message)"
+            Write-AppLockerLog -Level Error -Message "Stack trace: $($_.ScriptStackTrace)"
         }
 
         # Show window

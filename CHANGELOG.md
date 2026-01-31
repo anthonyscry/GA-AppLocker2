@@ -2,6 +2,18 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.14] - 2026-01-30
+
+### Bug Fixes
+
+- **Dashboard window not appearing on startup** — `Get-CimInstance -ClassName Win32_ComputerSystem` was called on the WPF STA thread during `Initialize-MainWindow` to detect domain membership. This WMI call **times out after 5-60+ seconds** in many environments, blocking `ShowDialog()` from ever executing. Replaced with `.NET` `[System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties()` which returns in **0-1ms**. Computer name, user, and domain still populated via `$env:` variables.
+
+- **Redundant nested module loading causing double-import** — `GA-AppLocker.psm1` had 10 manual `Import-Module` calls for all sub-modules (Core, Storage, Discovery, etc.) even though `GA-AppLocker.psd1` `NestedModules` already loads them automatically. This caused every module to load twice, producing a duplicate "All nested modules loaded successfully" log entry and unnecessary overhead. Removed all manual imports — `.psd1` `NestedModules` is now the single source of truth for sub-module loading.
+
+- **`Test-PingConnectivity` not exported from Discovery module** — The function was declared in `GA-AppLocker.Discovery.psd1` `FunctionsToExport` but missing from `GA-AppLocker.Discovery.psm1` `Export-ModuleMember`. This was masked by the old manual `Import-Module` approach which bypassed the `.psm1` export list. Now properly exported.
+
+---
+
 ## [1.2.13] - 2026-01-30
 
 ### Performance

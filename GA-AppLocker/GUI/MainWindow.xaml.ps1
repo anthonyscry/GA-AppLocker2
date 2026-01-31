@@ -707,13 +707,16 @@ function Initialize-MainWindow {
     } catch { }
 
     # Update domain info in status bar and dashboard
+    # NOTE: Uses .NET instead of Get-CimInstance to avoid WMI timeouts that block the WPF STA thread
     try {
-        $computerSystem = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
+        $ipProps = [System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties()
+        $domainName = $ipProps.DomainName
+        $isDomainJoined = -not [string]::IsNullOrEmpty($domainName)
         
         # Status bar
         $domainText = $Window.FindName('DomainText')
-        if ($domainText -and $computerSystem.PartOfDomain) {
-            $domainText.Text = "Domain: $($computerSystem.Domain)"
+        if ($domainText -and $isDomainJoined) {
+            $domainText.Text = "Domain: $domainName"
         }
         
         # Dashboard System Info
@@ -722,8 +725,8 @@ function Initialize-MainWindow {
         
         $sysDomain = $Window.FindName('SysInfoDomain')
         if ($sysDomain) {
-            if ($computerSystem.PartOfDomain) {
-                $sysDomain.Text = $computerSystem.Domain
+            if ($isDomainJoined) {
+                $sysDomain.Text = $domainName
             }
             else {
                 $sysDomain.Text = "Not domain joined"
@@ -734,21 +737,26 @@ function Initialize-MainWindow {
         if ($sysUser) { $sysUser.Text = "$env:USERDOMAIN\$env:USERNAME" }
         
         $sysDataPath = $Window.FindName('SysInfoDataPath')
-        if ($sysDataPath -and (Get-Command -Name 'Get-AppLockerDataPath' -ErrorAction SilentlyContinue)) {
-            $dataPath = Get-AppLockerDataPath
-            # Insert line break after AppData for better display
-            $sysDataPath.Text = $dataPath -replace '(AppData\\)', "`$1`n"
+        if ($sysDataPath) {
+            try {
+                $dataPath = Get-AppLockerDataPath
+                # Insert line break after AppData for better display
+                $sysDataPath.Text = $dataPath -replace '(AppData\\)', "`$1`n"
+            } catch { }
         }
+        Write-Log -Message 'System info updated'
     }
     catch {
-        # Silently fail - not critical
+        Write-Log -Level Warning -Message "System info update failed: $($_.Exception.Message)"
     }
 
     # Update data path in settings
-    $settingsPath = $Window.FindName('SettingsDataPath')
-    if ($settingsPath -and (Get-Command -Name 'Get-AppLockerDataPath' -ErrorAction SilentlyContinue)) {
-        $settingsPath.Text = Get-AppLockerDataPath
-    }
+    try {
+        $settingsPath = $Window.FindName('SettingsDataPath')
+        if ($settingsPath) {
+            $settingsPath.Text = Get-AppLockerDataPath
+        }
+    } catch { }
 
     # Restore previous session state (auto-restore silently)
     try {
