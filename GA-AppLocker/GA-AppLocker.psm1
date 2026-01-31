@@ -486,6 +486,8 @@ Export-ModuleMember -Function @(
     'Enable-WinRMGPO',
     'Disable-WinRMGPO',
     'Remove-WinRMGPO',
+    'Initialize-DisableWinRMGPO',
+    'Remove-DisableWinRMGPO',
     # Cache Management
     'Get-CachedValue',
     'Set-CachedValue',

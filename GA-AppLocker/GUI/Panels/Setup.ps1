@@ -13,6 +13,9 @@ function Initialize-SetupPanel {
     $btnRemoveWinRM = $Window.FindName('BtnRemoveWinRM')
     if ($btnRemoveWinRM) { $btnRemoveWinRM.Add_Click({ Invoke-ButtonAction -Action 'RemoveWinRM' }) }
 
+    $btnDisableWinRM = $Window.FindName('BtnDisableWinRMGPO')
+    if ($btnDisableWinRM) { $btnDisableWinRM.Add_Click({ Invoke-ButtonAction -Action 'DisableWinRMGPO' }) }
+
     $btnInitGPOs = $Window.FindName('BtnInitializeAppLockerGPOs')
     if ($btnInitGPOs) { $btnInitGPOs.Add_Click({ Invoke-ButtonAction -Action 'InitializeAppLockerGPOs' }) }
 
@@ -185,6 +188,57 @@ function global:Invoke-RemoveWinRMGPO {
         }
     }
     catch {
+        [System.Windows.MessageBox]::Show("Error: $($_.Exception.Message)", 'Error', 'OK', 'Error')
+    }
+}
+
+function global:Invoke-DisableWinRMGPO {
+    param([System.Windows.Window]$Window)
+
+    try {
+        $confirm = [System.Windows.MessageBox]::Show(
+            "This will create 'AppLocker-DisableWinRM' GPO that ACTIVELY reverses all WinRM settings:`n`n" +
+            "1. WinRM service set to Manual (reverses auto-start tattoo)`n" +
+            "2. AllowAutoConfig disabled (stops WinRM listener)`n" +
+            "3. LocalAccountTokenFilterPolicy = 0 (re-enables UAC filtering)`n" +
+            "4. Firewall blocks port 5985 inbound`n`n" +
+            "The AppLocker-EnableWinRM link will be disabled.`n`n" +
+            "After gpupdate propagates, remove both GPOs.`n`n" +
+            "Continue?",
+            'Create Disable-WinRM GPO (Tattoo Removal)',
+            'YesNo',
+            'Warning'
+        )
+
+        if ($confirm -ne 'Yes') { return }
+
+        Show-LoadingOverlay -Message 'Creating AppLocker-DisableWinRM GPO...' -SubMessage 'Applying counter-settings'
+
+        $result = Initialize-DisableWinRMGPO
+
+        Hide-LoadingOverlay
+
+        if ($result.Success) {
+            $settings = $result.Data.SettingsApplied -join "`n- "
+            [System.Windows.MessageBox]::Show(
+                "AppLocker-DisableWinRM GPO created!`n`n" +
+                "Settings applied:`n- $settings`n`n" +
+                "Next steps:`n" +
+                "1. Run gpupdate /force on target machines (or wait for GP cycle)`n" +
+                "2. Verify WinRM is disabled: Test-WSMan <hostname>`n" +
+                "3. When confirmed, remove both WinRM GPOs",
+                'Disable GPO Created',
+                'OK',
+                'Information'
+            )
+            Update-SetupStatus -Window $Window
+        }
+        else {
+            [System.Windows.MessageBox]::Show("Failed: $($result.Error)", 'Error', 'OK', 'Error')
+        }
+    }
+    catch {
+        Hide-LoadingOverlay
         [System.Windows.MessageBox]::Show("Error: $($_.Exception.Message)", 'Error', 'OK', 'Error')
     }
 }

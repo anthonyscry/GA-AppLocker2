@@ -153,6 +153,8 @@ Export-ModuleMember -Function @(
     'Get-SetupStatus',
     'Enable-WinRMGPO',
     'Disable-WinRMGPO',
-    'Remove-WinRMGPO'
+    'Remove-WinRMGPO',
+    'Initialize-DisableWinRMGPO',
+    'Remove-DisableWinRMGPO'
 )
 #endregion

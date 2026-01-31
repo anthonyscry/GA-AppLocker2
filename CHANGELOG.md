@@ -2,6 +2,26 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.25] - 2026-01-31
+
+### Bug Fixes
+
+- **Deployment: Fix XML import to GPO** -- `Set-AppLockerPolicy -XmlPolicy` failed with "The following file cannot be resolved" because PS 5.1's `Set-Content -Encoding UTF8` writes a UTF-8 BOM, causing `Set-AppLockerPolicy` to misinterpret the content. `Export-PolicyToXml` now writes BOM-free UTF-8 via `[System.IO.File]::WriteAllText()`. `Import-PolicyToGPO` reads with `[System.IO.File]::ReadAllText()` and falls back to LDAP RootDSE for domain DN when `Get-ADDomain` is unavailable.
+
+### Features
+
+- **Setup: AppLocker-DisableWinRM GPO (tattoo removal)** -- New `Initialize-DisableWinRMGPO` creates a counter-GPO that actively reverses all WinRM settings from AppLocker-EnableWinRM: sets WinRM service to Manual (reverses auto-start tattoo), disables AllowAutoConfig, restores UAC remote filtering (LocalAccountTokenFilterPolicy=0), blocks port 5985. Also disables the EnableWinRM link to prevent conflict. "Disable GPO" button in Setup panel.
+- **Software Inventory: Remote machine textbox** -- Enter hostnames directly (one per line or comma-separated) instead of requiring AD Discovery selection. Falls back to Scanner machine list when empty. Live count hint shows parsed hostnames.
+
+### Enhanced
+
+- **Deployment: Detailed logging** -- `Import-PolicyToGPO` now logs LDAP path and XML content length for debugging.
+
+### Stats
+
+- **Tests:** 397/397 passing (100%)
+- **Exported Commands:** ~200
+
 ## [1.2.24] - 2026-01-31
 
 ### Bug Fixes

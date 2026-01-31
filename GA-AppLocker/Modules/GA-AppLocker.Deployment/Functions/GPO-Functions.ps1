@@ -170,22 +170,38 @@ function Import-PolicyToGPO {
         # Get GPO
         $gpo = Get-GPO -Name $GPOName -ErrorAction Stop
 
-        # Read XML content
-        $xmlContent = Get-Content -Path $XmlPath -Raw
-
         # Get domain DN for LDAP path
-        $domain = Get-ADDomain -ErrorAction SilentlyContinue
-        if (-not $domain) {
-            return @{
-                Success = $false
-                Error   = 'Unable to retrieve Active Directory domain information. Ensure the machine is domain-joined and the ActiveDirectory module is available.'
-            }
+        $domain = $null
+        try {
+            $domain = Get-ADDomain -ErrorAction Stop
+        } catch {
+            Write-AppLockerLog -Level Warning -Message "Get-ADDomain failed: $($_.Exception.Message). Trying LDAP fallback."
         }
-        $ldapPath = "LDAP://CN={$($gpo.Id)},CN=Policies,CN=System,$($domain.DistinguishedName)"
+
+        if (-not $domain) {
+            # Fallback: derive domain DN from environment
+            try {
+                $rootDSE = [ADSI]'LDAP://RootDSE'
+                $domainDN = $rootDSE.defaultNamingContext.ToString()
+            } catch {
+                return @{
+                    Success = $false
+                    Error   = 'Unable to retrieve Active Directory domain information. Ensure the machine is domain-joined.'
+                }
+            }
+        } else {
+            $domainDN = $domain.DistinguishedName
+        }
+        $ldapPath = "LDAP://CN={$($gpo.Id)},CN=Policies,CN=System,$domainDN"
+        Write-AppLockerLog -Message "Import-PolicyToGPO: LDAP path = $ldapPath"
 
         # Set AppLocker policy using PowerShell
         # Note: Set-AppLockerPolicy requires AppLocker module
         if (Get-Command -Name 'Set-AppLockerPolicy' -ErrorAction SilentlyContinue) {
+            # Read XML content using .NET to avoid BOM/encoding issues from Get-Content
+            $xmlContent = [System.IO.File]::ReadAllText((Resolve-Path $XmlPath).Path)
+            Write-AppLockerLog -Message "Import-PolicyToGPO: XML content length = $($xmlContent.Length) chars"
+
             if ($Merge) {
                 Set-AppLockerPolicy -XmlPolicy $xmlContent -Ldap $ldapPath -Merge
             }
@@ -221,6 +237,7 @@ function Import-PolicyToGPO {
         }
     }
     catch {
+        Write-AppLockerLog -Level Error -Message "Import-PolicyToGPO failed: $($_.Exception.Message)"
         return @{
             Success = $false
             Data    = $null

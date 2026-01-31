@@ -30,9 +30,63 @@ function Initialize-SoftwarePanel {
             Update-SoftwareDataGrid -Window $global:GA_MainWindow
         })
     }
+
+    # Wire up remote machine textbox to show live count
+    $remoteMachineBox = $Window.FindName('TxtSoftwareRemoteMachines')
+    if ($remoteMachineBox) {
+        $remoteMachineBox.Add_TextChanged({
+            $machineBox = $global:GA_MainWindow.FindName('TxtSoftwareRemoteMachines')
+            $hint = $global:GA_MainWindow.FindName('TxtSoftwareMachineHint')
+            if ($machineBox -and $hint) {
+                $parsed = @(Get-SoftwareRemoteMachineList -Window $global:GA_MainWindow)
+                if ($parsed.Count -gt 0) {
+                    $hint.Text = "$($parsed.Count) machine(s): $($parsed[0..2] -join ', ')$(if ($parsed.Count -gt 3) { '...' })"
+                } else {
+                    $scanCount = @($script:SelectedScanMachines).Count
+                    if ($scanCount -gt 0) {
+                        $hint.Text = "Empty -- will use Scanner list ($scanCount machines)"
+                    } else {
+                        $hint.Text = '0 machines'
+                    }
+                }
+            }
+        })
+    }
 }
 
 #region ===== SCAN FUNCTIONS =====
+
+function script:Get-SoftwareRemoteMachineList {
+    <#
+    .SYNOPSIS
+        Parses the remote machine textbox into a list of hostnames.
+        Falls back to $script:SelectedScanMachines (Scanner panel list) if textbox is empty.
+    #>
+    param([System.Windows.Window]$Window)
+
+    $machineBox = $Window.FindName('TxtSoftwareRemoteMachines')
+    $rawText = if ($machineBox) { $machineBox.Text } else { '' }
+
+    if (-not [string]::IsNullOrWhiteSpace($rawText)) {
+        # Parse: split by newlines, commas, semicolons, then trim and deduplicate
+        $parsed = @($rawText -split '[,;\r\n]+' |
+            ForEach-Object { $_.Trim() } |
+            Where-Object { $_ -ne '' } |
+            Sort-Object -Unique)
+        return $parsed
+    }
+
+    # Fallback: Scanner panel machine list
+    $scanMachines = @($script:SelectedScanMachines)
+    if ($scanMachines.Count -gt 0) {
+        $hostnames = @($scanMachines | ForEach-Object {
+            if ($_ -is [string]) { $_ } else { $_.Hostname }
+        })
+        return $hostnames
+    }
+
+    return @()
+}
 
 function global:Invoke-ScanLocalSoftware {
     <#
@@ -92,16 +146,11 @@ function global:Invoke-ScanRemoteSoftware {
     #>
     param([System.Windows.Window]$Window)
 
-    $machines = @($script:SelectedScanMachines)
-    if ($machines.Count -eq 0) {
-        Show-Toast -Message 'No machines selected. Go to AD Discovery to select machines for scanning.' -Type 'Warning'
+    $hostnames = @(Get-SoftwareRemoteMachineList -Window $Window)
+    if ($hostnames.Count -eq 0) {
+        Show-Toast -Message 'No machines specified. Enter hostnames in the Remote Machines box, or select machines from AD Discovery.' -Type 'Warning'
         return
     }
-
-    # Get hostnames
-    $hostnames = @($machines | ForEach-Object {
-        if ($_ -is [string]) { $_ } else { $_.Hostname }
-    })
 
     Show-LoadingOverlay -Message "Scanning software on $($hostnames.Count) machine(s)..." -SubMessage ($hostnames[0..2] -join ', ')
 

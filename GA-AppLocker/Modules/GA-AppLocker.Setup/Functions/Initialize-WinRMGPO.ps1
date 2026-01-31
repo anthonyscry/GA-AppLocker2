@@ -248,6 +248,232 @@ function Disable-WinRMGPO {
     return $result
 }
 
+function Initialize-DisableWinRMGPO {
+    <#
+    .SYNOPSIS
+        Creates a GPO that actively reverses all WinRM settings (tattoo removal).
+
+    .DESCRIPTION
+        Creates 'AppLocker-DisableWinRM' GPO that forcefully undoes everything
+        Initialize-WinRMGPO configured. This is NOT the same as just removing
+        the enable GPO -- removing a GPO only reverts policy-based (HKLM\SOFTWARE\Policies)
+        settings. Registry tattoos in HKLM\SYSTEM persist forever.
+
+        This GPO actively writes counter-values:
+        1. WinRM service set to Manual start (3) -- reverses auto-start tattoo
+        2. AllowAutoConfig set to 0 -- explicitly disables WinRM listener
+        3. LocalAccountTokenFilterPolicy set to 0 -- re-enables UAC filtering
+        4. Firewall rule blocks port 5985 inbound -- closes the port
+
+        Workflow:
+        1. Link this GPO (enforced at domain root)
+        2. Run gpupdate /force on target machines (or wait for GP cycle)
+        3. Once confirmed clean, remove BOTH GPOs
+
+    .PARAMETER GPOName
+        Name of the disable GPO. Default: 'AppLocker-DisableWinRM'
+
+    .PARAMETER LinkToRoot
+        Link to domain root. Default: $true
+
+    .PARAMETER Enforced
+        Enforce the link. Default: $true
+
+    .EXAMPLE
+        Initialize-DisableWinRMGPO
+        Creates the disable GPO enforced at domain root.
+    #>
+    [CmdletBinding()]
+    [OutputType([PSCustomObject])]
+    param(
+        [Parameter()]
+        [string]$GPOName = 'AppLocker-DisableWinRM',
+
+        [Parameter()]
+        [switch]$LinkToRoot = $true,
+
+        [Parameter()]
+        [switch]$Enforced = $true
+    )
+
+    $result = [PSCustomObject]@{
+        Success = $false
+        Data    = $null
+        Error   = $null
+    }
+
+    try {
+        Write-SetupLog -Message "Initializing Disable-WinRM GPO: $GPOName (Enforced: $($Enforced.IsPresent))"
+
+        if (-not (Test-ModuleAvailable -ModuleName 'GroupPolicy')) {
+            throw "GroupPolicy module not available. Install RSAT features."
+        }
+
+        Import-Module GroupPolicy -ErrorAction Stop
+
+        # Check if GPO already exists
+        $existingGPO = Get-GPO -Name $GPOName -ErrorAction SilentlyContinue
+        if ($existingGPO) {
+            Write-SetupLog -Message "GPO '$GPOName' already exists. Updating configuration."
+            $gpo = $existingGPO
+        }
+        else {
+            $gpo = New-GPO -Name $GPOName -Comment "Reverses WinRM settings from AppLocker-EnableWinRM. Tattoo removal GPO. Created by GA-AppLocker." -ErrorAction Stop
+            Write-SetupLog -Message "Created GPO: $GPOName"
+        }
+
+        $settingsApplied = @()
+
+        #region --- 1. WinRM Service Manual Start (reverses auto-start tattoo) ---
+        # The enable GPO wrote Start=2 (Automatic) to HKLM\SYSTEM which tattoos.
+        # This writes Start=3 (Manual) to undo it via GPO.
+        $svcRegPath = 'HKLM\SYSTEM\CurrentControlSet\Services\WinRM'
+        Set-GPRegistryValue -Name $GPOName -Key $svcRegPath -ValueName 'Start' -Type DWord -Value 3 -ErrorAction SilentlyContinue
+        $settingsApplied += 'WinRM Service set to Manual (Start=3)'
+        Write-SetupLog -Message "Set WinRM service to Manual start (reverses auto-start tattoo)"
+        #endregion
+
+        #region --- 2. Disable WinRM Listener (AllowAutoConfig = 0) ---
+        # Explicitly disables the WinRM listener policy.
+        $winrmPolicyPath = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\WinRM\Service'
+        Set-GPRegistryValue -Name $GPOName -Key $winrmPolicyPath -ValueName 'AllowAutoConfig' -Type DWord -Value 0 -ErrorAction SilentlyContinue
+        # Clear the IP filters
+        Set-GPRegistryValue -Name $GPOName -Key $winrmPolicyPath -ValueName 'IPv4Filter' -Type String -Value '' -ErrorAction SilentlyContinue
+        Set-GPRegistryValue -Name $GPOName -Key $winrmPolicyPath -ValueName 'IPv6Filter' -Type String -Value '' -ErrorAction SilentlyContinue
+        $settingsApplied += 'WinRM AllowAutoConfig disabled (0), IP filters cleared'
+        Write-SetupLog -Message "Disabled WinRM listener policy (AllowAutoConfig=0, filters cleared)"
+        #endregion
+
+        #region --- 3. Re-enable UAC Remote Filtering (LocalAccountTokenFilterPolicy = 0) ---
+        # Reverses the UAC bypass. Remote local admin connections get filtered token again.
+        $uacPolicyPath = 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
+        Set-GPRegistryValue -Name $GPOName -Key $uacPolicyPath -ValueName 'LocalAccountTokenFilterPolicy' -Type DWord -Value 0 -ErrorAction SilentlyContinue
+        $settingsApplied += 'LocalAccountTokenFilterPolicy = 0 (UAC remote filtering restored)'
+        Write-SetupLog -Message "Set LocalAccountTokenFilterPolicy = 0 (re-enables UAC remote filtering)"
+        #endregion
+
+        #region --- 4. Firewall: Block Port 5985 ---
+        # Instead of just removing the allow rule, actively block port 5985.
+        $firewallRegPath = 'HKLM\SOFTWARE\Policies\Microsoft\WindowsFirewall\FirewallRules'
+        $winrmBlockRule = 'v2.31|Action=Block|Active=TRUE|Dir=In|Protocol=6|LPort=5985|Name=Block WinRM HTTP (AppLocker Cleanup)|Desc=Block WinRM HTTP - tattoo removal by GA-AppLocker|'
+        Set-GPRegistryValue -Name $GPOName -Key $firewallRegPath -ValueName 'WinRM-HTTP-In' -Type String -Value $winrmBlockRule -ErrorAction SilentlyContinue
+        $settingsApplied += 'Firewall: Port 5985 (WinRM HTTP) Inbound BLOCK'
+        Write-SetupLog -Message "Configured firewall rule: Block WinRM HTTP (port 5985) inbound"
+        #endregion
+
+        #region --- Link to Domain Root ---
+        $linkedTo = $null
+        if ($LinkToRoot) {
+            $domainDN = Get-DomainDN
+            if ($domainDN) {
+                try {
+                    New-GPLink -Name $GPOName -Target $domainDN -ErrorAction SilentlyContinue
+                    Write-SetupLog -Message "Linked GPO to domain root: $domainDN"
+                }
+                catch {
+                    if ($_.Exception.Message -notmatch 'already linked') {
+                        Write-SetupLog -Message "Warning linking GPO: $($_.Exception.Message)" -Level Warning
+                    }
+                }
+
+                if ($Enforced) {
+                    try {
+                        Set-GPLink -Name $GPOName -Target $domainDN -Enforced Yes -ErrorAction Stop
+                        $settingsApplied += "GPO Link: Enforced at domain root"
+                        Write-SetupLog -Message "Enforced GPO link at domain root"
+                    }
+                    catch {
+                        Write-SetupLog -Message "Warning enforcing GPO link: $($_.Exception.Message)" -Level Warning
+                        $settingsApplied += "GPO Link: Linked to domain root (enforcement failed)"
+                    }
+                }
+                else {
+                    $settingsApplied += "GPO Link: Linked to domain root (not enforced)"
+                }
+                $linkedTo = $domainDN
+            }
+        }
+        #endregion
+
+        # Disable the Enable GPO link if it exists (so both don't fight)
+        try {
+            $enableGPO = Get-GPO -Name 'AppLocker-EnableWinRM' -ErrorAction SilentlyContinue
+            if ($enableGPO) {
+                $domDN = Get-DomainDN
+                if ($domDN) {
+                    Set-GPLink -Name 'AppLocker-EnableWinRM' -Target $domDN -LinkEnabled No -ErrorAction SilentlyContinue
+                    $settingsApplied += 'AppLocker-EnableWinRM link disabled'
+                    Write-SetupLog -Message "Disabled AppLocker-EnableWinRM link to prevent conflict"
+                }
+            }
+        } catch {
+            Write-SetupLog -Message "Could not disable EnableWinRM link: $($_.Exception.Message)" -Level Warning
+        }
+
+        $result.Success = $true
+        $result.Data = [PSCustomObject]@{
+            GPOName          = $GPOName
+            GPOId            = $gpo.Id
+            LinkedTo         = $linkedTo
+            Enforced         = $Enforced.IsPresent
+            SettingsApplied  = $settingsApplied
+            Status           = 'Created'
+            CreatedDate      = Get-Date
+        }
+
+        Write-SetupLog -Message "Disable-WinRM GPO initialization complete. Settings: $($settingsApplied -join '; ')"
+    }
+    catch {
+        $result.Error = "Failed to initialize Disable-WinRM GPO: $($_.Exception.Message)"
+        Write-SetupLog -Message $result.Error -Level Error
+    }
+
+    return $result
+}
+
+function Remove-DisableWinRMGPO {
+    <#
+    .SYNOPSIS
+        Removes the AppLocker-DisableWinRM GPO after cleanup is confirmed.
+    .DESCRIPTION
+        Use this after gpupdate has propagated and WinRM is confirmed disabled
+        on all target machines. Removes the disable GPO since it is no longer needed.
+    #>
+    [CmdletBinding()]
+    param([string]$GPOName = 'AppLocker-DisableWinRM')
+
+    $result = [PSCustomObject]@{ Success = $false; Data = $null; Error = $null }
+
+    try {
+        if (-not (Test-ModuleAvailable -ModuleName 'GroupPolicy')) {
+            throw "GroupPolicy module not available."
+        }
+        Import-Module GroupPolicy -ErrorAction Stop
+
+        $gpo = Get-GPO -Name $GPOName -ErrorAction SilentlyContinue
+        if (-not $gpo) {
+            $result.Error = "GPO '$GPOName' not found"
+            return $result
+        }
+
+        Remove-GPO -Name $GPOName -ErrorAction Stop
+        Write-SetupLog -Message "Removed Disable-WinRM GPO: $GPOName"
+
+        $result.Success = $true
+        $result.Data = [PSCustomObject]@{
+            GPOName = $GPOName
+            Status  = 'Removed'
+            Note    = 'Disable GPO removed. WinRM should now be fully cleaned up on target machines.'
+        }
+    }
+    catch {
+        $result.Error = "Failed to remove Disable-WinRM GPO: $($_.Exception.Message)"
+        Write-SetupLog -Message $result.Error -Level Error
+    }
+
+    return $result
+}
+
 function Remove-WinRMGPO {
     <#
     .SYNOPSIS

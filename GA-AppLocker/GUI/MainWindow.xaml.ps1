@@ -163,6 +163,7 @@ function global:Invoke-ButtonAction {
         'InitializeWinRM' { Invoke-InitializeWinRM -Window $win }
         'ToggleWinRM' { Invoke-ToggleWinRM -Window $win }
         'RemoveWinRM' { Invoke-RemoveWinRMGPO -Window $win }
+        'DisableWinRMGPO' { Invoke-DisableWinRMGPO -Window $win }
         'InitializeAppLockerGPOs' { Invoke-InitializeAppLockerGPOs -Window $win }
         'InitializeADStructure' { Invoke-InitializeADStructure -Window $win }
         'InitializeAll' { Invoke-InitializeAll -Window $win }

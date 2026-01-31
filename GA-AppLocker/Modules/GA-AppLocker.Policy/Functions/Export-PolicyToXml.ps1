@@ -176,7 +176,10 @@ $(Build-PolicyRuleCollectionXml -Rules $appxRules)
             New-Item -Path $outputDir -ItemType Directory -Force | Out-Null
         }
 
-        $xmlContent | Set-Content -Path $OutputPath -Encoding UTF8
+        # Write WITHOUT BOM -- PS 5.1's Set-Content -Encoding UTF8 adds a BOM which can
+        # cause Set-AppLockerPolicy to misinterpret the content as a file path.
+        $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+        [System.IO.File]::WriteAllText($OutputPath, $xmlContent, $utf8NoBom)
 
         # Count actually exported rules (after phase filtering)
         $exportedRuleCount = @($exeRules).Count + @($scriptRules).Count + @($msiRules).Count + @($dllRules).Count + @($appxRules).Count
