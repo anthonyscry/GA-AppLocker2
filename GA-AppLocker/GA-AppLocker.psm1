@@ -45,12 +45,12 @@ Add-Type -AssemblyName WindowsBase
 # Nested modules are loaded automatically by NestedModules in the .psd1 manifest.
 # They are imported in dependency order BEFORE this .psm1 runs, so all functions
 # (Write-AppLockerLog, Get-AppLockerDataPath, etc.) are already available here.
-# DO NOT manually Import-Module them — that caused double-loading and WPF deadlocks.
+# DO NOT manually Import-Module them -- that caused double-loading and WPF deadlocks.
 try {
     Write-AppLockerLog -Message 'All nested modules loaded successfully' -NoConsole
 }
 catch {
-    # Core module not loaded — something is very wrong
+    # Core module not loaded -- something is very wrong
     throw "GA-AppLocker.Core nested module failed to load. Ensure NestedModules in .psd1 is correct."
 }
 #endregion
@@ -200,30 +200,47 @@ function Start-AppLockerDashboard {
         # Show window
         Write-AppLockerLog -Message 'Showing dialog...'
 
-        # Debug: Track why window closes
+        # Debug: Track why window closes (pure .NET -- cmdlets may be unavailable)
         $window.add_Closing({
             param($s, $e)
             try {
-                $stack = (Get-PSCallStack | ForEach-Object { "$($_.Command) at $($_.Location)" }) -join "`n"
-                Write-AppLockerLog -Level Warning -Message "MainWindow Closing. DialogResult=$($s.DialogResult)`nStack:`n$stack"
+                $ts = [DateTime]::Now.ToString('yyyy-MM-dd HH:mm:ss')
+                $logDir = [System.IO.Path]::Combine([Environment]::GetFolderPath('LocalApplicationData'), 'GA-AppLocker', 'Logs')
+                if ([System.IO.Directory]::Exists($logDir)) {
+                    $logFile = [System.IO.Path]::Combine($logDir, "GA-AppLocker_$([DateTime]::Now.ToString('yyyy-MM-dd')).log")
+                    [System.IO.File]::AppendAllText($logFile, "[$ts] [WARNING] MainWindow Closing. DialogResult=$($s.DialogResult)`r`n")
+                }
             } catch { }
         })
 
         $window.add_Closed({
             param($s, $e)
-            try { Write-AppLockerLog -Level Warning -Message "MainWindow Closed." } catch { }
+            try {
+                $ts = [DateTime]::Now.ToString('yyyy-MM-dd HH:mm:ss')
+                $logDir = [System.IO.Path]::Combine([Environment]::GetFolderPath('LocalApplicationData'), 'GA-AppLocker', 'Logs')
+                if ([System.IO.Directory]::Exists($logDir)) {
+                    $logFile = [System.IO.Path]::Combine($logDir, "GA-AppLocker_$([DateTime]::Now.ToString('yyyy-MM-dd')).log")
+                    [System.IO.File]::AppendAllText($logFile, "[$ts] [WARNING] MainWindow Closed.`r`n")
+                }
+            } catch { }
         })
 
         # Add handler for unhandled dispatcher exceptions
+        # MUST use pure .NET -- cmdlets (Write-Warning, Get-Command) are NOT available
+        # in WPF timer/closure scopes due to cmdlet resolution loss
         [System.Windows.Threading.Dispatcher]::CurrentDispatcher.add_UnhandledException({
             param($sender, $e)
             try {
-                Write-AppLockerLog -Level Error -Message "WPF Dispatcher exception: $($e.Exception.Message)`n$($e.Exception.ToString())"
-            } catch {
-                Write-Warning "WPF Dispatcher exception: $($e.Exception.Message)"
-            }
-            # Don't swallow - let it crash so we can see the real error
-            $e.Handled = $false
+                $ts = [DateTime]::Now.ToString('yyyy-MM-dd HH:mm:ss')
+                $logDir = [System.IO.Path]::Combine([Environment]::GetFolderPath('LocalApplicationData'), 'GA-AppLocker', 'Logs')
+                if ([System.IO.Directory]::Exists($logDir)) {
+                    $logFile = [System.IO.Path]::Combine($logDir, "GA-AppLocker_$([DateTime]::Now.ToString('yyyy-MM-dd')).log")
+                    [System.IO.File]::AppendAllText($logFile, "[$ts] [ERROR] WPF Dispatcher exception: $($e.Exception.Message)`r`n")
+                }
+            } catch { }
+            # Swallow non-fatal dispatcher exceptions (timer scope cmdlet loss)
+            # so they don't kill the entire window
+            $e.Handled = $true
         })
 
         # Add loaded event to verify window renders
@@ -240,22 +257,29 @@ function Start-AppLockerDashboard {
         $window.Focus() | Out-Null
 
         $result = $window.ShowDialog()
-        Write-AppLockerLog -Message "ShowDialog returned: $result"
-
-        Write-AppLockerLog -Message 'Application closed'
+        try { Write-AppLockerLog -Message "ShowDialog returned: $result" } catch { }
+        try { Write-AppLockerLog -Message 'Application closed' } catch { }
     }
     catch {
+        # Use .NET file logging -- cmdlets may not be available after WPF session
         try {
-            Write-AppLockerLog -Level Error -Message "Failed to start GUI: $($_.Exception.Message)"
-        } catch {
-            # Write-Host not available in WPF context - silently continue
+            $ts = [DateTime]::Now.ToString('yyyy-MM-dd HH:mm:ss')
+            $logDir = [System.IO.Path]::Combine([Environment]::GetFolderPath('LocalApplicationData'), 'GA-AppLocker', 'Logs')
+            if ([System.IO.Directory]::Exists($logDir)) {
+                $logFile = [System.IO.Path]::Combine($logDir, "GA-AppLocker_$([DateTime]::Now.ToString('yyyy-MM-dd')).log")
+                [System.IO.File]::AppendAllText($logFile, "[$ts] [ERROR] Failed to start GUI: $($_.Exception.Message)`r`n")
+            }
+        } catch { }
+        # Only show error dialog for real startup failures, not WPF timer scope losses
+        $errMsg = $_.Exception.Message
+        if ($errMsg -notmatch 'Write-AppLockerLog|Write-Warning|Get-Command') {
+            [System.Windows.MessageBox]::Show(
+                "Failed to start GA-AppLocker Dashboard:`n`n$errMsg",
+                'Startup Error',
+                'OK',
+                'Error'
+            )
         }
-        [System.Windows.MessageBox]::Show(
-            "Failed to start GA-AppLocker Dashboard:`n`n$($_.Exception.Message)",
-            'Startup Error',
-            'OK',
-            'Error'
-        )
     }
     #endregion
 }

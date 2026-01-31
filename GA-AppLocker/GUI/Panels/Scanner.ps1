@@ -975,11 +975,11 @@ function global:Invoke-SelectMachinesForScan {
     # First check if any machines are checked in the Discovery DataGrid
     $checkedMachines = Get-CheckedMachines -Window $Window
     if ($checkedMachines.Count -gt 0) {
-        # Use the checked machines directly — no dialog needed
+        # Use the checked machines directly -- no dialog needed
         $selectedMachines = $checkedMachines
     }
     else {
-        # No checkboxes checked — fall back to selection dialog with all machines
+        # No checkboxes checked -- fall back to selection dialog with all machines
         $selectedMachines = Show-MachineSelectionDialog -ParentWindow $Window -Machines $script:DiscoveredMachines
     }
     
@@ -1720,16 +1720,16 @@ function global:Show-RuleGenerationConfigDialog {
             <TextBlock Text="Target Group" Foreground="{StaticResource FgBrush}" FontWeight="SemiBold" Margin="0,0,0,5"/>
             <ComboBox x:Name="CboTargetGroup" Background="{StaticResource ControlBg}" Foreground="{StaticResource FgBrush}" 
                       BorderBrush="{StaticResource BorderBrush}" Padding="8,6" Margin="0,0,0,15">
-                <ComboBoxItem Content="Authenticated Users" Tag="S-1-5-11" IsSelected="True"/>
-                <ComboBoxItem Content="Everyone" Tag="S-1-1-0"/>
-                <ComboBoxItem Content="Administrators" Tag="S-1-5-32-544"/>
-                <ComboBoxItem Content="Users" Tag="S-1-5-32-545"/>
-                <ComboBoxItem Content="AppLocker-Users" Tag="RESOLVE:AppLocker-Users"/>
+                <ComboBoxItem Content="AppLocker-Users" Tag="RESOLVE:AppLocker-Users" IsSelected="True"/>
                 <ComboBoxItem Content="AppLocker-Admins" Tag="RESOLVE:AppLocker-Admins"/>
                 <ComboBoxItem Content="AppLocker-Exempt" Tag="RESOLVE:AppLocker-Exempt"/>
                 <ComboBoxItem Content="AppLocker-Audit" Tag="RESOLVE:AppLocker-Audit"/>
                 <ComboBoxItem Content="AppLocker-Installers" Tag="RESOLVE:AppLocker-Installers"/>
                 <ComboBoxItem Content="AppLocker-Developers" Tag="RESOLVE:AppLocker-Developers"/>
+                <ComboBoxItem Content="Everyone" Tag="S-1-1-0"/>
+                <ComboBoxItem Content="Authenticated Users" Tag="S-1-5-11"/>
+                <ComboBoxItem Content="Administrators" Tag="S-1-5-32-544"/>
+                <ComboBoxItem Content="Users" Tag="S-1-5-32-545"/>
             </ComboBox>
             
             <!-- Unsigned File Handling -->

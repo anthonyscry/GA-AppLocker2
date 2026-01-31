@@ -334,11 +334,9 @@ function global:Show-AddRulesToPolicyDialog {
     # Store references for closures
     $listBoxRef = $listBox
     $dialogRef = $dialog
-    $script:DialogSelectedPolicyId = $null
 
     $btnAdd.Add_Click({
         if ($listBoxRef.SelectedItem) {
-            $script:DialogSelectedPolicyId = $listBoxRef.SelectedItem.Tag
             $dialogRef.DialogResult = $true
             $dialogRef.Close()
         }
@@ -354,8 +352,8 @@ function global:Show-AddRulesToPolicyDialog {
 
     $result = $dialog.ShowDialog()
     
-    if ($result -eq $true) {
-        return $script:DialogSelectedPolicyId
+    if ($result -eq $true -and $listBox.SelectedItem) {
+        return [string]$listBox.SelectedItem.Tag
     }
     return $null
 }

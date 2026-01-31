@@ -31,7 +31,7 @@ function Initialize-RulesPanel {
         'BtnLaunchRuleWizard', 'BtnCreateManualRule', 'BtnExportRulesXml', 'BtnExportRulesCsv',
         'BtnImportRulesXml', 'BtnRefreshRules', 'BtnApproveRule', 'BtnRejectRule', 'BtnReviewRule',
         'BtnDeleteRule', 'BtnViewRuleDetails', 'BtnViewRuleHistory', 'BtnAddRuleToPolicy',
-        'BtnApproveTrustedRules', 'BtnRemoveDuplicateRules', 'BtnAddCommonDenyRules',
+        'BtnAddAdminAllowRules', 'BtnRemoveDuplicateRules', 'BtnAddCommonDenyRules', 'BtnAddDenyBrowserRules',
         'BtnChangeAction', 'BtnChangeGroup'
     )
 
@@ -170,6 +170,10 @@ function global:Update-RulesDataGrid {
                 $sidCache[$sid] = @{ Name = $sid.Substring(11); RiskLevel = 'Low' }
                 continue
             }
+            if ($sid -like 'RESOLVE:*') {
+                $sidCache[$sid] = @{ Name = $sid.Substring(8); RiskLevel = 'Low' }
+                continue
+            }
             if ($sid -like 'S-1-5-21-*-512') {
                 $sidCache[$sid] = @{ Name = 'Domain Admins'; RiskLevel = 'Low' }
                 continue
@@ -214,7 +218,7 @@ function global:Update-RulesDataGrid {
                 $props['GroupName'] = $ruleSid
             }
 
-            # Clean PublisherName for display — truncate after country code (C=XX)
+            # Clean PublisherName for display -- truncate after country code (C=XX)
             # Strips OID/serial junk that appears after C=US in raw cert subjects
             # Rules created after v1.2.12 are already clean, this handles older rules on disk
             if ($props['PublisherName']) {
@@ -1216,7 +1220,7 @@ function global:Invoke-AddCommonDenyRules {
         "  - %OSDRIVE%\Windows\Temp\*`n" +
         "  - %OSDRIVE%\PerfLogs\*`n`n" +
         "Rules will be created for Exe, Msi, and Script collections.`n" +
-        "Status: Approved | Action: Deny | Target: Everyone`n`n" +
+        "Status: Approved | Action: Deny | Target: AppLocker-Users`n`n" +
         "Do you want to continue?",
         'Create Common Deny Rules',
         'YesNo',
@@ -1228,6 +1232,9 @@ function global:Invoke-AddCommonDenyRules {
     Show-LoadingOverlay -Message 'Creating common deny rules...' -SubMessage 'Please wait'
 
     try {
+        # Resolve the target group SID upfront (handles missing AD groups gracefully)
+        $targetSid = Resolve-GroupSid -GroupName 'AppLocker-Users'
+
         $denyPaths = @(
             @{ Path = '%OSDRIVE%\Users\*\AppData\Local\Temp\*'; Desc = 'User AppData Temp folder' }
             @{ Path = '%OSDRIVE%\Users\*\Downloads\*';          Desc = 'User Downloads folder' }
@@ -1254,7 +1261,7 @@ function global:Invoke-AddCommonDenyRules {
                         -CollectionType $collection `
                         -Name $ruleName `
                         -Description $ruleDesc `
-                        -UserOrGroupSid 'S-1-1-0' `
+                        -UserOrGroupSid $targetSid `
                         -Status 'Approved' `
                         -Save
 
@@ -1288,6 +1295,146 @@ function global:Invoke-AddCommonDenyRules {
         Write-Log -Level Warning -Message "Errors creating deny rules: $($errors -join '; ')"
         Show-Toast -Message "$($errors.Count) rule(s) failed to create." -Type 'Warning'
     }
+}
+
+function global:Invoke-AddDenyBrowserRules {
+    <#
+    .SYNOPSIS
+        Creates deny rules for internet browsers targeting AppLocker-Admins.
+    .DESCRIPTION
+        Denies Internet Explorer, Microsoft Edge, Google Chrome, and Mozilla Firefox
+        for the AppLocker-Admins group. Covers both Program Files and Program Files (x86).
+    #>
+    param([System.Windows.Window]$Window)
+
+    $confirm = [System.Windows.MessageBox]::Show(
+        "This will create Deny rules for internet browsers:`n`n" +
+        "  - Internet Explorer (iexplore.exe)`n" +
+        "  - Microsoft Edge (msedge.exe)`n" +
+        "  - Google Chrome (chrome.exe)`n" +
+        "  - Mozilla Firefox (firefox.exe)`n`n" +
+        "Both Program Files and Program Files (x86) paths covered.`n" +
+        "Status: Approved | Action: Deny | Target: AppLocker-Admins`n`n" +
+        "Do you want to continue?",
+        'Create Browser Deny Rules',
+        'YesNo',
+        'Question'
+    )
+
+    if ($confirm -ne 'Yes') { return }
+
+    Show-LoadingOverlay -Message 'Creating browser deny rules...' -SubMessage 'Please wait'
+
+    try {
+        # Resolve the target group SID upfront (handles missing AD groups gracefully)
+        $targetSid = Resolve-GroupSid -GroupName 'AppLocker-Admins'
+
+        $browsers = @(
+            @{ Name = 'Internet Explorer'; Paths = @('%PROGRAMFILES%\Internet Explorer\iexplore.exe', '%PROGRAMFILES(X86)%\Internet Explorer\iexplore.exe') }
+            @{ Name = 'Microsoft Edge';     Paths = @('%PROGRAMFILES%\Microsoft\Edge\Application\msedge.exe', '%PROGRAMFILES(X86)%\Microsoft\Edge\Application\msedge.exe') }
+            @{ Name = 'Google Chrome';      Paths = @('%PROGRAMFILES%\Google\Chrome\Application\chrome.exe', '%PROGRAMFILES(X86)%\Google\Chrome\Application\chrome.exe') }
+            @{ Name = 'Mozilla Firefox';    Paths = @('%PROGRAMFILES%\Mozilla Firefox\firefox.exe', '%PROGRAMFILES(X86)%\Mozilla Firefox\firefox.exe') }
+        )
+
+        $created = 0
+        $errors = @()
+
+        foreach ($browser in $browsers) {
+            foreach ($path in $browser.Paths) {
+                try {
+                    $ruleName = "Deny: $($browser.Name) ($path)"
+                    $ruleDesc = "Deny internet browser execution: $($browser.Name)"
+
+                    $result = New-PathRule `
+                        -Path $path `
+                        -Action 'Deny' `
+                        -CollectionType 'Exe' `
+                        -Name $ruleName `
+                        -Description $ruleDesc `
+                        -UserOrGroupSid $targetSid `
+                        -Status 'Approved' `
+                        -Save
+
+                    if ($result.Success) {
+                        $created++
+                    } else {
+                        $errors += "$ruleName`: $($result.Error)"
+                    }
+                }
+                catch {
+                    $errors += "$($browser.Name) ($path): $($_.Exception.Message)"
+                }
+            }
+        }
+    }
+    finally {
+        Hide-LoadingOverlay
+    }
+
+    # Refresh rules grid and counters
+    Reset-RulesSelectionState -Window $Window
+    Update-RulesDataGrid -Window $Window
+    Update-DashboardStats -Window $Window
+    Update-WorkflowBreadcrumb -Window $Window
+
+    if ($created -gt 0) {
+        Show-Toast -Message "Created $created browser deny rules (4 browsers x 2 paths)." -Type 'Success'
+    }
+    if ($errors.Count -gt 0) {
+        Write-Log -Level Warning -Message "Errors creating browser deny rules: $($errors -join '; ')"
+        Show-Toast -Message "$($errors.Count) rule(s) failed to create." -Type 'Warning'
+    }
+}
+
+function global:Invoke-AddAdminAllowRules {
+    <#
+    .SYNOPSIS
+        Creates allow-all path rules for AppLocker-Admins across all 4 collection types.
+    .DESCRIPTION
+        Uses the AppLocker-Admins Default (Allow All) template to create 4 allow-all
+        path rules (EXE, DLL, MSI, Script) so admins can run anything.
+    #>
+    param([System.Windows.Window]$Window)
+
+    $confirm = [System.Windows.MessageBox]::Show(
+        "This will create Allow-All rules for AppLocker-Admins:`n`n" +
+        "  - Allow All EXE`n" +
+        "  - Allow All DLL`n" +
+        "  - Allow All MSI`n" +
+        "  - Allow All Scripts`n`n" +
+        "Status: Approved | Action: Allow | Target: AppLocker-Admins`n`n" +
+        "Do you want to continue?",
+        'Create Admin Allow Rules',
+        'YesNo',
+        'Question'
+    )
+
+    if ($confirm -ne 'Yes') { return }
+
+    Show-LoadingOverlay -Message 'Creating admin allow rules...' -SubMessage 'Please wait'
+
+    try {
+        $result = New-RulesFromTemplate -TemplateName 'AppLocker-Admins Default (Allow All)' -Status 'Approved' -Save
+
+        if ($result.Success) {
+            $count = $result.Data.RulesCreated
+            Show-Toast -Message "Created $count AppLocker-Admins allow rules." -Type 'Success'
+        } else {
+            Show-Toast -Message "Failed: $($result.Error)" -Type 'Warning'
+        }
+    }
+    catch {
+        Show-Toast -Message "Error: $($_.Exception.Message)" -Type 'Error'
+    }
+    finally {
+        Hide-LoadingOverlay
+    }
+
+    # Refresh rules grid and counters
+    Reset-RulesSelectionState -Window $Window
+    Update-RulesDataGrid -Window $Window
+    Update-DashboardStats -Window $Window
+    Update-WorkflowBreadcrumb -Window $Window
 }
 
 function global:Invoke-ChangeSelectedRulesAction {
@@ -1417,18 +1564,18 @@ function global:Invoke-ChangeSelectedRulesGroup {
         <TextBlock Text="Set target group for $($selectedItems.Count) selected rule(s):"
                    Foreground="#E0E0E0" FontSize="14" Margin="0,0,0,15"/>
         <ComboBox x:Name="CboGroup" FontSize="13" Margin="0,0,0,20" Padding="5">
-            <ComboBoxItem Content="Everyone" IsSelected="True" Tag="S-1-1-0"/>
-            <ComboBoxItem Content="Administrators" Tag="S-1-5-32-544"/>
-            <ComboBoxItem Content="Users" Tag="S-1-5-32-545"/>
-            <ComboBoxItem Content="Authenticated Users" Tag="S-1-5-11"/>
-            <ComboBoxItem Content="Domain Users" Tag="S-1-5-21-*-513"/>
-            <ComboBoxItem Content="Domain Admins" Tag="S-1-5-21-*-512"/>
-            <ComboBoxItem Content="AppLocker-Users" Tag="RESOLVE:AppLocker-Users"/>
+            <ComboBoxItem Content="AppLocker-Users" IsSelected="True" Tag="RESOLVE:AppLocker-Users"/>
             <ComboBoxItem Content="AppLocker-Admins" Tag="RESOLVE:AppLocker-Admins"/>
             <ComboBoxItem Content="AppLocker-Exempt" Tag="RESOLVE:AppLocker-Exempt"/>
             <ComboBoxItem Content="AppLocker-Audit" Tag="RESOLVE:AppLocker-Audit"/>
             <ComboBoxItem Content="AppLocker-Installers" Tag="RESOLVE:AppLocker-Installers"/>
             <ComboBoxItem Content="AppLocker-Developers" Tag="RESOLVE:AppLocker-Developers"/>
+            <ComboBoxItem Content="Everyone" Tag="S-1-1-0"/>
+            <ComboBoxItem Content="Administrators" Tag="S-1-5-32-544"/>
+            <ComboBoxItem Content="Users" Tag="S-1-5-32-545"/>
+            <ComboBoxItem Content="Authenticated Users" Tag="S-1-5-11"/>
+            <ComboBoxItem Content="Domain Users" Tag="S-1-5-21-*-513"/>
+            <ComboBoxItem Content="Domain Admins" Tag="S-1-5-21-*-512"/>
         </ComboBox>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
             <Button x:Name="BtnOK" Content="Apply" Width="80" Padding="5"

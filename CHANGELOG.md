@@ -2,6 +2,62 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.23] - 2026-01-31
+
+### Bug Fixes
+
+- **WPF dispatcher crash fix** -- Unhandled dispatcher exception handler in `GA-AppLocker.psm1` used `Write-Warning` (a cmdlet!) as fallback logging in WPF timer/closure contexts where cmdlets are unavailable. Set `$e.Handled = $false` which propagated the exception and killed the entire window. Rewrote to use pure .NET `[System.IO.File]::AppendAllText()` for logging, set `$e.Handled = $true` to swallow non-fatal timer scope errors. Window closing handlers and post-ShowDialog calls also hardened with pure .NET I/O.
+
+- **Fix "+ Policy" dialog scope bug** -- `Show-AddRulesToPolicyDialog` used `$script:DialogSelectedPolicyId` set inside `.GetNewClosure()` click handler, which created a separate scope. Outer function never saw the value. Fixed by reading `$listBox.SelectedItem.Tag` directly after dialog closes (local variable, still in scope).
+
+- **Fix duplicate `Invoke-AddSelectedRulesToPolicy`** -- Two definitions existed: line 430 (correct, using `Get-SelectedRules`) and line ~1198 (broken, using `$dg.SelectedItems.Count` which is always 0 with virtual select-all for >500 items). Removed the broken second definition.
+
+- **SID display cache fix** -- Added handler for `RESOLVE:` prefix in the Rules DataGrid SID cache (alongside existing `UNRESOLVED:` handler): strips prefix, displays clean group name.
+
+### Features
+
+- **Deploy panel: Edit tab** -- New "Edit" tab in the Deploy panel between Actions and Status. Edit policy Name, Description, and Target GPO (dropdown: None/AppLocker-DC/AppLocker-Servers/AppLocker-Workstations/Custom with custom text field). Save changes button calls `Update-Policy` and refreshes the combo. Policy combo now uses proper `ComboBoxItem` objects with `.Tag` for the policy object.
+
+- **Deploy panel: Backup/Export/Import** -- Three new functions: `Invoke-BackupGpoPolicy` (backs up GPO to filesystem), `Invoke-ExportDeployPolicyXml` (exports policy XML), `Invoke-ImportDeployPolicyXml` (imports policy XML). Actions tab split into "JOB ACTIONS" and "POLICY BACKUP" sections.
+
+- **"+ Admin Allow" button** -- Replaces old "Trusted Vendors" button. Creates 4 allow-all path rules for AppLocker-Admins across EXE, DLL, MSI, and Script collection types using the `AppLocker-Admins Default (Allow All)` template. One-click admin baseline.
+
+- **"+ Deny Browsers" button** -- New red button creates 8 deny path rules blocking IE, Edge, Chrome, and Firefox (2 paths each: `%PROGRAMFILES%` and `%PROGRAMFILES(x86)%`) targeting AppLocker-Admins.
+
+- **Dark title bar** -- P/Invoke `DwmSetWindowAttribute` with `DWMWA_USE_IMMERSIVE_DARK_MODE` (attr 20, fallback 19) for native Windows dark title bar. Type compiled once and cached in `$script:DwmApiType`.
+
+- **Target group dropdowns reordered** -- All 3 target group dropdowns (Manual Rule, Scanner, Rules) now show AppLocker groups first with `AppLocker-Users` as default. Order: AppLocker-Users, AppLocker-Admins, AppLocker-Exempt, AppLocker-Audit, AppLocker-Installers, AppLocker-Developers, Everyone, Administrators, Users, Authenticated Users, Domain Users, Domain Admins.
+
+- **Common Deny Path Rules target changed** -- `Invoke-AddCommonDenyRules` now targets `AppLocker-Users` (via `Resolve-GroupSid`) instead of Everyone (S-1-1-0).
+
+- **Window size increased** -- 1450x1000 (was 1200x1050) for better content visibility.
+
+- **Action column coloring** -- Rules DataGrid Action column now uses colored text: Allow=#4CAF50 green, Deny=#EF5350 red, SemiBold.
+
+- **Unified filter bars** -- Rules, Policy, Deploy, and Software panels all use consistent DockPanel pattern with title left, Search+TextBox right, and transparent colored filter buttons below.
+
+### Enhanced
+
+- **Resolve-GroupSid cache** -- Added `$script:ResolvedGroupCache` hashtable that caches all lookups (successful SIDs, UNRESOLVED fallbacks, nulls). Eliminates repeated NTAccount translation attempts. Only logs one warning per failed group name instead of 4+.
+
+- **Troubleshooting scripts updated** -- `Enable-WinRM.ps1` and `Disable-WinRM.ps1` now apply/revert the exact same 4 settings as `Initialize-WinRMGPO`: WinRM service auto-start, AllowAutoConfig with IPv4/IPv6 filters, LocalAccountTokenFilterPolicy, and firewall port 5985. Previously only configured basic WinRM listener.
+
+- **Force-GPOSync.ps1 rewritten** -- Previous version had multiple bugs: `try/catch` on `repadmin` (native exe never throws), `Get-ADComputer -Filter *` returning disabled/stale accounts, no ping check before `Invoke-GPUpdate` (wall of RPC errors on offline machines), em dashes in string literals. Rewrite adds: `-Target`/`-OU`/`-SkipOffline` parameters, filters disabled accounts and 90-day stale machines, ping check with `Win32_PingStatus`, `Invoke-GPUpdate` (RPC) with `Invoke-Command` (WinRM) fallback per machine, excludes local DC from remote list, and clear summary with troubleshooting tips.
+
+- **Unicode em dash cleanup** -- Replaced 8 remaining Unicode em dashes (U+2014) in comments across `GA-AppLocker.psm1`, `Rules.ps1`, and `Scanner.ps1` with ASCII double hyphens. While comments don't break PS 5.1 parsing, they display as garbled characters in Windows-1252 editors.
+
+### Removed
+
+- **Removed "+ Policy" button from Rules panel bottom bar** -- Was redundant (Policy panel has its own "Add Rules").
+- **Removed Modules card from About page** -- Removed the 10 colored module badges WrapPanel.
+
+### Stats
+
+- **Tests:** 397/397 passing (100%)
+- **Exported Commands:** ~198
+
+---
+
 ## [1.2.22] - 2026-01-31
 
 ### Bug Fixes

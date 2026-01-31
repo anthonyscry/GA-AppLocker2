@@ -56,6 +56,14 @@ function Resolve-GroupSid {
         return $wellKnown[$GroupName]
     }
 
+    # Cache for resolved/failed groups (avoid repeated lookups and warning spam)
+    if (-not $script:ResolvedGroupCache) {
+        $script:ResolvedGroupCache = @{}
+    }
+    if ($script:ResolvedGroupCache.ContainsKey($GroupName)) {
+        return $script:ResolvedGroupCache[$GroupName]
+    }
+
     # Try .NET NTAccount translation (works for domain and local groups)
     try {
         $ntAccount = [System.Security.Principal.NTAccount]::new($GroupName)
@@ -65,14 +73,12 @@ function Resolve-GroupSid {
             try {
                 Write-AppLockerLog -Message "Resolved group '$GroupName' to SID: $($sid.Value)" -Level 'INFO'
             } catch { }
+            $script:ResolvedGroupCache[$GroupName] = $sid.Value
             return $sid.Value
         }
     }
     catch {
         # NTAccount translation failed - group may not exist or not domain-joined
-        try {
-            Write-AppLockerLog -Message "Could not resolve group '$GroupName' via NTAccount: $($_.Exception.Message)" -Level 'WARNING'
-        } catch { }
     }
 
     # Try with domain prefix (DOMAIN\GroupName)
@@ -86,23 +92,27 @@ function Resolve-GroupSid {
                 try {
                     Write-AppLockerLog -Message "Resolved group '$domain\$GroupName' to SID: $($sid.Value)" -Level 'INFO'
                 } catch { }
+                $script:ResolvedGroupCache[$GroupName] = $sid.Value
                 return $sid.Value
             }
         }
     }
     catch {
         # Also failed with domain prefix
-        try {
-            Write-AppLockerLog -Message "Could not resolve group '$env:USERDOMAIN\$GroupName': $($_.Exception.Message)" -Level 'WARNING'
-        } catch { }
     }
+
+    # Log warning only once per group name
+    try {
+        Write-AppLockerLog -Message "Could not resolve group '$GroupName' - using UNRESOLVED placeholder (group may not exist or machine not domain-joined)" -Level 'WARNING'
+    } catch { }
 
     # Fallback: return placeholder or null
     if ($FallbackToPlaceholder) {
-        # Use a wildcard SID pattern that indicates this needs resolution at deployment time
-        # S-1-5-21-*-<hash> - the * indicates a domain SID that wasn't resolved
-        return "UNRESOLVED:$GroupName"
+        $fallback = "UNRESOLVED:$GroupName"
+        $script:ResolvedGroupCache[$GroupName] = $fallback
+        return $fallback
     }
 
+    $script:ResolvedGroupCache[$GroupName] = $null
     return $null
 }

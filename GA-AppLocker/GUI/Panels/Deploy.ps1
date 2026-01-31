@@ -26,7 +26,9 @@ function Initialize-DeploymentPanel {
     # Wire up action buttons
     $actionButtons = @(
         'BtnCreateDeployment', 'BtnRefreshDeployments', 'BtnDeployJob',
-        'BtnStopDeployment', 'BtnCancelSelected', 'BtnViewDeployLog'
+        'BtnStopDeployment', 'BtnCancelSelected', 'BtnViewDeployLog',
+        'BtnBackupGpoPolicy', 'BtnExportPolicyXml', 'BtnImportPolicyXml',
+        'BtnSaveDeployPolicyChanges'
     )
 
     foreach ($btnName in $actionButtons) {
@@ -49,13 +51,7 @@ function Initialize-DeploymentPanel {
     }
 
     # Load policies into combo box
-    $policyCombo = $Window.FindName('CboDeployPolicy')
-    if ($policyCombo -and (Get-Command -Name 'Get-AllPolicies' -ErrorAction SilentlyContinue)) {
-        $result = Get-AllPolicies -Status 'Active'
-        if ($result.Success -and $result.Data) {
-            $policyCombo.ItemsSource = $result.Data
-        }
-    }
+    global:Refresh-DeployPolicyCombo -Window $Window
 
     # Wire up GPO dropdown to show/hide custom textbox
     $gpoCombo = $Window.FindName('CboDeployTargetGPO')
@@ -65,6 +61,34 @@ function Initialize-DeploymentPanel {
                 param($sender, $e)
                 $selectedItem = $sender.SelectedItem
                 $customBox = $global:GA_MainWindow.FindName('TxtDeployCustomGPO')
+                if ($customBox) {
+                    if ($selectedItem -and $selectedItem.Tag -eq 'Custom') {
+                        $customBox.Visibility = 'Visible'
+                    }
+                    else {
+                        $customBox.Visibility = 'Collapsed'
+                    }
+                }
+            })
+    }
+
+    # Wire up policy combo selection changed to load edit fields
+    $policyCombo = $Window.FindName('CboDeployPolicy')
+    if ($policyCombo) {
+        $policyCombo.Add_SelectionChanged({
+                param($sender, $e)
+                Update-DeployPolicyEditTab -Window $global:GA_MainWindow
+            })
+    }
+
+    # Wire up edit GPO dropdown to show/hide custom textbox
+    $editGpoCombo = $Window.FindName('CboDeployEditGPO')
+    $editCustomGpoBox = $Window.FindName('TxtDeployEditCustomGPO')
+    if ($editGpoCombo -and $editCustomGpoBox) {
+        $editGpoCombo.Add_SelectionChanged({
+                param($sender, $e)
+                $selectedItem = $sender.SelectedItem
+                $customBox = $global:GA_MainWindow.FindName('TxtDeployEditCustomGPO')
                 if ($customBox) {
                     if ($selectedItem -and $selectedItem.Tag -eq 'Custom') {
                         $customBox.Visibility = 'Visible'
@@ -108,6 +132,32 @@ function Update-ModuleStatus {
         }
         else { 
             [System.Windows.Media.SolidColorBrush]::new([System.Windows.Media.Color]::FromRgb(255, 213, 79))
+        }
+    }
+}
+
+function global:Refresh-DeployPolicyCombo {
+    <#
+    .SYNOPSIS
+        Refreshes the policy dropdown on the Deployment panel.
+    #>
+    param([System.Windows.Window]$Window)
+
+    $policyCombo = $Window.FindName('CboDeployPolicy')
+    if (-not $policyCombo) { return }
+    if (-not (Get-Command -Name 'Get-AllPolicies' -ErrorAction SilentlyContinue)) { return }
+
+    $policyCombo.Items.Clear()
+
+    # Load Active and Draft policies (anything deployable)
+    $result = Get-AllPolicies
+    if ($result.Success -and $result.Data) {
+        $deployable = @($result.Data | Where-Object { $_.Status -eq 'Active' -or $_.Status -eq 'Draft' })
+        foreach ($policy in $deployable) {
+            $item = [System.Windows.Controls.ComboBoxItem]::new()
+            $item.Content = "$($policy.Name) (Phase $($policy.Phase)) - $($policy.Status)"
+            $item.Tag = $policy
+            $policyCombo.Items.Add($item)
         }
     }
 }
@@ -285,7 +335,7 @@ function global:Invoke-CreateDeploymentJob {
     }
 
     try {
-        $policy = $policyCombo.SelectedItem
+        $policy = $policyCombo.SelectedItem.Tag
         $result = New-DeploymentJob -PolicyId $policy.PolicyId -GPOName $gpoName -Schedule $schedule
 
         if ($result.Success) {
@@ -551,24 +601,333 @@ function global:Show-DeploymentLog {
     param([System.Windows.Window]$Window)
 
     try {
-        $result = Get-DeploymentHistory -Limit 50
-
-        if (-not $result.Success -or -not $result.Data -or $result.Data.Count -eq 0) {
-            [System.Windows.MessageBox]::Show('No deployment history available.', 'No History', 'OK', 'Information')
+        $result = Get-AllDeploymentJobs
+        if (-not $result.Success -or -not $result.Data -or @($result.Data).Count -eq 0) {
+            [System.Windows.MessageBox]::Show('No deployment jobs found.', 'No Jobs', 'OK', 'Information')
             return
         }
 
-        $log = $result.Data | ForEach-Object {
-            "$($_.Timestamp) | $($_.Action) | $($_.Details) | $($_.User)"
+        $logText = "DEPLOYMENT JOBS`n" + ('=' * 60) + "`n`n"
+        foreach ($job in $result.Data) {
+            $created = ''
+            try {
+                if ($job.CreatedAt -is [datetime]) { $created = $job.CreatedAt.ToString('yyyy-MM-dd HH:mm') }
+                elseif ($job.CreatedAt) { $created = ([datetime]$job.CreatedAt).ToString('yyyy-MM-dd HH:mm') }
+            } catch { }
+            $logText += "Policy:   $($job.PolicyName)`n"
+            $logText += "GPO:      $($job.GPOName)`n"
+            $logText += "Status:   $($job.Status)`n"
+            $logText += "Progress: $($job.Progress)%`n"
+            $logText += "Created:  $created`n"
+            $logText += "Message:  $($job.Message)`n"
+            $logText += ('-' * 60) + "`n"
         }
 
-        $logText = "DEPLOYMENT HISTORY (Last 50 entries)`n" + ('=' * 50) + "`n`n"
-        $logText += ($log -join "`n")
-
-        [System.Windows.MessageBox]::Show($logText, 'Deployment Log', 'OK', 'Information')
+        [System.Windows.MessageBox]::Show($logText, 'Deployment Job Details', 'OK', 'Information')
     }
     catch {
         [System.Windows.MessageBox]::Show("Error: $($_.Exception.Message)", 'Error', 'OK', 'Error')
+    }
+}
+
+function global:Invoke-BackupGpoPolicy {
+    <#
+    .SYNOPSIS
+        Backs up the current AppLocker policy from a GPO to an XML file.
+    #>
+    param([System.Windows.Window]$Window)
+
+    # Ask which GPO to backup from
+    $gpoCombo = $Window.FindName('CboDeployTargetGPO')
+    $gpoName = if ($gpoCombo -and $gpoCombo.SelectedItem -and $gpoCombo.SelectedItem.Tag -ne 'Custom') {
+        $gpoCombo.SelectedItem.Tag
+    } else {
+        'AppLocker-Servers'
+    }
+
+    $confirm = [System.Windows.MessageBox]::Show(
+        "Backup current AppLocker policy from GPO '$gpoName'?`n`n" +
+        "This will use Get-AppLockerPolicy to export the`n" +
+        "effective policy to an XML backup file.",
+        'Backup GPO Policy',
+        'YesNo',
+        'Question'
+    )
+    if ($confirm -ne 'Yes') { return }
+
+    # Pick save location
+    $saveDialog = New-Object Microsoft.Win32.SaveFileDialog
+    $saveDialog.Filter = 'XML Files (*.xml)|*.xml'
+    $saveDialog.FileName = "AppLocker-Backup-$gpoName-$(Get-Date -Format 'yyyyMMdd-HHmmss').xml"
+    $saveDialog.Title = 'Save AppLocker Policy Backup'
+
+    if (-not $saveDialog.ShowDialog()) { return }
+    $outputPath = $saveDialog.FileName
+
+    Show-LoadingOverlay -Message "Backing up policy from GPO '$gpoName'..." -SubMessage 'Please wait'
+
+    try {
+        # Try Get-AppLockerPolicy from GPO
+        $hasAL = Get-Command -Name 'Get-AppLockerPolicy' -ErrorAction SilentlyContinue
+        if (-not $hasAL) {
+            Hide-LoadingOverlay
+            [System.Windows.MessageBox]::Show(
+                "Get-AppLockerPolicy cmdlet not available.`n`n" +
+                "Install RSAT or the AppLocker PowerShell module.",
+                'Module Not Found', 'OK', 'Warning')
+            return
+        }
+
+        # Try GPO-based backup first, fall back to local effective policy
+        $policy = $null
+        $source = ''
+        try {
+            $hasGP = Get-Module -ListAvailable -Name GroupPolicy
+            if ($hasGP) {
+                Import-Module GroupPolicy -ErrorAction Stop
+                $gpo = Get-GPO -Name $gpoName -ErrorAction Stop
+                $policy = Get-AppLockerPolicy -Id $gpo.Id -Domain $gpo.DomainName -Xml
+                $source = "GPO: $gpoName"
+            }
+        } catch { }
+
+        if (-not $policy) {
+            # Fallback: get effective local policy
+            $policy = Get-AppLockerPolicy -Effective -Xml
+            $source = 'Effective (Local)'
+        }
+
+        if ($policy) {
+            [System.IO.File]::WriteAllText($outputPath, $policy)
+            Hide-LoadingOverlay
+            Show-Toast -Message "Policy backed up from $source" -Type 'Success'
+            [System.Windows.MessageBox]::Show(
+                "Policy backup saved to:`n$outputPath`n`nSource: $source",
+                'Backup Complete', 'OK', 'Information')
+        } else {
+            Hide-LoadingOverlay
+            [System.Windows.MessageBox]::Show('No AppLocker policy found.', 'Empty', 'OK', 'Warning')
+        }
+    }
+    catch {
+        Hide-LoadingOverlay
+        [System.Windows.MessageBox]::Show("Backup failed: $($_.Exception.Message)", 'Error', 'OK', 'Error')
+    }
+}
+
+function global:Invoke-ExportDeployPolicyXml {
+    <#
+    .SYNOPSIS
+        Exports a GA-AppLocker policy to AppLocker XML format.
+    #>
+    param([System.Windows.Window]$Window)
+
+    # Get policies
+    $result = Get-AllPolicies
+    if (-not $result.Success -or @($result.Data).Count -eq 0) {
+        [System.Windows.MessageBox]::Show('No policies found to export.', 'No Policies', 'OK', 'Warning')
+        return
+    }
+
+    # Use currently selected policy from the Create tab combo, or show picker
+    $policyCombo = $Window.FindName('CboDeployPolicy')
+    $selectedPolicy = $null
+    if ($policyCombo -and $policyCombo.SelectedItem) {
+        $selectedPolicy = $policyCombo.SelectedItem.Tag
+    }
+
+    if (-not $selectedPolicy) {
+        [System.Windows.MessageBox]::Show('Please select a policy from the Create tab first.', 'No Selection', 'OK', 'Information')
+        return
+    }
+
+    # Pick save location
+    $saveDialog = New-Object Microsoft.Win32.SaveFileDialog
+    $saveDialog.Filter = 'XML Files (*.xml)|*.xml'
+    $saveDialog.FileName = "$($selectedPolicy.Name).xml"
+    $saveDialog.Title = 'Export Policy to XML'
+
+    if (-not $saveDialog.ShowDialog()) { return }
+
+    Show-LoadingOverlay -Message "Exporting policy '$($selectedPolicy.Name)'..." -SubMessage 'Please wait'
+
+    try {
+        $exportResult = Export-PolicyToXml -PolicyId $selectedPolicy.PolicyId -OutputPath $saveDialog.FileName
+        Hide-LoadingOverlay
+
+        if ($exportResult.Success) {
+            Show-Toast -Message "Policy exported to XML" -Type 'Success'
+            [System.Windows.MessageBox]::Show(
+                "Policy '$($selectedPolicy.Name)' exported to:`n$($saveDialog.FileName)",
+                'Export Complete', 'OK', 'Information')
+        } else {
+            [System.Windows.MessageBox]::Show("Export failed: $($exportResult.Error)", 'Error', 'OK', 'Error')
+        }
+    }
+    catch {
+        Hide-LoadingOverlay
+        [System.Windows.MessageBox]::Show("Export failed: $($_.Exception.Message)", 'Error', 'OK', 'Error')
+    }
+}
+
+function global:Invoke-ImportDeployPolicyXml {
+    <#
+    .SYNOPSIS
+        Imports rules from an AppLocker XML policy file.
+    #>
+    param([System.Windows.Window]$Window)
+
+    $openDialog = New-Object Microsoft.Win32.OpenFileDialog
+    $openDialog.Filter = 'XML Files (*.xml)|*.xml|All Files (*.*)|*.*'
+    $openDialog.Title = 'Import AppLocker Policy XML'
+
+    if (-not $openDialog.ShowDialog()) { return }
+
+    Show-LoadingOverlay -Message 'Importing rules from XML...' -SubMessage $openDialog.FileName
+
+    try {
+        $importResult = Import-RulesFromXml -Path $openDialog.FileName
+        Hide-LoadingOverlay
+
+        if ($importResult.Success) {
+            $count = if ($importResult.Data) { @($importResult.Data).Count } else { 0 }
+            Show-Toast -Message "Imported $count rules from XML" -Type 'Success'
+            [System.Windows.MessageBox]::Show(
+                "Imported $count rule(s) from:`n$($openDialog.FileName)`n`n" +
+                "Rules are in Pending status. Go to Rules panel to review.",
+                'Import Complete', 'OK', 'Information')
+        } else {
+            [System.Windows.MessageBox]::Show("Import failed: $($importResult.Error)", 'Error', 'OK', 'Error')
+        }
+    }
+    catch {
+        Hide-LoadingOverlay
+        [System.Windows.MessageBox]::Show("Import failed: $($_.Exception.Message)", 'Error', 'OK', 'Error')
+    }
+}
+
+function global:Update-DeployPolicyEditTab {
+    <#
+    .SYNOPSIS
+        Populates the Deploy Edit tab fields from the selected policy in the Create dropdown.
+    #>
+    param([System.Windows.Window]$Window)
+
+    $policyCombo = $Window.FindName('CboDeployPolicy')
+    $hint = $Window.FindName('TxtDeployEditPolicyHint')
+    $txtName = $Window.FindName('TxtDeployEditPolicyName')
+    $txtDesc = $Window.FindName('TxtDeployEditPolicyDesc')
+    $cboGPO = $Window.FindName('CboDeployEditGPO')
+    $txtCustomGPO = $Window.FindName('TxtDeployEditCustomGPO')
+
+    if (-not $policyCombo -or -not $policyCombo.SelectedItem) {
+        # No policy selected - clear fields
+        if ($hint) { $hint.Visibility = 'Visible' }
+        if ($txtName) { $txtName.Text = '' }
+        if ($txtDesc) { $txtDesc.Text = '' }
+        if ($cboGPO) { $cboGPO.SelectedIndex = 0 }
+        if ($txtCustomGPO) { $txtCustomGPO.Text = ''; $txtCustomGPO.Visibility = 'Collapsed' }
+        return
+    }
+
+    $policy = $policyCombo.SelectedItem.Tag
+    if (-not $policy) { return }
+
+    if ($hint) { $hint.Visibility = 'Collapsed' }
+    if ($txtName) { $txtName.Text = if ($policy.Name) { $policy.Name } else { '' } }
+    if ($txtDesc) { $txtDesc.Text = if ($policy.Description) { $policy.Description } else { '' } }
+
+    # Set Target GPO dropdown
+    if ($cboGPO) {
+        $gpoValue = if ($policy.TargetGPO) { $policy.TargetGPO } else { '' }
+        $matched = $false
+        for ($i = 0; $i -lt $cboGPO.Items.Count; $i++) {
+            $item = $cboGPO.Items[$i]
+            if ($item.Tag -eq $gpoValue) {
+                $cboGPO.SelectedIndex = $i
+                $matched = $true
+                break
+            }
+        }
+        if (-not $matched -and $gpoValue.Length -gt 0) {
+            # Custom GPO name
+            for ($i = 0; $i -lt $cboGPO.Items.Count; $i++) {
+                if ($cboGPO.Items[$i].Tag -eq 'Custom') {
+                    $cboGPO.SelectedIndex = $i
+                    break
+                }
+            }
+            if ($txtCustomGPO) {
+                $txtCustomGPO.Text = $gpoValue
+                $txtCustomGPO.Visibility = 'Visible'
+            }
+        }
+        elseif ($txtCustomGPO) {
+            $txtCustomGPO.Text = ''
+            $txtCustomGPO.Visibility = 'Collapsed'
+        }
+    }
+}
+
+function global:Invoke-SaveDeployPolicyChanges {
+    <#
+    .SYNOPSIS
+        Saves policy name, description, and target GPO changes from the Deploy Edit tab.
+    #>
+    param([System.Windows.Window]$Window)
+
+    # Get the selected policy from the Create tab combo
+    $policyCombo = $Window.FindName('CboDeployPolicy')
+    if (-not $policyCombo -or -not $policyCombo.SelectedItem) {
+        Show-Toast -Message 'Please select a policy from the Create tab first.' -Type 'Warning'
+        return
+    }
+
+    $policy = $policyCombo.SelectedItem.Tag
+    if (-not $policy -or -not $policy.PolicyId) {
+        Show-Toast -Message 'Invalid policy selected.' -Type 'Warning'
+        return
+    }
+
+    $txtName = $Window.FindName('TxtDeployEditPolicyName')
+    $editName = if ($txtName) { $txtName.Text.Trim() } else { '' }
+
+    if ([string]::IsNullOrWhiteSpace($editName)) {
+        Show-Toast -Message 'Policy name cannot be empty.' -Type 'Warning'
+        return
+    }
+
+    $txtDesc = $Window.FindName('TxtDeployEditPolicyDesc')
+    $editDesc = if ($txtDesc) { $txtDesc.Text.Trim() } else { '' }
+
+    # Get target GPO from dropdown or custom textbox
+    $cboGPO = $Window.FindName('CboDeployEditGPO')
+    $txtCustomGPO = $Window.FindName('TxtDeployEditCustomGPO')
+    $selectedGpoItem = if ($cboGPO) { $cboGPO.SelectedItem } else { $null }
+    $targetGPO = if ($selectedGpoItem -and $selectedGpoItem.Tag -eq 'Custom') {
+        if ($txtCustomGPO) { $txtCustomGPO.Text.Trim() } else { '' }
+    }
+    elseif ($selectedGpoItem) {
+        [string]$selectedGpoItem.Tag
+    }
+    else {
+        ''
+    }
+
+    try {
+        $result = Update-Policy -Id $policy.PolicyId -Name $editName -Description $editDesc -TargetGPO $targetGPO
+
+        if ($result.Success) {
+            Show-Toast -Message "Policy '$editName' updated." -Type 'Success'
+            # Refresh the policy combo to show updated name
+            global:Refresh-DeployPolicyCombo -Window $Window
+        }
+        else {
+            Show-Toast -Message "Failed: $($result.Error)" -Type 'Error'
+        }
+    }
+    catch {
+        Show-Toast -Message "Error: $($_.Exception.Message)" -Type 'Error'
     }
 }
 

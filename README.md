@@ -1,4 +1,4 @@
-# GA-AppLocker v1.2.22
+# GA-AppLocker v1.2.23
 
 Enterprise AppLocker policy management for air-gapped, classified, and highly secure Windows environments. Complete workflow from AD discovery through GPO deployment — no internet required.
 
@@ -51,14 +51,15 @@ AD Discovery ──► Artifact Scanning ──► Rule Generation ──► Pol
 
 ### Management & Operations
 - **Rule history & versioning** with rollback capability
-- **Bulk operations**: Approve trusted vendors, remove duplicates, batch status changes
+- **Bulk operations**: Admin Allow (4 rules), Deny Browsers (8 rules), Deny Paths (21 rules), batch status/group/action changes
 - **Policy comparison & snapshots** with restore
+- **Deploy panel editing** — Edit policy name, description, and target GPO inline; backup/export/import policies
 - **Tiered credentials** (T0/T1/T2) with DPAPI encryption
 - **Scheduled scans** with configurable targets
 - **Software inventory** — Scan local/remote installed software, CSV export/import, cross-system comparison
 
 ### User Interface
-- **Dark/light theme** toggle
+- **Dark theme** with native dark title bar (DwmSetWindowAttribute)
 - **9 dedicated panels**: Dashboard, AD Discovery, Credentials, Scanner, Rules, Policy, Deploy, Software Inventory, Setup
 - **Keyboard shortcuts**: Ctrl+1-9 navigation, F5 refresh, Ctrl+F search, Ctrl+S save
 - **Drag-and-drop**: Drop files to scan or import rules/policies
@@ -95,7 +96,7 @@ GA-AppLocker/
     └── GA-AppLocker.Validation/   # 5-stage policy XML validation pipeline
 ```
 
-**10 sub-modules**, ~195 exported functions. All functions return standardized result objects:
+**10 sub-modules**, ~198 exported functions. All functions return standardized result objects:
 
 ```powershell
 @{ Success = $true; Data = <result>; Error = $null }
@@ -141,6 +142,116 @@ Invoke-Pester -Path Tests\Unit\ -Output Detailed
 .\Tests\Automation\Run-AutomatedTests.ps1 -All -UseMockData
 ```
 
+## Standard Operating Procedure
+
+Step-by-step. Do them in order. Don't skip steps.
+
+### PHASE 0: Install the Tool
+
+1. Copy the `GA-AppLocker\` folder and `Run-Dashboard.ps1` to your admin workstation
+2. Open PowerShell **as Administrator**
+3. Run `.\Run-Dashboard.ps1` -- the dashboard opens
+4. If this is the first time, go to the **Setup** panel (Ctrl+9) and click **Initialize Environment**
+
+### PHASE 1: Set Up WinRM on Target Machines
+
+Machines need WinRM enabled so you can scan them remotely. Pick ONE method:
+
+**Method A -- GPO (recommended, does all machines at once):**
+1. Go to the **Setup** panel (Ctrl+9)
+2. Click **Create WinRM GPO** -- this creates an enforced GPO at domain root
+3. Wait for Group Policy to propagate (up to 90 minutes), or run `Troubleshooting\Force-GPOSync.ps1` on the DC
+
+**Method B -- Manual (one machine at a time):**
+1. Copy `Troubleshooting\Enable-WinRM.ps1` to each target machine
+2. Run it as Administrator on each machine
+3. To undo later: run `Troubleshooting\Disable-WinRM.ps1`
+
+### PHASE 2: Store Credentials
+
+1. Go to **Credentials** panel (Ctrl+3)
+2. Click **New Profile**
+3. Enter a name (e.g., "Domain Admin"), username, and password
+4. Set the tier: **T0** = Domain Controllers, **T1** = Servers, **T2** = Workstations
+5. Repeat for each tier you need to scan
+
+### PHASE 3: Discover Machines
+
+1. Go to **AD Discovery** panel (Ctrl+2)
+2. Domain info loads automatically -- wait for the OU tree to populate
+3. Click an OU in the tree to filter machines
+4. Select machines you want to scan (click rows, Shift+Click for range, Ctrl+Click for multi)
+5. Click **Test Connectivity** to verify WinRM is working (green = good)
+6. Click **Add to Scanner** to send selected machines to the Scanner
+
+### PHASE 4: Scan for Software Artifacts
+
+1. Go to **Scanner** panel (Ctrl+4)
+2. Verify your machines are listed in the Machines tab
+3. Go to the **Config** tab:
+   - Check scan paths (default: Program Files, System32)
+   - Check file types (EXE, DLL, MSI, scripts)
+   - Set target group (default: AppLocker-Users)
+4. Click **Start Local Scan** (scans your own machine) and/or **Start Remote Scan** (scans the added machines)
+5. Wait for the progress bar to finish -- artifacts appear in the Results tab
+
+### PHASE 5: Generate Rules
+
+**Quick method (bulk buttons):**
+1. Go to **Rules** panel (Ctrl+5)
+2. Click **+ Admin Allow** -- creates 4 allow-all rules for AppLocker-Admins (so admins aren't locked out)
+3. Click **+ Deny Paths** -- creates 21 deny rules blocking user-writable directories
+4. Click **+ Deny Browsers** -- creates 8 deny rules blocking browsers for admins (optional)
+5. Click **Generate Rules** -- opens the 3-step wizard for your scanned artifacts:
+   - Step 1: Pick rule type (Publisher preferred, Hash as fallback)
+   - Step 2: Preview the rules
+   - Step 3: Generate
+
+**Review rules:**
+1. Use filter buttons (All / Pending / Approved / Rejected) to sort
+2. Select rules and use **Approve** / **Reject** buttons, or right-click for more options
+3. Use **Group** and **Action** buttons to bulk-change target group or Allow/Deny
+
+### PHASE 6: Build a Policy
+
+1. Go to **Policy** panel (Ctrl+6)
+2. Click **New Policy** -- give it a name and pick a phase:
+   - **Phase 1**: EXE rules only (start here)
+   - **Phase 2**: EXE + Scripts
+   - **Phase 3**: EXE + Scripts + MSI
+   - **Phase 4**: Full enforcement (all types)
+3. Click **Add Rules** -- select your approved rules
+4. Policy starts in **Audit mode** (logs violations but doesn't block anything)
+
+### PHASE 7: Deploy to GPO
+
+1. Go to **Deploy** panel (Ctrl+7)
+2. Select your policy from the dropdown
+3. Go to the **Edit** tab -- set the Target GPO (AppLocker-DC, AppLocker-Servers, or AppLocker-Workstations)
+4. Click **Save Changes**
+5. Go to the **Actions** tab -- click **Create Job**, then **Deploy**
+6. The policy is pushed to the GPO. Run `gpupdate /force` on target machines or wait for propagation.
+
+### PHASE 8: Monitor and Enforce
+
+1. Check Event Viewer on target machines: `Applications and Services Logs > Microsoft > Windows > AppLocker`
+2. **8003** = file would have been blocked (Audit mode) -- review these
+3. **8004** = file was blocked (Enforce mode)
+4. If Audit mode looks clean (no legitimate apps blocked), go back to the Policy panel and change enforcement from Audit to Enforce
+5. Redeploy
+
+### If Something Goes Wrong
+
+| Problem | Fix |
+|---------|-----|
+| Can't scan remote machines | Run `Troubleshooting\Enable-WinRM.ps1` on them, or check the WinRM GPO |
+| "Access Denied" on remote scan | Check credentials in Credentials panel. Make sure the right tier is set |
+| GPO not applying | Run `Troubleshooting\Force-GPOSync.ps1` on the DC |
+| App hangs on startup | Close and reopen. Check `%LOCALAPPDATA%\GA-AppLocker\Logs\` |
+| Legitimate app getting blocked | Create a Publisher or Hash allow rule for it, add to policy, redeploy |
+| Need to undo WinRM on a machine | Run `Troubleshooting\Disable-WinRM.ps1` on it |
+| Need to remove WinRM GPO entirely | Setup panel > Remove GPO button |
+
 ## Air-Gap Deployment
 
 GA-AppLocker is designed for networks with no internet access:
@@ -151,4 +262,4 @@ GA-AppLocker is designed for networks with no internet access:
 
 ## License
 
-Proprietary — internal enterprise use only.
+Proprietary -- internal enterprise use only.

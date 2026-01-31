@@ -148,6 +148,10 @@ function global:Invoke-ButtonAction {
         'StopDeployment' { Invoke-StopDeployment -Window $win }
         'CancelDeploymentJob' { Invoke-CancelDeploymentJob -Window $win }
         'ViewDeploymentLog' { Show-DeploymentLog -Window $win }
+        'BackupGpoPolicy' { Invoke-BackupGpoPolicy -Window $win }
+        'ExportDeployPolicyXml' { Invoke-ExportDeployPolicyXml -Window $win }
+        'ImportDeployPolicyXml' { Invoke-ImportDeployPolicyXml -Window $win }
+        'SaveDeployPolicyChanges' { Invoke-SaveDeployPolicyChanges -Window $win }
         # Software Inventory panel
         'ScanLocalSoftware' { Invoke-ScanLocalSoftware -Window $win }
         'ScanRemoteSoftware' { Invoke-ScanRemoteSoftware -Window $win }
@@ -164,10 +168,12 @@ function global:Invoke-ButtonAction {
         'InitializeAll' { Invoke-InitializeAll -Window $win }
         # Rules panel - Common Deny Rules
         'AddCommonDenyRules' { Invoke-AddCommonDenyRules -Window $win }
+        'AddDenyBrowserRules' { Invoke-AddDenyBrowserRules -Window $win }
         'ChangeRuleAction' { Invoke-ChangeSelectedRulesAction -Window $win }
         'ChangeRuleGroup' { Invoke-ChangeSelectedRulesGroup -Window $win }
         # Dashboard Quick Actions
-        'ApproveTrustedVendors' { Invoke-ApproveTrustedVendors -Window $win }
+        'AddAdminAllowRules' { Invoke-AddAdminAllowRules -Window $win }
+        'AddRuleToPolicy' { Invoke-AddSelectedRulesToPolicy -Window $win }
         'RemoveDuplicateRules' { Invoke-RemoveDuplicateRules -Window $win }
         # Settings panel
         'ToggleTheme' { Toggle-Theme -Window $win }
@@ -612,6 +618,40 @@ function Initialize-MainWindow {
 
     # Store window reference for script-level access
     $global:GA_MainWindow = $Window
+
+    # Apply OS dark title bar once window handle is available
+    # Pre-compile the P/Invoke type outside the event (avoid Add-Type in WPF context)
+    $script:DwmApiType = $null
+    try {
+        $existingType = [Win32.DwmApi] 2>$null
+        if ($existingType) {
+            $script:DwmApiType = $existingType
+        }
+    } catch { }
+    if (-not $script:DwmApiType) {
+        try {
+            $dllImport = @'
+[DllImport("dwmapi.dll", PreserveSig = true)]
+public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
+'@
+            $script:DwmApiType = Add-Type -MemberDefinition $dllImport -Name 'DwmApi' -Namespace 'Win32' -PassThru -ErrorAction Stop
+        } catch { }
+    }
+
+    $Window.Add_SourceInitialized({
+        try {
+            if ($script:DwmApiType) {
+                $hwnd = (New-Object System.Windows.Interop.WindowInteropHelper($global:GA_MainWindow)).Handle
+                $value = 1
+                # DWMWA_USE_IMMERSIVE_DARK_MODE = 20 (Windows 11) or 19 (older Win10 builds)
+                $result = $script:DwmApiType::DwmSetWindowAttribute($hwnd, 20, [ref]$value, 4)
+                if ($result -ne 0) {
+                    [void]$script:DwmApiType::DwmSetWindowAttribute($hwnd, 19, [ref]$value, 4)
+                }
+            }
+        }
+        catch { }
+    })
 
     # Initialize navigation buttons
     try {
