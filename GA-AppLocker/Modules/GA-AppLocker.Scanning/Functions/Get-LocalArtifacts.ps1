@@ -51,6 +51,9 @@ function Get-LocalArtifacts {
         [switch]$SkipDllScanning,
 
         [Parameter()]
+        [switch]$SkipScriptScanning,
+
+        [Parameter()]
         [hashtable]$SyncHash = $null
     )
 
@@ -98,6 +101,13 @@ function Get-LocalArtifacts {
             Write-ScanLog -Message "Skipping DLL scanning (performance optimization)"
         }
         
+        # Filter out script extensions if SkipScriptScanning is enabled
+        if ($SkipScriptScanning) {
+            $scriptExts = @('.ps1', '.psm1', '.psd1', '.bat', '.cmd', '.vbs', '.js', '.wsf')
+            $Extensions = @($Extensions | Where-Object { $_ -notin $scriptExts })
+            Write-ScanLog -Message "Skipping script scanning (performance optimization)"
+        }
+        
         # Use List<T> for O(n) performance instead of array += O(n²)
         $artifacts = [System.Collections.Generic.List[PSCustomObject]]::new()
         $stats = @{
@@ -108,9 +118,21 @@ function Get-LocalArtifacts {
         }
 
         #region --- Phase 1: Collect all files from all paths first ---
+        # Read progress range from SyncHash (set by Start-ArtifactScan) or use defaults
+        $progressMin = 10
+        $progressMax = 88
+        if ($SyncHash) {
+            if ($SyncHash.LocalProgressMin) { $progressMin = [int]$SyncHash.LocalProgressMin }
+            if ($SyncHash.LocalProgressMax) { $progressMax = [int]$SyncHash.LocalProgressMax }
+        }
+        # Split range: discovery gets first 25%, file processing gets remaining 75%
+        $discoveryEnd = $progressMin + [int](($progressMax - $progressMin) * 0.25)
+        $processingStart = $discoveryEnd
+        $processingSpan = $progressMax - $processingStart
+        
         if ($SyncHash) {
             $SyncHash.StatusText = "Discovering files..."
-            $SyncHash.Progress = 26
+            $SyncHash.Progress = $progressMin
         }
         
         $allFiles = [System.Collections.Generic.List[object]]::new()
@@ -157,7 +179,7 @@ function Get-LocalArtifacts {
             # Update progress during discovery phase
             if ($SyncHash) {
                 $SyncHash.StatusText = "Discovering files... ($($allFiles.Count) found in $($stats.PathsScanned) paths)"
-                $SyncHash.Progress = [math]::Min(35, 26 + $stats.PathsScanned)
+                $SyncHash.Progress = [math]::Min($discoveryEnd, $progressMin + $stats.PathsScanned)
             }
         }
         
@@ -165,47 +187,238 @@ function Get-LocalArtifacts {
         Write-ScanLog -Message "Discovery complete: $($stats.FilesFound) files found"
         #endregion
 
-        #region --- Phase 2: Process all files with unified progress ---
-        if ($SyncHash) {
-            $SyncHash.StatusText = "Processing $($stats.FilesFound) files..."
-            $SyncHash.Progress = 36
-        }
-        
+        #region --- Phase 2: Process all files (parallel with RunspacePool for large sets) ---
         $totalFiles = $allFiles.Count
-        $fileIndex = 0
+        $parallelThreshold = 100  # Use RunspacePool only when worth the overhead
         
-        foreach ($file in $allFiles) {
-            try {
-                if (-not $file -or -not $file.FullName) {
-                    $stats.Errors++
-                    continue
-                }
-                $artifact = Get-FileArtifact -FilePath $file.FullName
-                if ($artifact) {
-                    $artifacts.Add($artifact)
-                    $stats.FilesProcessed++
-                }
-            }
-            catch {
-                $stats.Errors++
-                $errFile = if ($file) { $file.FullName } else { '(null)' }
-                Write-ScanLog -Level Warning -Message "Error processing file: $errFile - $($_.Exception.Message)"
+        if ($totalFiles -gt $parallelThreshold) {
+            #region --- Parallel processing with RunspacePool ---
+            $threadCount = [Math]::Min([Environment]::ProcessorCount, 8)
+            # ~200 files per batch balances overhead vs. granularity
+            $batchSize = [Math]::Max(50, [Math]::Min(200, [int]($totalFiles / ($threadCount * 4))))
+            
+            Write-ScanLog -Message "Parallel processing: $totalFiles files across $threadCount threads (batch size: $batchSize)"
+            if ($SyncHash) {
+                $SyncHash.StatusText = "Processing $totalFiles files ($threadCount threads)..."
+                $SyncHash.Progress = $processingStart
             }
             
-            # Update progress every 100 files or at end (unified across all paths)
-            $fileIndex++
-            if (($fileIndex % 100 -eq 0) -or ($fileIndex -eq $totalFiles)) {
-                if ($SyncHash) {
-                    # Progress range: 36 to 88 (52% span for file processing)
-                    $pct = [math]::Min(88, 36 + [int](52 * $fileIndex / [math]::Max(1, $totalFiles)))
-                    $SyncHash.Progress = $pct
-                    $SyncHash.StatusText = "Processing: $fileIndex / $totalFiles files ($($stats.FilesProcessed) artifacts)"
+            # Self-contained scriptblock — runspaces cannot access module script: scope
+            $processBlock = {
+                param([string[]]$FilePaths, [string]$ComputerName)
+                
+                $sha256 = [System.Security.Cryptography.SHA256]::Create()
+                $results = [System.Collections.Generic.List[PSCustomObject]]::new()
+                
+                foreach ($filePath in $FilePaths) {
+                    try {
+                        $file = Get-Item -Path $filePath -ErrorAction Stop
+                        
+                        # .NET SHA256 hash
+                        $hashString = $null
+                        try {
+                            $stream = [System.IO.File]::OpenRead($filePath)
+                            try {
+                                $hashBytes = $sha256.ComputeHash($stream)
+                                $hashString = [System.BitConverter]::ToString($hashBytes) -replace '-', ''
+                            }
+                            finally {
+                                $stream.Close()
+                                $stream.Dispose()
+                            }
+                        }
+                        catch { }
+                        
+                        # Version info
+                        $versionInfo = $null
+                        try {
+                            $versionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($filePath)
+                        }
+                        catch { }
+                        
+                        # Digital signature — .NET cert extraction (no CRL/OCSP)
+                        $isSigned = $false
+                        $signerSubject = $null
+                        $sigStatus = 'NotSigned'
+                        try {
+                            $cert = [System.Security.Cryptography.X509Certificates.X509Certificate]::CreateFromSignedFile($filePath)
+                            if ($cert) {
+                                $isSigned = $true
+                                $signerSubject = $cert.Subject
+                                $sigStatus = 'Valid'
+                            }
+                        } catch { }
+                        
+                        # Artifact type mapping
+                        $artType = switch ($file.Extension.ToLower()) {
+                            '.exe'  { 'EXE' }
+                            '.dll'  { 'DLL' }
+                            '.msi'  { 'MSI' }
+                            '.msp'  { 'MSP' }
+                            '.ps1'  { 'PS1' }
+                            '.psm1' { 'PS1' }
+                            '.psd1' { 'PS1' }
+                            '.bat'  { 'BAT' }
+                            '.cmd'  { 'CMD' }
+                            '.vbs'  { 'VBS' }
+                            '.js'   { 'JS' }
+                            '.wsf'  { 'WSF' }
+                            '.appx' { 'APPX' }
+                            '.msix' { 'APPX' }
+                            default { 'Unknown' }
+                        }
+                        
+                        $results.Add([PSCustomObject]@{
+                            FilePath         = $filePath
+                            FileName         = $file.Name
+                            Extension        = $file.Extension.ToLower()
+                            Directory        = $file.DirectoryName
+                            ComputerName     = $ComputerName
+                            SizeBytes        = $file.Length
+                            CreatedDate      = $file.CreationTime
+                            ModifiedDate     = $file.LastWriteTime
+                            SHA256Hash       = $hashString
+                            Publisher        = $versionInfo.CompanyName
+                            ProductName      = $versionInfo.ProductName
+                            ProductVersion   = $versionInfo.ProductVersion
+                            FileVersion      = $versionInfo.FileVersion
+                            FileDescription  = $versionInfo.FileDescription
+                            OriginalFilename = $versionInfo.OriginalFilename
+                            IsSigned         = $isSigned
+                            SignerCertificate = $signerSubject
+                            SignatureStatus  = $sigStatus
+                            CollectedDate    = [DateTime]::Now
+                            ArtifactType     = $artType
+                            CollectionType   = switch ($artType) {
+                                'EXE'     { 'Exe' }
+                                'DLL'     { 'Dll' }
+                                { $_ -in 'MSI','MSP' } { 'Msi' }
+                                { $_ -in 'PS1','BAT','CMD','VBS','JS','WSF' } { 'Script' }
+                                'APPX'    { 'Appx' }
+                                default   { 'Exe' }
+                            }
+                        })
+                    }
+                    catch {
+                        # Skip files that can't be processed (access denied, locked, etc.)
+                    }
                 }
-                # Log every 500 files so tail -Wait shows progress
-                if (($fileIndex % 500 -eq 0) -or ($fileIndex -eq $totalFiles)) {
-                    Write-ScanLog -Message "Local scan progress: $fileIndex / $totalFiles files ($($stats.FilesProcessed) artifacts, $($stats.Errors) errors)"
+                
+                $sha256.Dispose()
+                return ,@($results.ToArray())
+            }
+            
+            # Create RunspacePool
+            $pool = [runspacefactory]::CreateRunspacePool(1, $threadCount)
+            $pool.Open()
+            
+            # Extract file paths and split into batches
+            $filePaths = [string[]]($allFiles | ForEach-Object { $_.FullName })
+            $handles = [System.Collections.Generic.List[hashtable]]::new()
+            
+            for ($i = 0; $i -lt $totalFiles; $i += $batchSize) {
+                $end = [Math]::Min($i + $batchSize - 1, $totalFiles - 1)
+                $batch = $filePaths[$i..$end]
+                
+                $ps = [powershell]::Create()
+                [void]$ps.AddScript($processBlock)
+                [void]$ps.AddArgument($batch)
+                [void]$ps.AddArgument($env:COMPUTERNAME)
+                $ps.RunspacePool = $pool
+                
+                $handles.Add(@{
+                    PowerShell = $ps
+                    Handle     = $ps.BeginInvoke()
+                    BatchSize  = $batch.Count
+                })
+            }
+            
+            Write-ScanLog -Message "Queued $($handles.Count) batches across $threadCount threads"
+            
+            # Collect results as batches complete
+            $completedFiles = 0
+            foreach ($h in $handles) {
+                try {
+                    $batchResults = $h.PowerShell.EndInvoke($h.Handle)
+                    if ($batchResults) {
+                        foreach ($item in $batchResults) {
+                            if ($null -eq $item) { continue }
+                            # EndInvoke may return nested arrays — flatten
+                            if ($item -is [System.Array]) {
+                                foreach ($subItem in $item) {
+                                    if ($subItem) { $artifacts.Add($subItem) }
+                                }
+                            }
+                            else {
+                                $artifacts.Add($item)
+                            }
+                        }
+                    }
+                }
+                catch {
+                    $stats.Errors += $h.BatchSize
+                    Write-ScanLog -Level Warning -Message "Batch processing error: $($_.Exception.Message)"
+                }
+                finally {
+                    $h.PowerShell.Dispose()
+                }
+                
+                $completedFiles += $h.BatchSize
+                $stats.FilesProcessed = $artifacts.Count
+                
+                # Update progress after each batch
+                if ($SyncHash) {
+                    $pct = [math]::Min($progressMax, $processingStart + [int]($processingSpan * $completedFiles / [math]::Max(1, $totalFiles)))
+                    $SyncHash.Progress = $pct
+                    $SyncHash.StatusText = "Processing: $completedFiles / $totalFiles files ($($artifacts.Count) artifacts, $threadCount threads)"
+                }
+                if (($completedFiles % 500 -lt $batchSize) -or ($completedFiles -eq $totalFiles)) {
+                    Write-ScanLog -Message "Local scan progress: $completedFiles / $totalFiles files ($($artifacts.Count) artifacts, $($stats.Errors) errors)"
                 }
             }
+            
+            # Cleanup RunspacePool
+            $pool.Close()
+            $pool.Dispose()
+            $stats.Errors = [Math]::Max(0, $totalFiles - $completedFiles + $stats.Errors - $artifacts.Count)
+            #endregion
+        }
+        else {
+            #region --- Sequential processing for small file sets (≤ threshold) ---
+            if ($SyncHash) {
+                $SyncHash.StatusText = "Processing $totalFiles files..."
+                $SyncHash.Progress = $processingStart
+            }
+            
+            $fileIndex = 0
+            foreach ($file in $allFiles) {
+                try {
+                    if (-not $file -or -not $file.FullName) {
+                        $stats.Errors++
+                        continue
+                    }
+                    $artifact = Get-FileArtifact -FilePath $file.FullName
+                    if ($artifact) {
+                        $artifacts.Add($artifact)
+                        $stats.FilesProcessed++
+                    }
+                }
+                catch {
+                    $stats.Errors++
+                    $errFile = if ($file) { $file.FullName } else { '(null)' }
+                    Write-ScanLog -Level Warning -Message "Error processing file: $errFile - $($_.Exception.Message)"
+                }
+                
+                $fileIndex++
+                if (($fileIndex % 100 -eq 0) -or ($fileIndex -eq $totalFiles)) {
+                    if ($SyncHash) {
+                        $pct = [math]::Min($progressMax, $processingStart + [int]($processingSpan * $fileIndex / [math]::Max(1, $totalFiles)))
+                        $SyncHash.Progress = $pct
+                        $SyncHash.StatusText = "Processing: $fileIndex / $totalFiles files ($($stats.FilesProcessed) artifacts)"
+                    }
+                }
+            }
+            #endregion
         }
         #endregion
 

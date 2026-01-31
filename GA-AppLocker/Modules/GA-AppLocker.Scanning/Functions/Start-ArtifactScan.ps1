@@ -79,6 +79,9 @@ function Start-ArtifactScan {
         [switch]$SkipDllScanning,
 
         [Parameter()]
+        [switch]$SkipScriptScanning,
+
+        [Parameter()]
         [switch]$IncludeAppx,
 
         [Parameter()]
@@ -105,6 +108,30 @@ function Start-ArtifactScan {
         $allEvents = @()
         $machineResults = @{}
 
+        # Configure progress ranges based on what's being scanned
+        # to prevent local and remote progress bars from overlapping
+        $hasLocal = $ScanLocal.IsPresent
+        $hasRemote = ($Machines.Count -gt 0)
+        if ($SyncHash) {
+            if ($hasLocal -and $hasRemote) {
+                # Both: Local 10-45%, Remote 45-85%, Appx/Summary 85-100%
+                $SyncHash.LocalProgressMin = 10
+                $SyncHash.LocalProgressMax = 45
+                $SyncHash.RemoteProgressMin = 45
+                $SyncHash.RemoteProgressMax = 85
+            }
+            elseif ($hasLocal) {
+                # Local only: 10-88%, Appx/Summary 88-100%
+                $SyncHash.LocalProgressMin = 10
+                $SyncHash.LocalProgressMax = 88
+            }
+            elseif ($hasRemote) {
+                # Remote only: 10-88%, Summary 88-100%
+                $SyncHash.RemoteProgressMin = 10
+                $SyncHash.RemoteProgressMax = 88
+            }
+        }
+
         #region --- Local Scan ---
         if ($ScanLocal) {
             Write-ScanLog -Message "Scanning local machine..."
@@ -114,6 +141,7 @@ function Start-ArtifactScan {
             $localParams.Recurse = $true
             if ($SyncHash) { $localParams.SyncHash = $SyncHash }
             if ($SkipDllScanning) { $localParams.SkipDllScanning = $true }
+            if ($SkipScriptScanning) { $localParams.SkipScriptScanning = $true }
 
             $localResult = Get-LocalArtifacts @localParams
             if ($localResult.Success) {
@@ -194,10 +222,13 @@ function Start-ArtifactScan {
                 
                 # Update progress for UI — show which machines are being scanned
                 if ($SyncHash) {
+                    $remoteMin = if ($SyncHash.RemoteProgressMin) { [int]$SyncHash.RemoteProgressMin } else { 30 }
+                    $remoteMax = if ($SyncHash.RemoteProgressMax) { [int]$SyncHash.RemoteProgressMax } else { 85 }
+                    $remoteSpan = $remoteMax - $remoteMin
                     $machineNames = ($tierMachines | ForEach-Object { $_.Hostname }) -join ', '
                     $SyncHash.StatusText = "Scanning Tier $tier ($tierIndex/$totalTiers): $machineNames"
-                    # Scale remote progress from 30% to 85% across tier groups
-                    $SyncHash.Progress = [Math]::Min(85, 30 + [int](($tierIndex - 1) / [Math]::Max(1, $totalTiers) * 55))
+                    # Scale remote progress across configured range
+                    $SyncHash.Progress = [Math]::Min($remoteMax, $remoteMin + [int](($tierIndex - 1) / [Math]::Max(1, $totalTiers) * $remoteSpan))
                 }
 
                 # Get credential for this tier with fallback chain:
@@ -248,6 +279,7 @@ function Start-ArtifactScan {
                 if ($credential) { $remoteParams.Credential = $credential }
                 if ($Paths) { $remoteParams.Paths = $Paths }
                 if ($SkipDllScanning) { $remoteParams.SkipDllScanning = $true }
+                if ($SkipScriptScanning) { $remoteParams.SkipScriptScanning = $true }
 
                 $remoteResult = Get-RemoteArtifacts @remoteParams
                 if ($remoteResult.Success) {
@@ -267,7 +299,7 @@ function Start-ArtifactScan {
                     if ($SyncHash) {
                         $successCount = @($remoteResult.PerMachine.Values | Where-Object { $_.Success }).Count
                         $SyncHash.StatusText = "Tier $tier done: $($remoteResult.Data.Count) artifacts from $successCount/$($computerNames.Count) machines"
-                        $SyncHash.Progress = [Math]::Min(85, 30 + [int]($tierIndex / [Math]::Max(1, $totalTiers) * 55))
+                        $SyncHash.Progress = [Math]::Min($remoteMax, $remoteMin + [int]($tierIndex / [Math]::Max(1, $totalTiers) * $remoteSpan))
                     }
                 }
                 else {
