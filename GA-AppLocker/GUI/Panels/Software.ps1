@@ -15,7 +15,8 @@ function Initialize-SoftwarePanel {
         'BtnScanLocalSoftware', 'BtnScanRemoteSoftware',
         'BtnExportSoftwareCsv',
         'BtnImportBaseline', 'BtnImportComparison',
-        'BtnCompareSoftware', 'BtnClearComparison'
+        'BtnCompareSoftware', 'BtnClearComparison',
+        'BtnExportComparisonCsv'
     )
     foreach ($btnName in $buttons) {
         $btn = $Window.FindName($btnName)
@@ -786,6 +787,54 @@ function global:Invoke-CompareSoftware {
     }
     finally {
         Hide-LoadingOverlay
+    }
+}
+
+function global:Invoke-ExportComparisonCsv {
+    <#
+    .SYNOPSIS
+        Exports the current comparison results to a CSV file.
+        Includes the Source column (Match, Version Diff, Only in Scan, Only in Import).
+    #>
+    param($Window)
+
+    if ($script:SoftwareInventory.Count -eq 0) {
+        Show-Toast -Message 'No comparison data to export. Run a comparison first.' -Type 'Warning'
+        return
+    }
+
+    # Check if this is actually comparison data (has Source values like Match/Version Diff)
+    $hasComparisonData = @($script:SoftwareInventory | Where-Object {
+        $_.Source -eq 'Match' -or $_.Source -eq 'Version Diff' -or $_.Source -eq 'Only in Scan' -or $_.Source -eq 'Only in Import'
+    }).Count -gt 0
+
+    if (-not $hasComparisonData) {
+        Show-Toast -Message 'No comparison results found. Import two CSVs and click Compare first.' -Type 'Warning'
+        return
+    }
+
+    $dialog = [Microsoft.Win32.SaveFileDialog]::new()
+    $dialog.Title = 'Export Comparison Results'
+    $dialog.Filter = 'CSV Files (*.csv)|*.csv|All Files (*.*)|*.*'
+    $dialog.DefaultExt = '.csv'
+    $dialog.FileName = "SoftwareComparison_$(Get-Date -Format 'yyyyMMdd_HHmm').csv"
+
+    $result = $dialog.ShowDialog($Window)
+    if (-not $result) { return }
+
+    try {
+        $script:SoftwareInventory |
+            Select-Object Source, Machine, DisplayName, DisplayVersion, Publisher, InstallDate, Architecture |
+            Export-Csv -Path $dialog.FileName -NoTypeInformation -Encoding UTF8
+
+        $total = $script:SoftwareInventory.Count
+        $diffs = @($script:SoftwareInventory | Where-Object { $_.Source -ne 'Match' }).Count
+        Show-Toast -Message "Exported $total items ($diffs differences) to CSV." -Type 'Success'
+        Write-AppLockerLog -Message "Exported comparison results to: $($dialog.FileName)" -Level 'INFO'
+    }
+    catch {
+        Write-AppLockerLog -Message "Comparison CSV export failed: $($_.Exception.Message)" -Level 'ERROR'
+        Show-Toast -Message "Export failed: $($_.Exception.Message)" -Type 'Error'
     }
 }
 

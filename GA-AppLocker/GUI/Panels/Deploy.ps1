@@ -27,6 +27,7 @@ function Initialize-DeploymentPanel {
     $actionButtons = @(
         'BtnCreateDeployment', 'BtnRefreshDeployments', 'BtnDeployJob',
         'BtnStopDeployment', 'BtnCancelSelected', 'BtnViewDeployLog',
+        'BtnClearCompletedJobs',
         'BtnBackupGpoPolicy', 'BtnExportPolicyXml', 'BtnImportPolicyXml',
         'BtnStartDeployment', 'BtnSaveDeployPolicyChanges',
         'BtnToggleGpoLinkDC', 'BtnToggleGpoLinkServers', 'BtnToggleGpoLinkWks'
@@ -1003,6 +1004,8 @@ function global:Invoke-SaveDeployPolicyChanges {
             Show-Toast -Message "Policy '$editName' updated." -Type 'Success'
             # Refresh the policy combo to show updated name
             global:Refresh-DeployPolicyCombo -Window $Window
+            # Refresh the jobs DataGrid (jobs reference policy names)
+            Update-DeploymentJobsDataGrid -Window $Window
         }
         else {
             Show-Toast -Message "Failed: $($result.Error)" -Type 'Error'
@@ -1049,76 +1052,48 @@ function global:Invoke-ClearCompletedJobs {
 function global:Update-AppLockerGpoLinkStatus {
     <#
     .SYNOPSIS
-        Checks enabled/disabled status for the 3 AppLocker GPOs and updates the Deploy Actions pill toggles.
-        Also queries and displays linked OUs under each GPO name.
+        Checks enabled/disabled status for the 3 AppLocker GPOs and updates the Deploy Status pill toggles.
+        Uses Get-SetupStatus (proven to find GPOs reliably) instead of direct Get-GPO calls.
     #>
     param($Window)
 
-    # GPO name -> UI control suffix mapping
-    $gpoMap = @(
-        @{ Name = 'AppLocker-DC';           Suffix = 'DC' }
-        @{ Name = 'AppLocker-Servers';      Suffix = 'Servers' }
-        @{ Name = 'AppLocker-Workstations'; Suffix = 'Wks' }
-    )
+    $suffixMap = @{ 'DC' = 'DC'; 'Servers' = 'Servers'; 'Workstations' = 'Wks' }
 
-    # Pill color palette
-    $pillEnabled  = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#107C10')   # green
-    $pillDisabled = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#3E3E42')   # dark grey
-    $fgWhite  = [System.Windows.Media.Brushes]::White
+    # Text color palette
+    $fgGreen  = [System.Windows.Media.Brushes]::LightGreen
     $fgOrange = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#FF8C00')
     $fgGray   = [System.Windows.Media.Brushes]::Gray
 
-    $hasGP = Get-Module -ListAvailable -Name GroupPolicy
-    if (-not $hasGP) {
-        foreach ($gpo in $gpoMap) {
-            $btnCtrl = $Window.FindName("BtnToggleGpoLink$($gpo.Suffix)")
+    # Use Get-SetupStatus which is proven to find GPOs reliably
+    $status = $null
+    try { $status = Get-SetupStatus } catch {
+        Write-Log -Message "Update-AppLockerGpoLinkStatus: Get-SetupStatus failed: $($_.Exception.Message)" -Level 'DEBUG'
+    }
+
+    if (-not $status -or -not $status.Success -or -not $status.Data.AppLockerGPOs) {
+        foreach ($suffix in $suffixMap.Values) {
+            $btnCtrl = $Window.FindName("BtnToggleGpoLink$suffix")
             if ($btnCtrl) {
-                $btnCtrl.Content = 'No GP Module'
-                $btnCtrl.Background = $pillDisabled
+                $btnCtrl.Content = 'Unavailable'
                 $btnCtrl.Foreground = $fgGray
                 $btnCtrl.IsEnabled = $false
             }
-            $ouLabel = $Window.FindName("TxtGpoLinkedOU$($gpo.Suffix)")
+            $ouLabel = $Window.FindName("TxtGpoLinkedOU$suffix")
             if ($ouLabel) { $ouLabel.Text = '' }
         }
         return
     }
 
-    try {
-        Import-Module GroupPolicy -ErrorAction Stop
-    }
-    catch {
-        Write-Log -Message "Update-AppLockerGpoLinkStatus: Failed to import GroupPolicy module: $($_.Exception.Message)" -Level 'Error'
-        foreach ($gpo in $gpoMap) {
-            $btnCtrl = $Window.FindName("BtnToggleGpoLink$($gpo.Suffix)")
-            if ($btnCtrl) {
-                $btnCtrl.Content = 'No GP Module'
-                $btnCtrl.Background = $pillDisabled
-                $btnCtrl.Foreground = $fgGray
-                $btnCtrl.IsEnabled = $false
-            }
-            $ouLabel = $Window.FindName("TxtGpoLinkedOU$($gpo.Suffix)")
-            if ($ouLabel) { $ouLabel.Text = '' }
-        }
-        return
-    }
+    foreach ($gpo in $status.Data.AppLockerGPOs) {
+        $suffix = $suffixMap[$gpo.Type]
+        if (-not $suffix) { continue }
 
-    foreach ($gpo in $gpoMap) {
-        $btnCtrl = $Window.FindName("BtnToggleGpoLink$($gpo.Suffix)")
-        $ouLabel = $Window.FindName("TxtGpoLinkedOU$($gpo.Suffix)")
+        $btnCtrl = $Window.FindName("BtnToggleGpoLink$suffix")
+        $ouLabel = $Window.FindName("TxtGpoLinkedOU$suffix")
         if (-not $btnCtrl) { continue }
 
-        try {
-            $gpoObj = Get-GPO -Name $gpo.Name -ErrorAction Stop
-        }
-        catch {
-            Write-Log -Message "Update-AppLockerGpoLinkStatus: GPO '$($gpo.Name)' lookup failed: $($_.Exception.Message)" -Level 'DEBUG'
-            $gpoObj = $null
-        }
-
-        if (-not $gpoObj) {
+        if (-not $gpo.Exists) {
             $btnCtrl.Content = 'Not Created'
-            $btnCtrl.Background = $pillDisabled
             $btnCtrl.Foreground = $fgGray
             $btnCtrl.IsEnabled = $false
             if ($ouLabel) { $ouLabel.Text = '' }
@@ -1127,50 +1102,30 @@ function global:Update-AppLockerGpoLinkStatus {
 
         $btnCtrl.IsEnabled = $true
 
-        # Check GPO enabled/disabled status (GpoStatus property)
-        $gpoStatus = $gpoObj.GpoStatus.ToString()
-        if ($gpoStatus -eq 'AllSettingsEnabled') {
+        if ($gpo.GpoState -eq 'Enabled') {
             $btnCtrl.Content = 'Enabled'
-            $btnCtrl.Background = $pillEnabled
-            $btnCtrl.Foreground = $fgWhite
+            $btnCtrl.Foreground = $fgGreen
         }
-        elseif ($gpoStatus -eq 'AllSettingsDisabled') {
+        elseif ($gpo.GpoState -eq 'Disabled') {
             $btnCtrl.Content = 'Disabled'
-            $btnCtrl.Background = $pillDisabled
             $btnCtrl.Foreground = $fgOrange
-        }
-        elseif ($gpoStatus -eq 'ComputerSettingsDisabled') {
-            $btnCtrl.Content = 'Computer Off'
-            $btnCtrl.Background = $pillDisabled
-            $btnCtrl.Foreground = $fgOrange
-        }
-        elseif ($gpoStatus -eq 'UserSettingsDisabled') {
-            # User settings disabled = computer settings enabled (what we want for AppLocker)
-            $btnCtrl.Content = 'Enabled'
-            $btnCtrl.Background = $pillEnabled
-            $btnCtrl.Foreground = $fgWhite
         }
         else {
-            $btnCtrl.Content = $gpoStatus
-            $btnCtrl.Background = $pillDisabled
+            $btnCtrl.Content = if ($gpo.GpoState) { $gpo.GpoState } else { 'Configured' }
             $btnCtrl.Foreground = $fgGray
         }
 
-        # Query linked OUs via GPO XML report
-        if ($ouLabel) {
+        # Query linked OUs via GPO XML report (best effort)
+        if ($ouLabel -and $gpo.GPOId) {
             try {
                 $linkedOUs = @()
-                $xmlReport = Get-GPOReport -Guid $gpoObj.Id -ReportType Xml -ErrorAction SilentlyContinue
+                Import-Module GroupPolicy -ErrorAction SilentlyContinue
+                $xmlReport = Get-GPOReport -Guid $gpo.GPOId -ReportType Xml -ErrorAction SilentlyContinue
                 if ($xmlReport) {
                     $xml = [xml]$xmlReport
-                    $ns = @{ gpo = 'http://www.microsoft.com/GroupPolicy/Settings' }
-                    $linkNodes = $xml.SelectNodes('//gpo:LinksTo', (New-Object System.Xml.XmlNamespaceManager($xml.NameTable)))
-                    if (-not $linkNodes -or $linkNodes.Count -eq 0) {
-                        # Try without namespace
-                        $nsMgr = New-Object System.Xml.XmlNamespaceManager($xml.NameTable)
-                        $nsMgr.AddNamespace('gpo', $xml.DocumentElement.NamespaceURI)
-                        $linkNodes = $xml.SelectNodes('//gpo:LinksTo', $nsMgr)
-                    }
+                    $nsMgr = New-Object System.Xml.XmlNamespaceManager($xml.NameTable)
+                    $nsMgr.AddNamespace('gpo', $xml.DocumentElement.NamespaceURI)
+                    $linkNodes = $xml.SelectNodes('//gpo:LinksTo', $nsMgr)
                     foreach ($linkNode in $linkNodes) {
                         $somPath = $linkNode.SOMPath
                         if ($somPath) { $linkedOUs += $somPath }

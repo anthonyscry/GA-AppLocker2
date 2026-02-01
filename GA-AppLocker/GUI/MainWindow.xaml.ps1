@@ -164,6 +164,7 @@ function global:Invoke-ButtonAction {
         'ImportComparisonCsv' { Invoke-ImportComparisonCsv -Window $win }
         'CompareSoftware' { Invoke-CompareSoftware -Window $win }
         'ClearSoftwareComparison' { Invoke-ClearSoftwareComparison -Window $win }
+        'ExportComparisonCsv' { Invoke-ExportComparisonCsv -Window $win }
         # Setup panel - WinRM GPOs
         'InitializeWinRM' { Invoke-InitializeWinRM -Window $win }
         'ToggleEnableWinRM' { Invoke-ToggleWinRMGPO -Window $win -GPOName 'AppLocker-EnableWinRM' -StatusProperty 'WinRM' }

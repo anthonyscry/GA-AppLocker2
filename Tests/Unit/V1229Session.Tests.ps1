@@ -225,18 +225,21 @@ Describe 'GPO Link Control - Dispatcher + Deploy.ps1 Wiring' -Tag 'Unit', 'Integ
         }
     }
 
-    Context 'Update-AppLockerGpoLinkStatus maps all 3 GPOs' {
-        It 'Should map AppLocker-DC' {
-            $script:DeployPs1 | Should -Match "Name = 'AppLocker-DC'"
+    Context 'Update-AppLockerGpoLinkStatus maps all 3 GPOs via Get-SetupStatus' {
+        It 'Should map DC suffix' {
+            $script:DeployPs1 | Should -Match "'DC' = 'DC'"
         }
-        It 'Should map AppLocker-Servers' {
-            $script:DeployPs1 | Should -Match "Name = 'AppLocker-Servers'"
+        It 'Should map Servers suffix' {
+            $script:DeployPs1 | Should -Match "'Servers' = 'Servers'"
         }
-        It 'Should map AppLocker-Workstations' {
-            $script:DeployPs1 | Should -Match "Name = 'AppLocker-Workstations'"
+        It 'Should map Workstations suffix' {
+            $script:DeployPs1 | Should -Match "'Workstations' = 'Wks'"
         }
-        It 'Should check GpoStatus for enabled/disabled state' {
-            $script:DeployPs1 | Should -Match 'GpoStatus'
+        It 'Should use Get-SetupStatus to find GPOs' {
+            $script:DeployPs1 | Should -Match 'Get-SetupStatus'
+        }
+        It 'Should check GpoState for enabled/disabled state' {
+            $script:DeployPs1 | Should -Match 'GpoState'
         }
         It 'Should query linked OUs via Get-GPOReport' {
             $script:DeployPs1 | Should -Match 'Get-GPOReport'
@@ -1144,30 +1147,27 @@ Describe 'Filter Button Visual Consistency - Grey Pill Pattern' -Tag 'Unit', 'UI
 
 Describe 'GPO Pill Toggle - Visual State Management' -Tag 'Unit', 'Deploy', 'UI' {
 
-    Context 'Update-AppLockerGpoLinkStatus uses pill colors' {
-        It 'Defines green pill color for Enabled state (#107C10)' {
-            $script:DeployPs1 | Should -Match 'pillEnabled.*#107C10'
-        }
-        It 'Defines grey pill color for Disabled state (#3E3E42)' {
-            $script:DeployPs1 | Should -Match 'pillDisabled.*#3E3E42'
+    Context 'Update-AppLockerGpoLinkStatus uses foreground text colors' {
+        It 'Defines green foreground for Enabled state (LightGreen)' {
+            $script:DeployPs1 | Should -Match 'fgGreen.*LightGreen'
         }
         It 'Defines orange foreground for Disabled state (#FF8C00)' {
             $script:DeployPs1 | Should -Match 'fgOrange.*#FF8C00'
         }
-        It 'Sets button Content to Enabled when link is active' {
+        It 'Defines gray foreground for unavailable states' {
+            $script:DeployPs1 | Should -Match 'fgGray.*Brushes.*Gray'
+        }
+        It 'Sets button Content to Enabled when GPO is enabled' {
             $script:DeployPs1 | Should -Match '\$btnCtrl\.Content = ''Enabled'''
         }
-        It 'Sets button Content to Disabled when link is inactive' {
+        It 'Sets button Content to Disabled when GPO is disabled' {
             $script:DeployPs1 | Should -Match '\$btnCtrl\.Content = ''Disabled'''
-        }
-        It 'Sets button Content to Computer Off when computer settings disabled' {
-            $script:DeployPs1 | Should -Match '\$btnCtrl\.Content = ''Computer Off'''
         }
         It 'Sets button Content to Not Created when GPO missing' {
             $script:DeployPs1 | Should -Match '\$btnCtrl\.Content = ''Not Created'''
         }
-        It 'Sets button Content to No GP Module when RSAT missing' {
-            $script:DeployPs1 | Should -Match '\$btnCtrl\.Content = ''No GP Module'''
+        It 'Sets button Content to Unavailable when Get-SetupStatus fails' {
+            $script:DeployPs1 | Should -Match '\$btnCtrl\.Content = ''Unavailable'''
         }
         It 'Disables button when GPO not created' {
             $script:DeployPs1 | Should -Match '\$btnCtrl\.IsEnabled = \$false'

@@ -2663,12 +2663,12 @@ Width="1450"
 
                                     <TextBlock Text="Groups:" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,0,0,5"/>
                                     <WrapPanel Margin="0,0,0,15">
-                                        <Border Background="#252526" CornerRadius="3" Padding="6,3" Margin="0,0,4,4"><TextBlock Text="Admins" Foreground="{StaticResource ForegroundBrush}" FontSize="10"/></Border>
-                                        <Border Background="#252526" CornerRadius="3" Padding="6,3" Margin="0,0,4,4"><TextBlock Text="Exempt" Foreground="{StaticResource ForegroundBrush}" FontSize="10"/></Border>
-                                        <Border Background="#252526" CornerRadius="3" Padding="6,3" Margin="0,0,4,4"><TextBlock Text="Audit" Foreground="{StaticResource ForegroundBrush}" FontSize="10"/></Border>
-                                        <Border Background="#252526" CornerRadius="3" Padding="6,3" Margin="0,0,4,4"><TextBlock Text="Users" Foreground="{StaticResource ForegroundBrush}" FontSize="10"/></Border>
-                                        <Border Background="#252526" CornerRadius="3" Padding="6,3" Margin="0,0,4,4"><TextBlock Text="Installers" Foreground="{StaticResource ForegroundBrush}" FontSize="10"/></Border>
-                                        <Border Background="#252526" CornerRadius="3" Padding="6,3" Margin="0,0,4,4"><TextBlock Text="Developers" Foreground="{StaticResource ForegroundBrush}" FontSize="10"/></Border>
+                                        <Border x:Name="BadgeGroupAdmins" Background="#252526" CornerRadius="3" Padding="6,3" Margin="0,0,4,4"><TextBlock Text="Admins" Foreground="{StaticResource ForegroundBrush}" FontSize="10"/></Border>
+                                        <Border x:Name="BadgeGroupExempt" Background="#252526" CornerRadius="3" Padding="6,3" Margin="0,0,4,4"><TextBlock Text="Exempt" Foreground="{StaticResource ForegroundBrush}" FontSize="10"/></Border>
+                                        <Border x:Name="BadgeGroupAudit" Background="#252526" CornerRadius="3" Padding="6,3" Margin="0,0,4,4"><TextBlock Text="Audit" Foreground="{StaticResource ForegroundBrush}" FontSize="10"/></Border>
+                                        <Border x:Name="BadgeGroupUsers" Background="#252526" CornerRadius="3" Padding="6,3" Margin="0,0,4,4"><TextBlock Text="Users" Foreground="{StaticResource ForegroundBrush}" FontSize="10"/></Border>
+                                        <Border x:Name="BadgeGroupInstallers" Background="#252526" CornerRadius="3" Padding="6,3" Margin="0,0,4,4"><TextBlock Text="Installers" Foreground="{StaticResource ForegroundBrush}" FontSize="10"/></Border>
+                                        <Border x:Name="BadgeGroupDevelopers" Background="#252526" CornerRadius="3" Padding="6,3" Margin="0,0,4,4"><TextBlock Text="Developers" Foreground="{StaticResource ForegroundBrush}" FontSize="10"/></Border>
                                     </WrapPanel>
 
                                     <Button x:Name="BtnInitializeADStructure" Content="Initialize AD Structure" Style="{StaticResource PrimaryButtonStyle}" Padding="15,8" HorizontalAlignment="Left"/>
@@ -3063,6 +3063,13 @@ Width="1450"
                                                     Style="{StaticResource ButtonStyle}" Margin="0,0,0,15"
                                                     Background="#1565C0"
                                                     Tag="CompareSoftware"/>
+
+                                            <!-- Export Results -->
+                                            <TextBlock Text="EXPORT RESULTS" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,8"/>
+                                            <Button x:Name="BtnExportComparisonCsv" Content="Export Comparison to CSV"
+                                                    Style="{StaticResource ButtonStyle}" Margin="0,0,0,15"
+                                                    Tag="ExportComparisonCsv"
+                                                    ToolTip="Export comparison results (all categories) to a single CSV"/>
 
                                             <!-- Imported File Info -->
                                             <Border Background="#252526" CornerRadius="4" Padding="10" Margin="0,0,0,15">

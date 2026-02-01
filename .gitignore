@@ -46,3 +46,6 @@ PSScriptAnalyzerSettings.psd1
 # Legacy
 API-SETUP.md
 *-API-*.md
+
+# Auto Claude data directory
+.auto-claude/

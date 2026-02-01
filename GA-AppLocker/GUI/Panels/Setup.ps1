@@ -103,6 +103,30 @@ function Update-SetupStatus {
                     }
                 }
             }
+
+            # Update AD Structure group badges (green if exists, grey if not)
+            if ($status.Data.ADStructure -and $status.Data.ADStructure.Groups) {
+                $greenBg = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#1B5E20')
+                $greyBg  = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#252526')
+                # Map group names to badge x:Name suffixes
+                $groupBadgeMap = @{
+                    'AppLocker-Admins'     = 'Admins'
+                    'AppLocker-Exempt'     = 'Exempt'
+                    'AppLocker-Audit'      = 'Audit'
+                    'AppLocker-Users'      = 'Users'
+                    'AppLocker-Installers' = 'Installers'
+                    'AppLocker-Developers' = 'Developers'
+                }
+                foreach ($group in $status.Data.ADStructure.Groups) {
+                    $suffix = $groupBadgeMap[$group.Name]
+                    if ($suffix) {
+                        $badge = $Window.FindName("BadgeGroup$suffix")
+                        if ($badge) {
+                            $badge.Background = if ($group.Exists) { $greenBg } else { $greyBg }
+                        }
+                    }
+                }
+            }
         }
     }
     catch {
