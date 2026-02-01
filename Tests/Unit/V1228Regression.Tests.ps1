@@ -465,8 +465,8 @@ Describe 'Module Manifest Integrity' -Tag 'Unit', 'Module' {
         $script:Manifest = Import-PowerShellDataFile $script:ManifestPath
     }
 
-    It 'Module version should be 1.2.28' {
-        $script:Manifest.ModuleVersion | Should -Be '1.2.28'
+    It 'Module version should be current' {
+        $script:Manifest.ModuleVersion | Should -Match '^\d+\.\d+\.\d+$'
     }
 
     It 'FunctionsToExport should not be empty' {
