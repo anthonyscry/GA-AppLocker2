@@ -455,7 +455,7 @@ function Get-BatchPreview {
             if ($SkipDlls -and $art.ArtifactType -eq 'DLL') { $skip = $true }
             if ($SkipUnsigned -and -not $art.IsSigned) { $skip = $true }
             if ($SkipScripts -and $art.ArtifactType -in @('PS1', 'BAT', 'CMD', 'VBS', 'JS', 'WSF')) { $skip = $true }
-            if (-not $skip) { $filtered.Add($art) }
+            if (-not $skip) { [void]$filtered.Add($art) }
         }
         $result.AfterExclusions = $filtered.Count
 

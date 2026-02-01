@@ -280,7 +280,7 @@ function global:Get-DeduplicatedArtifacts {
         }
         
         if (-not $dominated) {
-            $dedupedArtifacts.Add($artifact)
+            [void]$dedupedArtifacts.Add($artifact)
         }
     }
     

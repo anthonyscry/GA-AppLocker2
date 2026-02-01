@@ -256,7 +256,7 @@ function global:Invoke-ScanRemoteSoftware {
                             )
                             foreach ($p in (Get-ItemProperty -Path $paths -ErrorAction SilentlyContinue |
                                     Where-Object { $_.DisplayName -and $_.DisplayName.Trim() -ne '' })) {
-                                $items.Add([PSCustomObject]@{
+                                [void]$items.Add([PSCustomObject]@{
                                     DisplayName     = $p.DisplayName
                                     DisplayVersion  = $p.DisplayVersion
                                     Publisher        = $p.Publisher
@@ -270,7 +270,7 @@ function global:Invoke-ScanRemoteSoftware {
                             try {
                                 if (Get-Command 'Get-WindowsFeature' -ErrorAction SilentlyContinue) {
                                     foreach ($feat in (Get-WindowsFeature -ErrorAction SilentlyContinue | Where-Object { $_.Installed })) {
-                                        $items.Add([PSCustomObject]@{
+                                        [void]$items.Add([PSCustomObject]@{
                                             DisplayName     = "[Role/Feature] $($feat.DisplayName)"
                                             DisplayVersion  = ''
                                             Publisher        = 'Microsoft'
@@ -301,8 +301,8 @@ function global:Invoke-ScanRemoteSoftware {
                             Architecture     = $item.Architecture
                             Source           = 'Remote'
                         }
-                        $allResults.Add($obj)
-                        $hostResults.Add($obj)
+                        [void]$allResults.Add($obj)
+                        [void]$hostResults.Add($obj)
                     }
 
                     # Auto-save per-hostname CSV
@@ -317,7 +317,7 @@ function global:Invoke-ScanRemoteSoftware {
                     }
                 }
                 catch {
-                    $failedHosts.Add("${hostname}: $($_.Exception.Message)")
+                    [void]$failedHosts.Add("${hostname}: $($_.Exception.Message)")
                 }
             }
 
@@ -414,7 +414,7 @@ function script:Get-InstalledSoftware {
 
     foreach ($item in (Get-ItemProperty -Path $paths -ErrorAction SilentlyContinue |
             Where-Object { $_.DisplayName -and $_.DisplayName.Trim() -ne '' })) {
-        $results.Add([PSCustomObject]@{
+        [void]$results.Add([PSCustomObject]@{
             Machine         = $MachineName
             DisplayName     = $item.DisplayName
             DisplayVersion  = if ($item.DisplayVersion) { $item.DisplayVersion } else { '' }
@@ -431,7 +431,7 @@ function script:Get-InstalledSoftware {
         if (Get-Command 'Get-WindowsFeature' -ErrorAction SilentlyContinue) {
             $features = @(Get-WindowsFeature -ErrorAction SilentlyContinue | Where-Object { $_.Installed })
             foreach ($feat in $features) {
-                $results.Add([PSCustomObject]@{
+                [void]$results.Add([PSCustomObject]@{
                     Machine         = $MachineName
                     DisplayName     = "[Role/Feature] $($feat.DisplayName)"
                     DisplayVersion  = ''
@@ -675,7 +675,7 @@ function global:Invoke-CompareSoftware {
         foreach ($key in $scanLookup.Keys) {
             if (-not $importLookup.ContainsKey($key)) {
                 $s = $scanLookup[$key]
-                $comparisonResults.Add([PSCustomObject]@{
+                [void]$comparisonResults.Add([PSCustomObject]@{
                     Machine        = $s.Machine
                     DisplayName    = $s.DisplayName
                     DisplayVersion = $s.DisplayVersion
@@ -692,7 +692,7 @@ function global:Invoke-CompareSoftware {
         foreach ($key in $importLookup.Keys) {
             if (-not $scanLookup.ContainsKey($key)) {
                 $i = $importLookup[$key]
-                $comparisonResults.Add([PSCustomObject]@{
+                [void]$comparisonResults.Add([PSCustomObject]@{
                     Machine        = $i.Machine
                     DisplayName    = $i.DisplayName
                     DisplayVersion = $i.DisplayVersion
@@ -714,7 +714,7 @@ function global:Invoke-CompareSoftware {
                 $importVer = if ($i.DisplayVersion) { $i.DisplayVersion.Trim() } else { '' }
 
                 if ($scanVer -ne $importVer) {
-                    $comparisonResults.Add([PSCustomObject]@{
+                    [void]$comparisonResults.Add([PSCustomObject]@{
                         Machine        = "$($s.Machine) vs $($i.Machine)"
                         DisplayName    = $s.DisplayName
                         DisplayVersion = "$scanVer -> $importVer"
@@ -726,7 +726,7 @@ function global:Invoke-CompareSoftware {
                     })
                 }
                 else {
-                    $comparisonResults.Add([PSCustomObject]@{
+                    [void]$comparisonResults.Add([PSCustomObject]@{
                         Machine        = $s.Machine
                         DisplayName    = $s.DisplayName
                         DisplayVersion = $s.DisplayVersion

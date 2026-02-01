@@ -182,7 +182,7 @@ function Publish-AppLockerEvent {
     }
 
     # Add to history (circular buffer)
-    $script:GA_AppLocker_EventHistory.Add($eventRecord)
+    [void]$script:GA_AppLocker_EventHistory.Add($eventRecord)
     if ($script:GA_AppLocker_EventHistory.Count -gt $script:GA_AppLocker_EventHistoryMaxSize) {
         $script:GA_AppLocker_EventHistory.RemoveAt(0)
     }

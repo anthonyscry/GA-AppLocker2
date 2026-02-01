@@ -739,7 +739,7 @@ function global:Set-SelectedRuleStatus {
                     $rule.Status = $Status
                     $rule.ModifiedDate = $now
                     $rule | ConvertTo-Json -Depth 10 | Set-Content -Path $ruleFile -Encoding UTF8
-                    $updatedIds.Add($item.Id)
+                    [void]$updatedIds.Add($item.Id)
                     $updated++
                 }
             }

@@ -747,7 +747,7 @@ function global:Invoke-LoadSelectedScan {
             $newArtifacts = [System.Collections.Generic.List[PSCustomObject]]::new()
             foreach ($a in $result.Data.Artifacts) {
                 if ($a.SHA256Hash -and -not $existingHashes.Contains($a.SHA256Hash)) {
-                    $newArtifacts.Add($a)
+                    [void]$newArtifacts.Add($a)
                 }
             }
             $script:CurrentScanArtifacts = @($script:CurrentScanArtifacts) + $newArtifacts.ToArray()
@@ -847,7 +847,7 @@ function global:Invoke-ImportArtifacts {
                     default { throw "Unsupported file format: $extension" }
                 }
                 
-                foreach ($a in $artifacts) { $allArtifacts.Add($a) }
+                foreach ($a in $artifacts) { [void]$allArtifacts.Add($a) }
                 $fileCount++
             }
 
@@ -860,7 +860,7 @@ function global:Invoke-ImportArtifacts {
                 $newArtifacts = [System.Collections.Generic.List[PSCustomObject]]::new()
                 foreach ($a in $allArtifacts) {
                     if ($a.SHA256Hash -and -not $existingHashes.Contains($a.SHA256Hash)) {
-                        $newArtifacts.Add($a)
+                        [void]$newArtifacts.Add($a)
                     }
                 }
                 $script:CurrentScanArtifacts = @($script:CurrentScanArtifacts) + $newArtifacts.ToArray()

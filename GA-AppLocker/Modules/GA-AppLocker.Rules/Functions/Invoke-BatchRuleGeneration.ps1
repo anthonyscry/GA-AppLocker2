@@ -116,7 +116,7 @@ function Invoke-BatchRuleGeneration {
 
     process {
         foreach ($art in $Artifacts) {
-            if ($art) { $allArtifacts.Add($art) }
+            if ($art) { [void]$allArtifacts.Add($art) }
         }
     }
 

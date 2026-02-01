@@ -709,7 +709,7 @@ function Refresh-WizardOUs {
             $result = Get-OUTree
             if ($result.Success) {
                 foreach ($ou in $result.Data) {
-                    $ouList.Items.Add($ou.DistinguishedName)
+                    [void]$ouList.Items.Add($ou.DistinguishedName)
                 }
             }
         }
@@ -719,7 +719,7 @@ function Refresh-WizardOUs {
             if ($searchBase) {
                 $ous = Get-ADOrganizationalUnit -Filter * -SearchBase $searchBase -ErrorAction Stop
                 foreach ($ou in $ous) {
-                    $ouList.Items.Add($ou.DistinguishedName)
+                    [void]$ouList.Items.Add($ou.DistinguishedName)
                 }
             }
         }

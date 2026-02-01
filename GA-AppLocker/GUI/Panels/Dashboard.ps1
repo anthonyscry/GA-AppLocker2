@@ -101,7 +101,7 @@ function global:Update-DashboardStats {
                     if ($pendingData -and $pendingData.Count -gt 0) {
                         $items = [System.Collections.ObjectModel.ObservableCollection[object]]::new()
                         foreach ($rule in $pendingData) {
-                            $items.Add([PSCustomObject]@{
+                            [void]$items.Add([PSCustomObject]@{
                                 Type = $rule.RuleType
                                 Name = $rule.Name
                             })

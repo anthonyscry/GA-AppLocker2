@@ -172,7 +172,7 @@ function Get-LocalArtifacts {
                 }
                 $foundFiles = Get-ChildItem @getChildParams
                 if ($foundFiles) {
-                    foreach ($f in $foundFiles) { $allFiles.Add($f) }
+                    foreach ($f in $foundFiles) { [void]$allFiles.Add($f) }
                 }
             }
             else {
@@ -181,7 +181,7 @@ function Get-LocalArtifacts {
                     $wildcardPath = Join-Path $scanPath "*$ext"
                     $extFiles = Get-ChildItem -Path $wildcardPath -File -ErrorAction SilentlyContinue
                     if ($extFiles) {
-                        foreach ($f in $extFiles) { $allFiles.Add($f) }
+                        foreach ($f in $extFiles) { [void]$allFiles.Add($f) }
                     }
                 }
             }
@@ -359,7 +359,7 @@ function Get-LocalArtifacts {
                             # EndInvoke may return nested arrays — flatten
                             if ($item -is [System.Array]) {
                                 foreach ($subItem in $item) {
-                                    if ($subItem) { $artifacts.Add($subItem) }
+                                    if ($subItem) { [void]$artifacts.Add($subItem) }
                                 }
                             }
                             else {

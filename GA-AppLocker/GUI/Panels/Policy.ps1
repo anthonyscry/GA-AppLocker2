@@ -135,7 +135,7 @@ function global:Update-PoliciesDataGrid {
                     } catch { }
                 }
 
-                $displayData.Add([PSCustomObject]@{
+                [void]$displayData.Add([PSCustomObject]@{
                     PolicyId        = $policy.PolicyId
                     Name            = $policy.Name
                     Description     = $policy.Description

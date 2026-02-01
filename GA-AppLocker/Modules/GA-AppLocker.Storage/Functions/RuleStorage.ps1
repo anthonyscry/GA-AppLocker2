@@ -188,7 +188,7 @@ function Rebuild-RulesIndex {
         $rules = [System.Collections.Generic.List[PSCustomObject]]::new()
         $files = [System.IO.Directory]::EnumerateFiles($RulesPath, '*.json', [System.IO.SearchOption]::TopDirectoryOnly)
         $fileList = [System.Collections.Generic.List[string]]::new()
-        foreach ($f in $files) { $fileList.Add($f) }
+        foreach ($f in $files) { [void]$fileList.Add($f) }
         
         $totalFiles = $fileList.Count
         $processed = 0

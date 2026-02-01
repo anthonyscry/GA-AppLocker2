@@ -56,7 +56,7 @@ function Get-RuleFromRepository {
         try {
             $cached = Get-CachedValue -Key $cacheKey -MaxAgeSeconds 300
             if ($cached) { return $cached }
-        } catch { }
+        } catch { Write-AppLockerLog -Message "Cache lookup failed for rule '$RuleId': $($_.Exception.Message)" -Level 'DEBUG' }
     }
 
     # Get from storage
@@ -64,7 +64,7 @@ function Get-RuleFromRepository {
 
     # Cache the result (use try-catch - Get-Command fails in WPF context)
     if ($rule) {
-        try { Set-CachedValue -Key $cacheKey -Value $rule -TTLSeconds 300 } catch { }
+        try { Set-CachedValue -Key $cacheKey -Value $rule -TTLSeconds 300 } catch { Write-AppLockerLog -Message "Cache store failed for rule '$RuleId': $($_.Exception.Message)" -Level 'DEBUG' }
     }
 
     return $rule
@@ -146,7 +146,7 @@ function Save-RuleToRepository {
             Clear-AppLockerCache -Key $cacheKey | Out-Null
             Clear-AppLockerCache -Pattern 'RuleCounts*' | Out-Null
             Clear-AppLockerCache -Pattern 'RuleQuery*' | Out-Null
-        } catch { }
+        } catch { Write-AppLockerLog -Message "Cache invalidation failed after saving rule '$ruleId': $($_.Exception.Message)" -Level 'DEBUG' }
 
         # Publish event (use try-catch - Get-Command fails in WPF context)
         try {
@@ -155,7 +155,7 @@ function Save-RuleToRepository {
                 RuleType = $Rule.RuleType
                 Status = $Rule.Status
             } | Out-Null
-        } catch { }
+        } catch { Write-AppLockerLog -Message "Event publish failed for '$eventName' on rule '$ruleId': $($_.Exception.Message)" -Level 'DEBUG' }
 
         $result.Success = $true
         $result.Data = $Rule
@@ -212,7 +212,7 @@ function Remove-RuleFromRepository {
             Clear-AppLockerCache -Key "Rule_$RuleId" | Out-Null
             Clear-AppLockerCache -Pattern 'RuleCounts*' | Out-Null
             Clear-AppLockerCache -Pattern 'RuleQuery*' | Out-Null
-        } catch { }
+        } catch { Write-AppLockerLog -Message "Cache invalidation failed after removing rule '$RuleId': $($_.Exception.Message)" -Level 'DEBUG' }
 
         # Publish event (use try-catch - Get-Command fails in WPF context)
         if ($rule) {
@@ -221,7 +221,7 @@ function Remove-RuleFromRepository {
                     RuleId = $RuleId
                     RuleType = $rule.RuleType
                 } | Out-Null
-            } catch { }
+            } catch { Write-AppLockerLog -Message "Event publish failed for 'RuleDeleted' on rule '$RuleId': $($_.Exception.Message)" -Level 'DEBUG' }
         }
 
         $result.Success = $true
@@ -306,7 +306,7 @@ function Find-RulesInRepository {
         try {
             $cached = Get-CachedValue -Key $cacheKey -MaxAgeSeconds 60
             if ($cached) { return $cached }
-        } catch { }
+        } catch { Write-AppLockerLog -Message "Cache lookup failed for rule query '$cacheKey': $($_.Exception.Message)" -Level 'DEBUG' }
     }
 
     # Build query parameters for Get-RulesFromDatabase
@@ -351,7 +351,7 @@ function Find-RulesInRepository {
 
     # Cache results (use try-catch - Get-Command fails in WPF context)
     if ($rules) {
-        try { Set-CachedValue -Key $cacheKey -Value $rules -TTLSeconds 60 } catch { }
+        try { Set-CachedValue -Key $cacheKey -Value $rules -TTLSeconds 60 } catch { Write-AppLockerLog -Message "Cache store failed for rule query results: $($_.Exception.Message)" -Level 'DEBUG' }
     }
 
     return $rules
@@ -388,14 +388,14 @@ function Get-RuleCountsFromRepository {
         try {
             $cached = Get-CachedValue -Key $cacheKey -MaxAgeSeconds 120
             if ($cached) { return $cached }
-        } catch { }
+        } catch { Write-AppLockerLog -Message "Cache lookup failed for rule counts: $($_.Exception.Message)" -Level 'DEBUG' }
     }
 
     $counts = Get-RuleCounts
 
     # Use try-catch - Get-Command fails in WPF context
     if ($counts) {
-        try { Set-CachedValue -Key $cacheKey -Value $counts -TTLSeconds 120 } catch { }
+        try { Set-CachedValue -Key $cacheKey -Value $counts -TTLSeconds 120 } catch { Write-AppLockerLog -Message "Cache store failed for rule counts: $($_.Exception.Message)" -Level 'DEBUG' }
     }
 
     return $counts
@@ -479,7 +479,7 @@ function Invoke-RuleBatchOperation {
     }
 
     # Bulk cache invalidation (use try-catch - Get-Command fails in WPF context)
-    try { $null = Clear-AppLockerCache -Pattern 'Rule*' } catch { }
+    try { $null = Clear-AppLockerCache -Pattern 'Rule*' } catch { Write-AppLockerLog -Message "Bulk cache invalidation failed after batch '$Operation': $($_.Exception.Message)" -Level 'DEBUG' }
 
     # Single bulk event (use try-catch - Get-Command fails in WPF context)
     try {
@@ -488,7 +488,7 @@ function Invoke-RuleBatchOperation {
             Count = $result.Processed
             RuleIds = $RuleIds
         }
-    } catch { }
+    } catch { Write-AppLockerLog -Message "Event publish failed for 'RuleBulkUpdated' ($Operation, $($result.Processed) rules): $($_.Exception.Message)" -Level 'DEBUG' }
 
     $result.Success = ($result.Failed -eq 0)
     return $result

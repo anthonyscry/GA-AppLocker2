@@ -39,10 +39,10 @@ function global:Show-Toast {
     
     # Create content grid
     $grid = [System.Windows.Controls.Grid]::new()
-    $grid.ColumnDefinitions.Add([System.Windows.Controls.ColumnDefinition]::new())
+    [void]$grid.ColumnDefinitions.Add([System.Windows.Controls.ColumnDefinition]::new())
     $closeCol = [System.Windows.Controls.ColumnDefinition]::new()
     $closeCol.Width = [System.Windows.GridLength]::new(24)
-    $grid.ColumnDefinitions.Add($closeCol)
+    [void]$grid.ColumnDefinitions.Add($closeCol)
     
     # Icon based on type
     $icon = switch ($Type) {
@@ -60,7 +60,7 @@ function global:Show-Toast {
     $text.TextWrapping = 'Wrap'
     $text.VerticalAlignment = 'Center'
     [System.Windows.Controls.Grid]::SetColumn($text, 0)
-    $grid.Children.Add($text)
+    [void]$grid.Children.Add($text)
     
     # Close button
     $closeBtn = [System.Windows.Controls.Button]::new()
@@ -83,7 +83,7 @@ function global:Show-Toast {
         if ($stack) { $stack.Children.Remove($parentToast) }
     }.GetNewClosure())
     
-    $grid.Children.Add($closeBtn)
+    [void]$grid.Children.Add($closeBtn)
     $toast.Child = $grid
     
     # Insert at top of stack

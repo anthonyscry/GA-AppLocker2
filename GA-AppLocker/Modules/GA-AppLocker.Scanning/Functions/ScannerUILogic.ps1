@@ -272,7 +272,7 @@ function Group-ArtifactsByPublisher {
             $grouped[$publisher] = [System.Collections.Generic.List[PSCustomObject]]::new()
         }
         
-        $grouped[$publisher].Add($artifact)
+        [void]$grouped[$publisher].Add($artifact)
     }
     
     return $grouped

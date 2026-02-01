@@ -298,7 +298,7 @@ function global:Invoke-DomainRefresh {
                 $ouErrMsg = if ($Result.OUResult -and $Result.OUResult.Error) { $Result.OUResult.Error } else { 'OU enumeration returned no data' }
                 $ouErrorItem.Header = $ouErrMsg
                 $ouErrorItem.Foreground = [System.Windows.Media.Brushes]::OrangeRed
-                $treeView.Items.Add($ouErrorItem)
+                [void]$treeView.Items.Add($ouErrorItem)
             }
 
             # Update machine grid — merge new AD data with existing connectivity status
@@ -355,7 +355,7 @@ function global:Invoke-DomainRefresh {
                 $errorItem = [System.Windows.Controls.TreeViewItem]::new()
                 $errorItem.Header = "Unable to connect to domain"
                 $errorItem.Foreground = [System.Windows.Media.Brushes]::OrangeRed
-                $treeView.Items.Add($errorItem)
+                [void]$treeView.Items.Add($errorItem)
             }
             # Show full error in toast
             if (Get-Command -Name 'Show-Toast' -ErrorAction SilentlyContinue) {
@@ -378,7 +378,7 @@ function global:Invoke-DomainRefresh {
             $errorItem = [System.Windows.Controls.TreeViewItem]::new()
             $errorItem.Header = "Unable to connect to domain"
             $errorItem.Foreground = [System.Windows.Media.Brushes]::OrangeRed
-            $treeView.Items.Add($errorItem)
+            [void]$treeView.Items.Add($errorItem)
         }
         # Show full error in toast
         if (Get-Command -Name 'Show-Toast' -ErrorAction SilentlyContinue) {
@@ -423,7 +423,7 @@ function global:Update-OUTreeView {
             $emptyItem = [System.Windows.Controls.TreeViewItem]::new()
             $emptyItem.Header = "No OUs found"
             $emptyItem.Foreground = [System.Windows.Media.Brushes]::Gray
-            $TreeView.Items.Add($emptyItem)
+            [void]$TreeView.Items.Add($emptyItem)
             return
         }
 
@@ -448,14 +448,14 @@ function global:Update-OUTreeView {
             # Add child OUs recursively
             Add-ChildOUsToTreeItem -ParentItem $rootItem -ParentOU $root -AllOUs $OUs
 
-            $TreeView.Items.Add($rootItem)
+            [void]$TreeView.Items.Add($rootItem)
             $rootItem.IsExpanded = $true
         }
         else {
             $noRootItem = [System.Windows.Controls.TreeViewItem]::new()
             $noRootItem.Header = "No root OU found"
             $noRootItem.Foreground = [System.Windows.Media.Brushes]::Gray
-            $TreeView.Items.Add($noRootItem)
+            [void]$TreeView.Items.Add($noRootItem)
         }
     }
     catch {
@@ -464,7 +464,7 @@ function global:Update-OUTreeView {
         $errorItem = [System.Windows.Controls.TreeViewItem]::new()
         $errorItem.Header = "Error building tree: $($_.Exception.Message)"
         $errorItem.Foreground = [System.Windows.Media.Brushes]::OrangeRed
-        $TreeView.Items.Add($errorItem)
+        [void]$TreeView.Items.Add($errorItem)
     }
 }
 
@@ -510,7 +510,7 @@ function global:Add-ChildOUsToTreeItem {
         # Recursively add grandchildren
         Add-ChildOUsToTreeItem -ParentItem $childItem -ParentOU $child -AllOUs $AllOUs
 
-        $ParentItem.Items.Add($childItem)
+        [void]$ParentItem.Items.Add($childItem)
     }
 }
 

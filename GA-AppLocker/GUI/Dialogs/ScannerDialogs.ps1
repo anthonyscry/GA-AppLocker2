@@ -116,7 +116,7 @@ function global:Show-MachineSelectionDialog {
         $cb.Tag = $machine
         $cb.Foreground = [System.Windows.Media.Brushes]::White
         $cb.Margin = [System.Windows.Thickness]::new(5, 3, 5, 3)
-        $machineStack.Children.Add($cb)
+        [void]$machineStack.Children.Add($cb)
     }
     
     $updateCount = {

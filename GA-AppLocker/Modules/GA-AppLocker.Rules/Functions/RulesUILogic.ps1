@@ -242,14 +242,14 @@ function Group-RulesByPublisher {
             }
         }
         
-        $grouped[$publisher].Rules.Add($rule)
+        [void]$grouped[$publisher].Rules.Add($rule)
         
         # Group by product within publisher
         $product = if ($rule.ProductName) { $rule.ProductName } else { '(Unknown Product)' }
         if (-not $grouped[$publisher].Products.ContainsKey($product)) {
             $grouped[$publisher].Products[$product] = [System.Collections.Generic.List[PSCustomObject]]::new()
         }
-        $grouped[$publisher].Products[$product].Add($rule)
+        [void]$grouped[$publisher].Products[$product].Add($rule)
     }
     
     return $grouped

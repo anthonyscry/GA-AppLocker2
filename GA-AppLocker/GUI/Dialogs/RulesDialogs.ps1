@@ -150,7 +150,7 @@ function global:Show-RuleHistoryDialog {
         
         $item.Content = "v$($version.Version) | $($version.ChangeType) | $modifiedDate | $($version.ModifiedBy)"
         $item.Tag = $version
-        $versionsList.Items.Add($item)
+        [void]$versionsList.Items.Add($item)
     }
     
     # Selection changed handler
@@ -293,7 +293,7 @@ function global:Show-AddRulesToPolicyDialog {
     $label.Foreground = [System.Windows.Media.Brushes]::White
     $label.FontSize = 14
     $label.Margin = [System.Windows.Thickness]::new(0, 0, 0, 15)
-    $stack.Children.Add($label)
+    [void]$stack.Children.Add($label)
 
     # Policy ListBox
     $listBox = [System.Windows.Controls.ListBox]::new()
@@ -309,9 +309,9 @@ function global:Show-AddRulesToPolicyDialog {
         $item.Tag = $policy.PolicyId
         $item.Foreground = [System.Windows.Media.Brushes]::White
         $item.Padding = [System.Windows.Thickness]::new(5, 3, 5, 3)
-        $listBox.Items.Add($item)
+        [void]$listBox.Items.Add($item)
     }
-    $stack.Children.Add($listBox)
+    [void]$stack.Children.Add($listBox)
 
     # Buttons
     $btnPanel = [System.Windows.Controls.StackPanel]::new()
@@ -336,9 +336,9 @@ function global:Show-AddRulesToPolicyDialog {
     $btnCancel.Foreground = [System.Windows.Media.Brushes]::White
     $btnCancel.BorderThickness = [System.Windows.Thickness]::new(0)
 
-    $btnPanel.Children.Add($btnAdd)
-    $btnPanel.Children.Add($btnCancel)
-    $stack.Children.Add($btnPanel)
+    [void]$btnPanel.Children.Add($btnAdd)
+    [void]$btnPanel.Children.Add($btnCancel)
+    [void]$stack.Children.Add($btnPanel)
 
     $dialog.Content = $stack
 

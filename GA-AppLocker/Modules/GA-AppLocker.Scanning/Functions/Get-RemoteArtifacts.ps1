@@ -336,10 +336,10 @@ function Get-RemoteArtifacts {
                     if ($item -is [System.Array] -or $item -is [System.Collections.IList]) {
                         # Nested array from a machine — flatten it
                         foreach ($subItem in $item) {
-                            if ($subItem) { $batchedResults.Add($subItem); $flatCount++ }
+                            if ($subItem) { [void]$batchedResults.Add($subItem); $flatCount++ }
                         }
                     } else {
-                        if ($item) { $batchedResults.Add($item); $flatCount++ }
+                        if ($item) { [void]$batchedResults.Add($item); $flatCount++ }
                     }
                 }
                 Write-ScanLog -Message "Received $flatCount artifact(s) from batch $batchNumber"

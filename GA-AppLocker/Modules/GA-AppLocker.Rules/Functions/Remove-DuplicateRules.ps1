@@ -146,7 +146,7 @@ function Remove-DuplicateRules {
                         if (-not $hashGroups.ContainsKey($key)) {
                             $hashGroups[$key] = [System.Collections.Generic.List[PSCustomObject]]::new()
                         }
-                        $hashGroups[$key].Add($rule)
+                        [void]$hashGroups[$key].Add($rule)
                     }
                 }
                 'Publisher' {
@@ -155,7 +155,7 @@ function Remove-DuplicateRules {
                         if (-not $pubGroups.ContainsKey($key)) {
                             $pubGroups[$key] = [System.Collections.Generic.List[PSCustomObject]]::new()
                         }
-                        $pubGroups[$key].Add($rule)
+                        [void]$pubGroups[$key].Add($rule)
                     }
                 }
                 'Path' {
@@ -164,7 +164,7 @@ function Remove-DuplicateRules {
                         if (-not $pathGroups.ContainsKey($key)) {
                             $pathGroups[$key] = [System.Collections.Generic.List[PSCustomObject]]::new()
                         }
-                        $pathGroups[$key].Add($rule)
+                        [void]$pathGroups[$key].Add($rule)
                     }
                 }
             }
@@ -387,7 +387,7 @@ function Find-DuplicateRules {
         $dbResult = Get-AllRules -Take 100000
         if ($dbResult.Success -and $dbResult.Data.Count -gt 0) {
             $allRules = [System.Collections.Generic.List[PSCustomObject]]::new()
-            foreach ($rule in $dbResult.Data) { $allRules.Add($rule) }
+            foreach ($rule in $dbResult.Data) { [void]$allRules.Add($rule) }
             $result.TotalRules = $allRules.Count
         }
         else {
