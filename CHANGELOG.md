@@ -2,6 +2,32 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.39] - 2026-02-01
+
+### Bug Fixes (Live DC01 Testing)
+
+- **Deploy phase dropdown labels** -- Create tab phase dropdown showed wrong labels ("Audit & Discovery", "Enforcement Prep", etc.) instead of matching Edit tab ("Phase 1: EXE Only", "Phase 2: EXE + Script", etc.)
+
+- **Deploy Policy button did nothing** -- `BtnStartDeployment` Tag was `"DeployPolicy"` but dispatcher expected `"CreateDeploymentJob"`. Fixed Tag and updated button Content to "Create Deployment Job"
+
+- **Clear Completed Jobs** -- Added `Remove-DeploymentJob` function (accepts `-JobId` or `-Status`, deletes JSON files from Deployments folder), `BtnClearCompletedJobs` button in XAML, `Invoke-ClearCompletedJobs` handler in Deploy panel, dispatcher entry for `ClearCompletedJobs`
+
+- **Software Inventory DataGrid unreadable** -- Selection used system default bright-blue which was unreadable on dark theme. Added standalone dark-theme RowStyle with `#0078D4` selected background and white foreground, plus `#2D2D30` hover
+
+- **GPO Link Control rewrite** -- Replaced OU-specific link check (`Get-GPInheritance` + `Set-GPLink`/`New-GPLink`) with GPO status approach (`GpoStatus` enable/disable + `Get-GPOReport` XML for linked OU display). Added `TxtGpoLinkedOU*` subtitle TextBlocks under each GPO pill name showing linked OUs
+
+- **Default OU targets on GPO creation** -- Added OU resolution logic: tries `OU=Member Servers` and `OU=Workstations` first, falls back to `CN=Computers`. DC always uses `OU=Domain Controllers`
+
+- **GPOs disabled by default** -- After `New-GPO`, sets `GpoStatus = AllSettingsDisabled` so new GPOs don't take effect until explicitly enabled
+
+### Stats
+
+- **Version:** 1.2.39
+- **Tests:** 1547/1547 passing (100%)
+- **Exported Commands:** ~193
+
+---
+
 ## [1.2.38] - 2026-02-01
 
 ### Bug Fixes

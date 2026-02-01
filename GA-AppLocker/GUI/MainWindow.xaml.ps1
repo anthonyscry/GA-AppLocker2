@@ -147,6 +147,7 @@ function global:Invoke-ButtonAction {
         'StopDeployment' { Invoke-StopDeployment -Window $win }
         'CancelDeploymentJob' { Invoke-CancelDeploymentJob -Window $win }
         'ViewDeploymentLog' { Show-DeploymentLog -Window $win }
+        'ClearCompletedJobs' { Invoke-ClearCompletedJobs -Window $win }
         'BackupGpoPolicy' { Invoke-BackupGpoPolicy -Window $win }
         'ExportDeployPolicyXml' { Invoke-ExportDeployPolicyXml -Window $win }
         'ImportDeployPolicyXml' { Invoke-ImportDeployPolicyXml -Window $win }

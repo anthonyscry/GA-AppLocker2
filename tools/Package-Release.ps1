@@ -2,7 +2,7 @@
 # Creates a minimal zip containing only what's needed to run the application.
 $ErrorActionPreference = 'Stop'
 
-$version = 'v1.2.0'
+$version = 'v1.2.39'
 $projectRoot = Split-Path $PSScriptRoot -Parent
 $releaseDir = Join-Path $projectRoot "Release_$version"
 $zipPath = Join-Path $projectRoot "GA-AppLocker-$version.zip"

@@ -139,6 +139,84 @@ function Get-DeploymentJob {
     }
 }
 
+function Remove-DeploymentJob {
+    <#
+    .SYNOPSIS
+        Removes one or more deployment jobs by ID or status.
+
+    .DESCRIPTION
+        Deletes deployment job JSON files from storage. Can remove specific jobs by ID
+        or all jobs matching a given status (e.g., Completed, Failed, Cancelled).
+
+    .PARAMETER JobId
+        The unique identifier of the deployment job to remove.
+
+    .PARAMETER Status
+        Remove all jobs with this status (e.g., 'Completed', 'Failed', 'Cancelled').
+
+    .EXAMPLE
+        Remove-DeploymentJob -JobId "abc123"
+        Remove-DeploymentJob -Status "Completed"
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $false)]
+        [string]$JobId,
+
+        [Parameter(Mandatory = $false)]
+        [ValidateSet('Pending', 'Running', 'Completed', 'Failed', 'Cancelled', 'ManualRequired')]
+        [string]$Status
+    )
+
+    try {
+        $dataPath = Get-AppLockerDataPath
+        $deploymentsPath = Join-Path $dataPath 'Deployments'
+
+        if (-not (Test-Path $deploymentsPath)) {
+            return @{ Success = $true; Data = 0 }
+        }
+
+        $removedCount = 0
+
+        if ($JobId) {
+            $jobFile = Join-Path $deploymentsPath "$JobId.json"
+            if (Test-Path $jobFile) {
+                Remove-Item -Path $jobFile -Force
+                $removedCount = 1
+            }
+        }
+        elseif ($Status) {
+            $jobFiles = Get-ChildItem -Path $deploymentsPath -Filter '*.json' -File
+            foreach ($file in $jobFiles) {
+                try {
+                    $job = Get-Content -Path $file.FullName -Raw | ConvertFrom-Json
+                    if ($job.Status -eq $Status) {
+                        Remove-Item -Path $file.FullName -Force
+                        $removedCount++
+                    }
+                }
+                catch {
+                    Write-DeployLog -Message "Failed to read/remove job file '$($file.Name)': $($_.Exception.Message)" -Level 'DEBUG'
+                }
+            }
+        }
+        else {
+            return @{ Success = $false; Error = 'Specify either -JobId or -Status' }
+        }
+
+        return @{
+            Success = $true
+            Data    = $removedCount
+        }
+    }
+    catch {
+        return @{
+            Success = $false
+            Error   = $_.Exception.Message
+        }
+    }
+}
+
 function Get-AllDeploymentJobs {
     <#
     .SYNOPSIS

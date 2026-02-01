@@ -20,6 +20,7 @@
         'New-DeploymentJob',
         'Get-DeploymentJob',
         'Get-AllDeploymentJobs',
+        'Remove-DeploymentJob',
         'Start-Deployment',
         'Stop-Deployment',
         'Get-DeploymentStatus',

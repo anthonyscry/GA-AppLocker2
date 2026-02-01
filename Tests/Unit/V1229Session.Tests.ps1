@@ -210,14 +210,15 @@ Describe 'GPO Link Control - Dispatcher + Deploy.ps1 Wiring' -Tag 'Unit', 'Integ
         It 'Should use Get-GPO to verify GPO exists' {
             $script:DeployPs1 | Should -Match 'Get-GPO -Name \$gpoName'
         }
-        It 'Should use Get-GPInheritance to check link status' {
-            $script:DeployPs1 | Should -Match 'Get-GPInheritance'
+        It 'Should check GpoStatus to determine enabled/disabled state' {
+            $script:DeployPs1 | Should -Match 'GpoStatus'
         }
-        It 'Should use Set-GPLink to toggle link' {
-            $script:DeployPs1 | Should -Match 'Set-GPLink -Name \$gpoName'
+        It 'Should use Get-GPOReport to query linked OUs' {
+            $script:DeployPs1 | Should -Match 'Get-GPOReport'
         }
-        It 'Should offer New-GPLink when GPO exists but is not linked' {
-            $script:DeployPs1 | Should -Match 'New-GPLink -Name \$gpoName'
+        It 'Should toggle GPO between AllSettingsEnabled and AllSettingsDisabled' {
+            $script:DeployPs1 | Should -Match 'AllSettingsDisabled'
+            $script:DeployPs1 | Should -Match 'AllSettingsEnabled'
         }
         It 'Should refresh status after toggle' {
             $script:DeployPs1 | Should -Match 'Update-AppLockerGpoLinkStatus -Window \$Window'
@@ -234,12 +235,11 @@ Describe 'GPO Link Control - Dispatcher + Deploy.ps1 Wiring' -Tag 'Unit', 'Integ
         It 'Should map AppLocker-Workstations' {
             $script:DeployPs1 | Should -Match "Name = 'AppLocker-Workstations'"
         }
-        It 'DC should target OU=Domain Controllers' {
-            $script:DeployPs1 | Should -Match "Target = 'OU=Domain Controllers'"
+        It 'Should check GpoStatus for enabled/disabled state' {
+            $script:DeployPs1 | Should -Match 'GpoStatus'
         }
-        It 'Servers should target CN=Computers' {
-            # Match Servers row specifically
-            $script:DeployPs1 | Should -Match "AppLocker-Servers.*CN=Computers"
+        It 'Should query linked OUs via Get-GPOReport' {
+            $script:DeployPs1 | Should -Match 'Get-GPOReport'
         }
     }
 }
@@ -1005,8 +1005,14 @@ Describe 'XAML-Code Cross-Reference - New Elements' -Tag 'Unit', 'Integration' {
         It 'BtnToggleGpoLinkWks pill Content is set by Deploy.ps1' {
             $script:DeployPs1 | Should -Match 'BtnToggleGpoLink.*Wks'
         }
-        It 'Deploy.ps1 should NOT reference old TxtGpoLink status TextBlocks' {
-            $script:DeployPs1 | Should -Not -Match 'TxtGpoLink'
+        It 'Deploy.ps1 should NOT reference old TxtGpoLinkDCStatus TextBlock' {
+            $script:DeployPs1 | Should -Not -Match 'TxtGpoLinkDCStatus'
+        }
+        It 'Deploy.ps1 should NOT reference old TxtGpoLinkServersStatus TextBlock' {
+            $script:DeployPs1 | Should -Not -Match 'TxtGpoLinkServersStatus'
+        }
+        It 'Deploy.ps1 should NOT reference old TxtGpoLinkWksStatus TextBlock' {
+            $script:DeployPs1 | Should -Not -Match 'TxtGpoLinkWksStatus'
         }
     }
 
@@ -1154,8 +1160,8 @@ Describe 'GPO Pill Toggle - Visual State Management' -Tag 'Unit', 'Deploy', 'UI'
         It 'Sets button Content to Disabled when link is inactive' {
             $script:DeployPs1 | Should -Match '\$btnCtrl\.Content = ''Disabled'''
         }
-        It 'Sets button Content to Not Linked when GPO exists but unlinked' {
-            $script:DeployPs1 | Should -Match '\$btnCtrl\.Content = ''Not Linked'''
+        It 'Sets button Content to Computer Off when computer settings disabled' {
+            $script:DeployPs1 | Should -Match '\$btnCtrl\.Content = ''Computer Off'''
         }
         It 'Sets button Content to Not Created when GPO missing' {
             $script:DeployPs1 | Should -Match '\$btnCtrl\.Content = ''Not Created'''

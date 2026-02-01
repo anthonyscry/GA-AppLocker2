@@ -54,6 +54,40 @@ function Initialize-AppLockerGPOs {
             throw "Could not determine domain DN"
         }
 
+        # Resolve best-match OU targets with fallback
+        $serversTarget = "CN=Computers,$domainDN"
+        $workstationsTarget = "CN=Computers,$domainDN"
+
+        if (-not $ServersOU) {
+            # Try OU=Member Servers first, then CN=Computers as fallback
+            $candidateServers = "OU=Member Servers,$domainDN"
+            try {
+                if ([adsi]::Exists("LDAP://$candidateServers")) {
+                    $serversTarget = $candidateServers
+                    Write-SetupLog -Message "Found OU=Member Servers, using as Servers target"
+                }
+            }
+            catch { Write-SetupLog -Message "OU=Member Servers not found, falling back to CN=Computers" -Level 'DEBUG' }
+        }
+        else {
+            $serversTarget = $ServersOU
+        }
+
+        if (-not $WorkstationsOU) {
+            # Try OU=Workstations first, then CN=Computers as fallback
+            $candidateWks = "OU=Workstations,$domainDN"
+            try {
+                if ([adsi]::Exists("LDAP://$candidateWks")) {
+                    $workstationsTarget = $candidateWks
+                    Write-SetupLog -Message "Found OU=Workstations, using as Workstations target"
+                }
+            }
+            catch { Write-SetupLog -Message "OU=Workstations not found, falling back to CN=Computers" -Level 'DEBUG' }
+        }
+        else {
+            $workstationsTarget = $WorkstationsOU
+        }
+
         # Define GPOs to create
         $gposToCreate = @(
             @{
@@ -64,12 +98,12 @@ function Initialize-AppLockerGPOs {
             @{
                 Name        = $script:DefaultGPONames.Servers
                 Description = 'AppLocker policies for Member Servers'
-                TargetOU    = if ($ServersOU) { $ServersOU } else { "CN=Computers,$domainDN" }
+                TargetOU    = $serversTarget
             }
             @{
                 Name        = $script:DefaultGPONames.Workstations
                 Description = 'AppLocker policies for Workstations'
-                TargetOU    = if ($WorkstationsOU) { $WorkstationsOU } else { "CN=Computers,$domainDN" }
+                TargetOU    = $workstationsTarget
             }
         )
 
@@ -86,9 +120,10 @@ function Initialize-AppLockerGPOs {
                     $status = 'Existing'
                 }
                 else {
-                    # Create new GPO
+                    # Create new GPO (disabled by default — user enables after review)
                     $gpo = New-GPO -Name $gpoConfig.Name -Comment $gpoConfig.Description -ErrorAction Stop
-                    Write-SetupLog -Message "Created GPO: $($gpoConfig.Name)"
+                    $gpo.GpoStatus = [Microsoft.GroupPolicy.GpoStatus]::AllSettingsDisabled
+                    Write-SetupLog -Message "Created GPO: $($gpoConfig.Name) (disabled by default)"
                     $status = 'Created'
                 }
 

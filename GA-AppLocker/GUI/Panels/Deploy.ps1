@@ -1013,26 +1013,57 @@ function global:Invoke-SaveDeployPolicyChanges {
     }
 }
 
+function global:Invoke-ClearCompletedJobs {
+    <#
+    .SYNOPSIS
+        Removes all completed deployment jobs from the list.
+    #>
+    param($Window)
+
+    $confirm = Show-AppLockerMessageBox 'Remove all completed deployment jobs from the list?' 'Clear Jobs' 'YesNo' 'Question'
+    if ($confirm -ne 'Yes') { return }
+
+    try {
+        $removed = 0
+        foreach ($status in @('Completed', 'Failed', 'Cancelled')) {
+            $result = Remove-DeploymentJob -Status $status
+            if ($result.Success) { $removed += $result.Data }
+        }
+
+        if ($removed -gt 0) {
+            Show-Toast -Message "$removed job(s) cleared." -Type 'Success'
+        }
+        else {
+            Show-Toast -Message 'No completed/failed/cancelled jobs to clear.' -Type 'Info'
+        }
+
+        Update-DeploymentJobsDataGrid -Window $Window
+    }
+    catch {
+        Show-AppLockerMessageBox "Error clearing jobs: $($_.Exception.Message)" 'Error' 'OK' 'Error'
+    }
+}
+
 #region GPO Link Control
 
 function global:Update-AppLockerGpoLinkStatus {
     <#
     .SYNOPSIS
-        Checks link status for the 3 AppLocker GPOs and updates the Deploy Actions pill toggles.
+        Checks enabled/disabled status for the 3 AppLocker GPOs and updates the Deploy Actions pill toggles.
+        Also queries and displays linked OUs under each GPO name.
     #>
     param($Window)
 
     # GPO name -> UI control suffix mapping
     $gpoMap = @(
-        @{ Name = 'AppLocker-DC';           Suffix = 'DC';      Target = 'OU=Domain Controllers' }
-        @{ Name = 'AppLocker-Servers';      Suffix = 'Servers';  Target = 'CN=Computers' }
-        @{ Name = 'AppLocker-Workstations'; Suffix = 'Wks';      Target = 'CN=Computers' }
+        @{ Name = 'AppLocker-DC';           Suffix = 'DC' }
+        @{ Name = 'AppLocker-Servers';      Suffix = 'Servers' }
+        @{ Name = 'AppLocker-Workstations'; Suffix = 'Wks' }
     )
 
     # Pill color palette
     $pillEnabled  = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#107C10')   # green
     $pillDisabled = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#3E3E42')   # dark grey
-    $pillNotLinked = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#3E3E42')
     $fgWhite  = [System.Windows.Media.Brushes]::White
     $fgOrange = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#FF8C00')
     $fgGray   = [System.Windows.Media.Brushes]::Gray
@@ -1047,6 +1078,8 @@ function global:Update-AppLockerGpoLinkStatus {
                 $btnCtrl.Foreground = $fgGray
                 $btnCtrl.IsEnabled = $false
             }
+            $ouLabel = $Window.FindName("TxtGpoLinkedOU$($gpo.Suffix)")
+            if ($ouLabel) { $ouLabel.Text = '' }
         }
         return
     }
@@ -1054,14 +1087,9 @@ function global:Update-AppLockerGpoLinkStatus {
     try {
         Import-Module GroupPolicy -ErrorAction SilentlyContinue
 
-        # Get domain DN for building full OU paths
-        $domainDN = $null
-        try {
-            $domainDN = ([adsi]"LDAP://RootDSE").defaultNamingContext[0]
-        } catch { Write-AppLockerLog -Message "Failed to get domain DN via LDAP RootDSE: $($_.Exception.Message)" -Level 'DEBUG' }
-
         foreach ($gpo in $gpoMap) {
             $btnCtrl = $Window.FindName("BtnToggleGpoLink$($gpo.Suffix)")
+            $ouLabel = $Window.FindName("TxtGpoLinkedOU$($gpo.Suffix)")
             if (-not $btnCtrl) { continue }
 
             $gpoObj = Get-GPO -Name $gpo.Name -ErrorAction SilentlyContinue
@@ -1070,39 +1098,73 @@ function global:Update-AppLockerGpoLinkStatus {
                 $btnCtrl.Background = $pillDisabled
                 $btnCtrl.Foreground = $fgGray
                 $btnCtrl.IsEnabled = $false
+                if ($ouLabel) { $ouLabel.Text = '' }
                 continue
             }
 
             $btnCtrl.IsEnabled = $true
 
-            # Try to find the link at the default target OU
-            $link = $null
-            if ($domainDN) {
-                $fullTarget = "$($gpo.Target),$domainDN"
-                try {
-                    $link = Get-GPInheritance -Target $fullTarget -ErrorAction SilentlyContinue |
-                            Select-Object -ExpandProperty GpoLinks |
-                            Where-Object { $_.DisplayName -eq $gpo.Name }
-                } catch { Write-AppLockerLog -Message "Failed to query GPO link for '$($gpo.Name)' at '$fullTarget': $($_.Exception.Message)" -Level 'DEBUG' }
+            # Check GPO enabled/disabled status (GpoStatus property)
+            $gpoStatus = $gpoObj.GpoStatus.ToString()
+            if ($gpoStatus -eq 'AllSettingsEnabled') {
+                $btnCtrl.Content = 'Enabled'
+                $btnCtrl.Background = $pillEnabled
+                $btnCtrl.Foreground = $fgWhite
             }
-
-            if ($link) {
-                if ($link.Enabled) {
-                    $btnCtrl.Content = 'Enabled'
-                    $btnCtrl.Background = $pillEnabled
-                    $btnCtrl.Foreground = $fgWhite
-                }
-                else {
-                    $btnCtrl.Content = 'Disabled'
-                    $btnCtrl.Background = $pillDisabled
-                    $btnCtrl.Foreground = $fgOrange
-                }
+            elseif ($gpoStatus -eq 'AllSettingsDisabled') {
+                $btnCtrl.Content = 'Disabled'
+                $btnCtrl.Background = $pillDisabled
+                $btnCtrl.Foreground = $fgOrange
+            }
+            elseif ($gpoStatus -eq 'ComputerSettingsDisabled') {
+                $btnCtrl.Content = 'Computer Off'
+                $btnCtrl.Background = $pillDisabled
+                $btnCtrl.Foreground = $fgOrange
+            }
+            elseif ($gpoStatus -eq 'UserSettingsDisabled') {
+                # User settings disabled = computer settings enabled (what we want for AppLocker)
+                $btnCtrl.Content = 'Enabled'
+                $btnCtrl.Background = $pillEnabled
+                $btnCtrl.Foreground = $fgWhite
             }
             else {
-                # GPO exists but not linked at default OU
-                $btnCtrl.Content = 'Not Linked'
-                $btnCtrl.Background = $pillNotLinked
+                $btnCtrl.Content = $gpoStatus
+                $btnCtrl.Background = $pillDisabled
                 $btnCtrl.Foreground = $fgGray
+            }
+
+            # Query linked OUs via GPO XML report
+            if ($ouLabel) {
+                try {
+                    $linkedOUs = @()
+                    $xmlReport = Get-GPOReport -Guid $gpoObj.Id -ReportType Xml -ErrorAction SilentlyContinue
+                    if ($xmlReport) {
+                        $xml = [xml]$xmlReport
+                        $ns = @{ gpo = 'http://www.microsoft.com/GroupPolicy/Settings' }
+                        $linkNodes = $xml.SelectNodes('//gpo:LinksTo', (New-Object System.Xml.XmlNamespaceManager($xml.NameTable)))
+                        if (-not $linkNodes -or $linkNodes.Count -eq 0) {
+                            # Try without namespace
+                            $nsMgr = New-Object System.Xml.XmlNamespaceManager($xml.NameTable)
+                            $nsMgr.AddNamespace('gpo', $xml.DocumentElement.NamespaceURI)
+                            $linkNodes = $xml.SelectNodes('//gpo:LinksTo', $nsMgr)
+                        }
+                        foreach ($linkNode in $linkNodes) {
+                            $somPath = $linkNode.SOMPath
+                            if ($somPath) { $linkedOUs += $somPath }
+                        }
+                    }
+
+                    if ($linkedOUs.Count -gt 0) {
+                        $ouLabel.Text = "Linked: " + ($linkedOUs -join ', ')
+                    }
+                    else {
+                        $ouLabel.Text = 'Not linked to any OU'
+                    }
+                }
+                catch {
+                    Write-AppLockerLog -Message "Failed to query linked OUs for '$($gpo.Name)': $($_.Exception.Message)" -Level 'DEBUG'
+                    $ouLabel.Text = ''
+                }
             }
         }
     }
@@ -1114,7 +1176,9 @@ function global:Update-AppLockerGpoLinkStatus {
 function global:Invoke-ToggleAppLockerGpoLink {
     <#
     .SYNOPSIS
-        Toggles the link state for an AppLocker GPO (DC, Servers, or Workstations).
+        Toggles the enabled/disabled state of an AppLocker GPO (DC, Servers, or Workstations).
+    .DESCRIPTION
+        Enables or disables the entire GPO (GpoStatus), not individual links.
     #>
     param(
         $Window,
@@ -1123,11 +1187,8 @@ function global:Invoke-ToggleAppLockerGpoLink {
     )
 
     $nameMap = @{ DC = 'AppLocker-DC'; Servers = 'AppLocker-Servers'; Workstations = 'AppLocker-Workstations' }
-    $targetMap = @{ DC = 'OU=Domain Controllers'; Servers = 'CN=Computers'; Workstations = 'CN=Computers' }
-    $suffixMap = @{ DC = 'DC'; Servers = 'Servers'; Workstations = 'Wks' }
 
     $gpoName = $nameMap[$GPOType]
-    $suffix = $suffixMap[$GPOType]
 
     try {
         $hasGP = Get-Module -ListAvailable -Name GroupPolicy
@@ -1143,39 +1204,24 @@ function global:Invoke-ToggleAppLockerGpoLink {
             return
         }
 
-        $domainDN = ([adsi]"LDAP://RootDSE").defaultNamingContext[0]
-        $fullTarget = "$($targetMap[$GPOType]),$domainDN"
+        $currentStatus = $gpoObj.GpoStatus.ToString()
 
-        # Check current link state
-        $link = $null
-        try {
-            $link = Get-GPInheritance -Target $fullTarget -ErrorAction SilentlyContinue |
-                    Select-Object -ExpandProperty GpoLinks |
-                    Where-Object { $_.DisplayName -eq $gpoName }
-        } catch { Write-AppLockerLog -Message "Failed to query GPO link for '$gpoName' at '$fullTarget': $($_.Exception.Message)" -Level 'DEBUG' }
-
-        if (-not $link) {
-            # GPO exists but isn't linked — offer to create link
-            $answer = Show-AppLockerMessageBox "'$gpoName' is not linked to '$fullTarget'.`n`nCreate the link now?" 'Not Linked' 'YesNo' 'Question'
-            if ($answer -ne 'Yes') { return }
-
-            New-GPLink -Name $gpoName -Target $fullTarget -ErrorAction Stop
-            Show-Toast -Message "$gpoName linked and enabled" -Type 'Success'
-        }
-        elseif ($link.Enabled) {
-            Set-GPLink -Name $gpoName -Target $fullTarget -LinkEnabled No -ErrorAction Stop
-            Show-Toast -Message "$gpoName link disabled" -Type 'Info'
+        if ($currentStatus -eq 'AllSettingsEnabled' -or $currentStatus -eq 'UserSettingsDisabled') {
+            # Currently enabled -> disable
+            $gpoObj.GpoStatus = [Microsoft.GroupPolicy.GpoStatus]::AllSettingsDisabled
+            Show-Toast -Message "$gpoName disabled" -Type 'Info'
         }
         else {
-            Set-GPLink -Name $gpoName -Target $fullTarget -LinkEnabled Yes -ErrorAction Stop
-            Show-Toast -Message "$gpoName link enabled" -Type 'Success'
+            # Currently disabled -> enable
+            $gpoObj.GpoStatus = [Microsoft.GroupPolicy.GpoStatus]::AllSettingsEnabled
+            Show-Toast -Message "$gpoName enabled" -Type 'Success'
         }
 
         # Refresh status display
         Update-AppLockerGpoLinkStatus -Window $Window
     }
     catch {
-        Show-AppLockerMessageBox "Error toggling $gpoName link:`n$($_.Exception.Message)" 'Error' 'OK' 'Error'
+        Show-AppLockerMessageBox "Error toggling $gpoName status:`n$($_.Exception.Message)" 'Error' 'OK' 'Error'
     }
 }
 
