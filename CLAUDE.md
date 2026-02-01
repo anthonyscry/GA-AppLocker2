@@ -4,7 +4,7 @@
 
 GA-AppLocker is a PowerShell 5.1 WPF application for enterprise AppLocker policy management in air-gapped, classified, or highly secure environments. Complete workflow: AD Discovery → Artifact Scanning → Rule Generation → Policy Building → GPO Deployment.
 
-**Version:** 1.2.27 | **Tests:** 397/397 passing (100%) | **Exported Commands:** ~200
+**Version:** 1.2.29 | **Tests:** 550/550 passing (100%) | **Exported Commands:** ~200
 
 ## Quick Start
 
@@ -155,7 +155,7 @@ All data: `%LOCALAPPDATA%\GA-AppLocker\`
 ## Testing
 
 ```powershell
-# Pester unit tests (397/397 passing — 100%)
+# Pester unit tests (550/550 passing — 100%)
 Invoke-Pester -Path Tests\Unit\ -Output Detailed
 
 # Workflow tests with mock data (no AD required)
@@ -262,6 +262,8 @@ All rule modifications auto-sync the JSON index:
 
 | Version | Date | Key Changes |
 |---------|------|-------------|
+| 1.2.29 | Jan 31, 2026 | Documentation and test count update (550/550 tests passing, up from 397), version bump across all docs |
+| 1.2.28 | Jan 31, 2026 | Fix deployment error (pass file path not XML content to Set-AppLockerPolicy), fix per-host CSV export null ComputerName crash, Software Inventory remote scan runs in background runspace (no UI freeze), Software panel auto-populates remote machines from AD Discovery (online+WinRM), Deploy panel refreshes policy combo + jobs list on every navigation |
 | 1.2.27 | Jan 31, 2026 | Auto-export per-host CSV artifact files after every scan ({HostName}_artifacts_{date}.csv in Scans folder) |
 | 1.2.26 | Jan 31, 2026 | Code quality sweep (17 fixes): Remove destructive startup rule deletion, fix .psd1/.psm1 export mismatches (missing Policy exports, duplicate Storage entries, phantom Rules exports), fix scheduled scan hardcoded dev paths, consolidate Get-MachineTypeFromOU (config-based tier mapping), fix Backup-AppLockerData settings path, fix AuditTrail APPDATA fallback, Event System global->script scope, Test-Prerequisites .NET domain check (no Get-CimInstance), Test-CredentialProfile WMI ping (no Test-Connection), scanning scriptblock sync comments + CollectionType, ConvertFrom-Artifact O(1) List growth, Setup module .psd1 manifest, Remove-Rule export ambiguity (Storage only), LDAP RequireSSL config option, scheduled scan runner ACL + RemoteSigned, Write-AuditLog JSONL append-only format, dynamic APP_VERSION from manifest |
 | 1.2.25 | Jan 31, 2026 | Fix deployment error (UTF-8 BOM in exported XML + .NET file read + LDAP fallback for domain DN), AppLocker-DisableWinRM GPO for tattoo removal (reverses WinRM service, listener, UAC, firewall), Software panel remote machine textbox (enter hostnames directly instead of requiring AD Discovery) |

@@ -5,6 +5,7 @@
 $script:SoftwareInventory = @()       # Current scan/imported data shown in DataGrid
 $script:SoftwareImportedData = @()    # Imported CSV data for comparison
 $script:SoftwareImportedFile = ''     # Name of imported file
+$script:CurrentSoftwareSourceFilter = 'All'  # Source filter for comparison results
 
 function Initialize-SoftwarePanel {
     param([System.Windows.Window]$Window)
@@ -20,6 +21,25 @@ function Initialize-SoftwarePanel {
         if ($btn -and $btn.Tag) {
             $tagValue = $btn.Tag.ToString()
             $btn.Add_Click({ Invoke-ButtonAction -Action $tagValue }.GetNewClosure())
+        }
+    }
+
+    # Wire up source filter buttons
+    $sourceFilterButtons = @(
+        'BtnFilterSoftwareAll', 'BtnFilterSoftwareMatch', 'BtnFilterSoftwareVersionDiff',
+        'BtnFilterSoftwareOnlyScan', 'BtnFilterSoftwareOnlyImport'
+    )
+    foreach ($btnName in $sourceFilterButtons) {
+        $btn = $Window.FindName($btnName)
+        if ($btn) {
+            $btn.Add_Click({
+                param($sender, $e)
+                $tag = $sender.Tag
+                if ($tag -match 'FilterSoftware(.+)') {
+                    $filter = $Matches[1]
+                    Update-SoftwareSourceFilter -Window $global:GA_MainWindow -Filter $filter
+                }
+            }.GetNewClosure())
         }
     }
 
@@ -142,139 +162,222 @@ function global:Invoke-ScanLocalSoftware {
 function global:Invoke-ScanRemoteSoftware {
     <#
     .SYNOPSIS
-        Scans installed software on remote machines via WinRM.
+        Scans installed software on remote machines via WinRM (background runspace).
     #>
     param([System.Windows.Window]$Window)
 
     $hostnames = @(Get-SoftwareRemoteMachineList -Window $Window)
     if ($hostnames.Count -eq 0) {
-        Show-Toast -Message 'No machines specified. Enter hostnames in the Remote Machines box, or select machines from AD Discovery.' -Type 'Warning'
+        [System.Windows.MessageBox]::Show(
+            "No remote machines specified.`n`nTo add machines:`n1. Go to AD Discovery and run a connectivity test`n2. Navigate to Software Inventory -- online machines with WinRM will auto-populate`n3. Or type hostnames directly in the Remote Machines box (one per line)",
+            'No Machines Selected', 'OK', 'Warning')
         return
     }
 
     Show-LoadingOverlay -Message "Scanning software on $($hostnames.Count) machine(s)..." -SubMessage ($hostnames[0..2] -join ', ')
 
-    try {
-        $allResults = [System.Collections.Generic.List[PSCustomObject]]::new()
+    # Get credential on UI thread (needs access to DPAPI)
+    $cred = $null
+    foreach ($tryTier in @(2, 1, 0)) {
+        try {
+            $credResult = Get-CredentialForTier -Tier $tryTier
+            if ($credResult.Success -and $credResult.Data) {
+                $cred = $credResult.Data
+                break
+            }
+        } catch { }
+    }
 
-        # Get credential using the same tier-based fallback chain as the Scanner panel.
-        # Try tiers in order T2 (workstations) -> T1 (servers) -> T0 (DCs), then implicit Windows auth.
-        $cred = $null
-        $credSource = 'implicit Windows auth'
-        foreach ($tryTier in @(2, 1, 0)) {
+    # Build synchronized hashtable for cross-thread communication
+    $script:SoftwareSyncHash = [hashtable]::Synchronized(@{
+        Window     = $Window
+        Hostnames  = $hostnames
+        Credential = $cred
+        Result     = $null
+        Error      = $null
+        IsComplete = $false
+        StatusText = 'Initializing...'
+    })
+
+    # Create background runspace
+    $script:SoftwareRunspace = [runspacefactory]::CreateRunspace()
+    $script:SoftwareRunspace.ApartmentState = 'STA'
+    $script:SoftwareRunspace.ThreadOptions = 'ReuseThread'
+    $script:SoftwareRunspace.Open()
+    $script:SoftwareRunspace.SessionStateProxy.SetVariable('SyncHash', $script:SoftwareSyncHash)
+
+    $modulePath = (Get-Module GA-AppLocker).ModuleBase
+    $script:SoftwareRunspace.SessionStateProxy.SetVariable('ModulePath', $modulePath)
+
+    $script:SoftwarePowerShell = [powershell]::Create()
+    $script:SoftwarePowerShell.Runspace = $script:SoftwareRunspace
+
+    [void]$script:SoftwarePowerShell.AddScript({
+        param($SyncHash, $ModulePath)
+
+        try {
+            # Import module in this runspace
+            $manifestPath = Join-Path $ModulePath 'GA-AppLocker.psd1'
+            if (Test-Path $manifestPath) {
+                Import-Module $manifestPath -Force -ErrorAction Stop
+            }
+
+            $hostnames = $SyncHash.Hostnames
+            $cred = $SyncHash.Credential
+            $allResults = [System.Collections.Generic.List[PSCustomObject]]::new()
+            $failedHosts = [System.Collections.Generic.List[string]]::new()
+
+            # Ensure Scans folder exists
+            $scansFolder = $null
             try {
-                $credResult = Get-CredentialForTier -Tier $tryTier
-                if ($credResult.Success -and $credResult.Data) {
-                    $cred = $credResult.Data
-                    $credSource = "Tier $tryTier credential"
-                    break
+                $appDataPath = Get-AppLockerDataPath
+                $scansFolder = [System.IO.Path]::Combine($appDataPath, 'Scans')
+                if (-not [System.IO.Directory]::Exists($scansFolder)) {
+                    [System.IO.Directory]::CreateDirectory($scansFolder) | Out-Null
                 }
             } catch { }
-        }
-        Write-AppLockerLog -Message "Software remote scan using: $credSource" -Level 'INFO'
 
-        # Ensure Scans folder exists for auto-save
-        $scansFolder = $null
-        try {
-            $appDataPath = Get-AppLockerDataPath
-            $scansFolder = [System.IO.Path]::Combine($appDataPath, 'Scans')
-            if (-not [System.IO.Directory]::Exists($scansFolder)) {
-                [System.IO.Directory]::CreateDirectory($scansFolder) | Out-Null
-            }
-        } catch {
-            Write-AppLockerLog -Message "Could not create Scans folder: $($_.Exception.Message)" -Level 'ERROR'
-        }
+            $dateSuffix = (Get-Date).ToString('ddMMMyy').ToUpper()
+            $hostIndex = 0
 
-        $dateSuffix = (Get-Date).ToString('ddMMMyy').ToUpper()
+            foreach ($hostname in $hostnames) {
+                $hostIndex++
+                $SyncHash.StatusText = "Scanning $hostname ($hostIndex/$($hostnames.Count))..."
 
-        foreach ($hostname in $hostnames) {
-            try {
-                $invokeParams = @{
-                    ComputerName = $hostname
-                    ScriptBlock  = {
-                        $paths = @(
-                            'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
-                            'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
-                        )
-                        Get-ItemProperty -Path $paths -ErrorAction SilentlyContinue |
-                            Where-Object { $_.DisplayName -and $_.DisplayName.Trim() -ne '' } |
-                            ForEach-Object {
-                                [PSCustomObject]@{
-                                    DisplayName    = $_.DisplayName
-                                    DisplayVersion = $_.DisplayVersion
-                                    Publisher      = $_.Publisher
-                                    InstallDate    = $_.InstallDate
-                                    InstallLocation = $_.InstallLocation
-                                    Architecture   = if ($_.PSPath -like '*WOW6432*') { 'x86' } else { 'x64' }
+                try {
+                    $invokeParams = @{
+                        ComputerName = $hostname
+                        ScriptBlock  = {
+                            $paths = @(
+                                'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
+                                'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
+                            )
+                            Get-ItemProperty -Path $paths -ErrorAction SilentlyContinue |
+                                Where-Object { $_.DisplayName -and $_.DisplayName.Trim() -ne '' } |
+                                ForEach-Object {
+                                    [PSCustomObject]@{
+                                        DisplayName     = $_.DisplayName
+                                        DisplayVersion  = $_.DisplayVersion
+                                        Publisher        = $_.Publisher
+                                        InstallDate      = $_.InstallDate
+                                        InstallLocation  = $_.InstallLocation
+                                        Architecture     = if ($_.PSPath -like '*WOW6432*') { 'x86' } else { 'x64' }
+                                    }
                                 }
-                            }
+                        }
+                        ErrorAction = 'Stop'
                     }
-                    ErrorAction = 'Stop'
+                    if ($cred) { $invokeParams['Credential'] = $cred }
+
+                    $remoteResults = @(Invoke-Command @invokeParams)
+                    $hostResults = [System.Collections.Generic.List[PSCustomObject]]::new()
+                    foreach ($item in $remoteResults) {
+                        $obj = [PSCustomObject]@{
+                            Machine         = $hostname
+                            DisplayName     = $item.DisplayName
+                            DisplayVersion  = $item.DisplayVersion
+                            Publisher        = $item.Publisher
+                            InstallDate      = $item.InstallDate
+                            InstallLocation  = $item.InstallLocation
+                            Architecture     = $item.Architecture
+                            Source           = 'Remote'
+                        }
+                        $allResults.Add($obj)
+                        $hostResults.Add($obj)
+                    }
+
+                    # Auto-save per-hostname CSV
+                    if ($scansFolder -and $hostResults.Count -gt 0) {
+                        try {
+                            $csvName = "${hostname}_softwarelist_${dateSuffix}.csv"
+                            $csvPath = [System.IO.Path]::Combine($scansFolder, $csvName)
+                            $hostResults |
+                                Select-Object Machine, DisplayName, DisplayVersion, Publisher, InstallDate, InstallLocation, Architecture, Source |
+                                Export-Csv -Path $csvPath -NoTypeInformation -Encoding UTF8
+                        } catch { }
+                    }
                 }
-                if ($cred) { $invokeParams['Credential'] = $cred }
-
-                $remoteResults = @(Invoke-Command @invokeParams)
-                $hostResults = [System.Collections.Generic.List[PSCustomObject]]::new()
-                foreach ($item in $remoteResults) {
-                    $obj = [PSCustomObject]@{
-                        Machine        = $hostname
-                        DisplayName    = $item.DisplayName
-                        DisplayVersion = $item.DisplayVersion
-                        Publisher      = $item.Publisher
-                        InstallDate    = $item.InstallDate
-                        InstallLocation = $item.InstallLocation
-                        Architecture   = $item.Architecture
-                        Source         = 'Remote'
-                    }
-                    $allResults.Add($obj)
-                    $hostResults.Add($obj)
-                }
-
-                Write-AppLockerLog -Message "Scanned $($remoteResults.Count) programs on $hostname" -Level 'INFO'
-
-                # Auto-save per-hostname CSV: hostname_softwarelist_ddMMMYY.csv
-                if ($scansFolder -and $hostResults.Count -gt 0) {
-                    try {
-                        $csvName = "${hostname}_softwarelist_${dateSuffix}.csv"
-                        $csvPath = [System.IO.Path]::Combine($scansFolder, $csvName)
-                        $hostResults |
-                            Select-Object Machine, DisplayName, DisplayVersion, Publisher, InstallDate, InstallLocation, Architecture, Source |
-                            Export-Csv -Path $csvPath -NoTypeInformation -Encoding UTF8
-                        Write-AppLockerLog -Message "Auto-saved software list: $csvName" -Level 'INFO'
-                    } catch {
-                        Write-AppLockerLog -Message "Failed to auto-save CSV for $hostname`: $($_.Exception.Message)" -Level 'ERROR'
-                    }
+                catch {
+                    $failedHosts.Add("${hostname}: $($_.Exception.Message)")
                 }
             }
-            catch {
-                Write-AppLockerLog -Message "Failed to scan software on $hostname`: $($_.Exception.Message)" -Level 'ERROR'
-                Show-Toast -Message "Failed to scan $hostname`: $($_.Exception.Message)" -Type 'Warning'
+
+            $SyncHash.StatusText = 'Processing results...'
+            $SyncHash.Result = @{
+                AllResults  = @($allResults)
+                FailedHosts = @($failedHosts)
+                HostCount   = $hostnames.Count
+                ScansFolder = $scansFolder
             }
         }
+        catch {
+            $SyncHash.Error = $_.Exception.Message
+        }
+        finally {
+            $SyncHash.IsComplete = $true
+        }
+    })
 
-        $script:SoftwareInventory = @($allResults)
-        Update-SoftwareDataGrid -Window $Window
-        Update-SoftwareStats -Window $Window
+    [void]$script:SoftwarePowerShell.AddArgument($script:SoftwareSyncHash)
+    [void]$script:SoftwarePowerShell.AddArgument($modulePath)
 
-        $statusText = $Window.FindName('TxtSoftwareStatus')
-        if ($statusText) { $statusText.Text = "Scanned $($allResults.Count) programs across $($hostnames.Count) machine(s)" }
+    # Start async
+    $script:SoftwareAsyncResult = $script:SoftwarePowerShell.BeginInvoke()
 
-        $lastScan = $Window.FindName('TxtSoftwareLastScan')
-        if ($lastScan) { $lastScan.Text = "$($hostnames.Count) machines - $(Get-Date -Format 'MM/dd HH:mm')" }
+    # Poll for completion via DispatcherTimer
+    $script:SoftwareTimer = New-Object System.Windows.Threading.DispatcherTimer
+    $script:SoftwareTimer.Interval = [TimeSpan]::FromMilliseconds(300)
 
-        # Summary toast with auto-save info
-        $savedCount = @($hostnames | Where-Object { $allResults | Where-Object { $_.Machine -eq $_ } }).Count
-        $toastMsg = "Found $($allResults.Count) installed programs across $($hostnames.Count) machine(s)."
-        if ($scansFolder) { $toastMsg += " CSVs saved to Scans folder." }
-        Show-Toast -Message $toastMsg -Type 'Success'
-    }
-    catch {
-        Write-AppLockerLog -Message "Remote software scan failed: $($_.Exception.Message)" -Level 'ERROR'
-        Show-Toast -Message "Remote scan failed: $($_.Exception.Message)" -Type 'Error'
-    }
-    finally {
-        Hide-LoadingOverlay
-    }
+    $script:SoftwareTimer.Add_Tick({
+        $syncHash = $script:SoftwareSyncHash
+        $win = $syncHash.Window
+
+        # Update overlay text
+        Show-LoadingOverlay -Message $syncHash.StatusText
+
+        if ($syncHash.IsComplete) {
+            $script:SoftwareTimer.Stop()
+
+            try { $script:SoftwarePowerShell.EndInvoke($script:SoftwareAsyncResult) } catch { }
+            if ($script:SoftwarePowerShell) { $script:SoftwarePowerShell.Dispose() }
+            if ($script:SoftwareRunspace) {
+                $script:SoftwareRunspace.Close()
+                $script:SoftwareRunspace.Dispose()
+            }
+
+            Hide-LoadingOverlay
+
+            if ($syncHash.Error) {
+                Show-Toast -Message "Remote scan failed: $($syncHash.Error)" -Type 'Error'
+                return
+            }
+
+            $r = $syncHash.Result
+            $script:SoftwareInventory = $r.AllResults
+            Update-SoftwareDataGrid -Window $win
+            Update-SoftwareStats -Window $win
+
+            $statusText = $win.FindName('TxtSoftwareStatus')
+            if ($statusText) { $statusText.Text = "Scanned $($r.AllResults.Count) programs across $($r.HostCount) machine(s)" }
+
+            $lastScan = $win.FindName('TxtSoftwareLastScan')
+            if ($lastScan) { $lastScan.Text = "$($r.HostCount) machines - $(Get-Date -Format 'MM/dd HH:mm')" }
+
+            if ($r.FailedHosts.Count -gt 0) {
+                $failDetails = $r.FailedHosts -join "`n"
+                [System.Windows.MessageBox]::Show(
+                    "Scan completed but $($r.FailedHosts.Count) machine(s) failed:`n`n$failDetails",
+                    'Partial Scan Results', 'OK', 'Warning')
+            }
+
+            $toastMsg = "Found $($r.AllResults.Count) installed programs across $($r.HostCount) machine(s)."
+            if ($r.ScansFolder) { $toastMsg += " CSVs saved to Scans folder." }
+            $toastType = if ($r.FailedHosts.Count -gt 0) { 'Warning' } else { 'Success' }
+            Show-Toast -Message $toastMsg -Type $toastType
+        }
+    })
+
+    $script:SoftwareTimer.Start()
 }
 
 function script:Get-InstalledSoftware {
@@ -354,6 +457,8 @@ function global:Invoke-ImportSoftwareCsv {
     <#
     .SYNOPSIS
         Imports a software inventory CSV file for viewing or comparison.
+        First import (or import when no scan/baseline exists) becomes the baseline.
+        Second import goes into the comparison slot for Compare Inventories.
     #>
     param([System.Windows.Window]$Window)
 
@@ -380,6 +485,8 @@ function global:Invoke-ImportSoftwareCsv {
             return
         }
 
+        $fileName = [System.IO.Path]::GetFileName($dialog.FileName)
+
         # Normalize: ensure all expected properties exist
         $normalized = @($imported | ForEach-Object {
             [PSCustomObject]@{
@@ -394,22 +501,55 @@ function global:Invoke-ImportSoftwareCsv {
             }
         })
 
-        # Store as imported data AND show it
-        $script:SoftwareImportedData = $normalized
-        $script:SoftwareImportedFile = [System.IO.Path]::GetFileName($dialog.FileName)
-        $script:SoftwareInventory = $normalized
+        # Determine slot: if no baseline exists (no scan data and no prior import as baseline), this becomes the baseline.
+        # If baseline already exists (from scan or prior import), this goes into the comparison slot.
+        $hasBaseline = @($script:SoftwareInventory | Where-Object { $_.Source -ne 'Imported' -and $_.Source -ne 'Compare' }).Count -gt 0
+        $hasBaselineFromImport = $script:SoftwareInventory.Count -gt 0 -and $script:SoftwareImportedData.Count -eq 0
 
-        Update-SoftwareDataGrid -Window $Window
-        Update-SoftwareStats -Window $Window
+        if (-not $hasBaseline -and -not $hasBaselineFromImport) {
+            # No baseline — this CSV becomes the baseline (shown in DataGrid as "CSV" source)
+            $baselineData = @($normalized | ForEach-Object {
+                [PSCustomObject]@{
+                    Machine        = $_.Machine
+                    DisplayName    = $_.DisplayName
+                    DisplayVersion = $_.DisplayVersion
+                    Publisher      = $_.Publisher
+                    InstallDate    = $_.InstallDate
+                    InstallLocation = $_.InstallLocation
+                    Architecture   = $_.Architecture
+                    Source         = 'CSV'
+                }
+            })
+            $script:SoftwareInventory = $baselineData
+            $script:SoftwareImportedData = @()
+            $script:SoftwareImportedFile = ''
 
-        $importedFileText = $Window.FindName('TxtSoftwareImportedFile')
-        if ($importedFileText) { $importedFileText.Text = "$($script:SoftwareImportedFile) ($($normalized.Count) items)" }
+            Update-SoftwareDataGrid -Window $Window
+            Update-SoftwareStats -Window $Window
 
-        $statusText = $Window.FindName('TxtSoftwareStatus')
-        if ($statusText) { $statusText.Text = "Imported $($normalized.Count) items from $($script:SoftwareImportedFile)" }
+            $statusText = $Window.FindName('TxtSoftwareStatus')
+            if ($statusText) { $statusText.Text = "Baseline: $($baselineData.Count) items from $fileName - import another CSV to compare." }
 
-        Show-Toast -Message "Imported $($normalized.Count) software items from CSV." -Type 'Success'
-        Write-AppLockerLog -Message "Imported software CSV: $($dialog.FileName) ($($normalized.Count) items)" -Level 'INFO'
+            $lastScan = $Window.FindName('TxtSoftwareLastScan')
+            if ($lastScan) { $lastScan.Text = "CSV: $fileName" }
+
+            Show-Toast -Message "Loaded $($baselineData.Count) items as baseline from $fileName. Import another CSV to compare." -Type 'Success'
+            Write-AppLockerLog -Message "Imported software CSV as baseline: $($dialog.FileName) ($($baselineData.Count) items)" -Level 'INFO'
+        }
+        else {
+            # Baseline exists — this CSV goes into comparison slot
+            $script:SoftwareImportedData = $normalized
+            $script:SoftwareImportedFile = $fileName
+
+            $importedFileText = $Window.FindName('TxtSoftwareImportedFile')
+            if ($importedFileText) { $importedFileText.Text = "$fileName ($($normalized.Count) items)" }
+
+            $statusText = $Window.FindName('TxtSoftwareStatus')
+            if ($statusText) { $statusText.Text = "Comparison ready: $($normalized.Count) items from $fileName. Click Compare Inventories." }
+
+            Show-Toast -Message "Loaded $($normalized.Count) items for comparison from $fileName. Click Compare Inventories." -Type 'Success'
+            Write-AppLockerLog -Message "Imported software CSV for comparison: $($dialog.FileName) ($($normalized.Count) items)" -Level 'INFO'
+        }
     }
     catch {
         Write-AppLockerLog -Message "CSV import failed: $($_.Exception.Message)" -Level 'ERROR'
@@ -424,21 +564,21 @@ function global:Invoke-ImportSoftwareCsv {
 function global:Invoke-CompareSoftware {
     <#
     .SYNOPSIS
-        Compares current scan data against imported CSV data.
-        Shows three categories: Only in Scan, Only in Imported, Version Differences.
+        Compares baseline data (scan or first CSV) against imported CSV data.
+        Shows four categories: Match, Version Diff, Only in Baseline, Only in Import.
     #>
     param([System.Windows.Window]$Window)
 
-    # Need both a scan and an import to compare
+    # Need both a baseline and an import to compare
     if ($script:SoftwareImportedData.Count -eq 0) {
-        Show-Toast -Message 'No imported data to compare against. Import a CSV first.' -Type 'Warning'
+        Show-Toast -Message 'No imported data to compare against. Import a second CSV first.' -Type 'Warning'
         return
     }
 
-    # Get scan data (non-imported entries)
+    # Get baseline data (scan results or first-imported CSV, not the comparison-imported entries)
     $scanData = @($script:SoftwareInventory | Where-Object { $_.Source -ne 'Imported' -and $_.Source -ne 'Compare' })
     if ($scanData.Count -eq 0) {
-        Show-Toast -Message 'No scan data to compare. Run a local or remote scan first, then import a CSV.' -Type 'Warning'
+        Show-Toast -Message 'No baseline data to compare. Run a scan or import a CSV first, then import a second CSV.' -Type 'Warning'
         return
     }
 
@@ -498,7 +638,7 @@ function global:Invoke-CompareSoftware {
             }
         }
 
-        # Version differences (same name, different version)
+        # Version differences and matches (same name in both)
         foreach ($key in $scanLookup.Keys) {
             if ($importLookup.ContainsKey($key)) {
                 $s = $scanLookup[$key]
@@ -518,16 +658,29 @@ function global:Invoke-CompareSoftware {
                         Source         = 'Version Diff'
                     })
                 }
+                else {
+                    $comparisonResults.Add([PSCustomObject]@{
+                        Machine        = $s.Machine
+                        DisplayName    = $s.DisplayName
+                        DisplayVersion = $s.DisplayVersion
+                        Publisher      = $s.Publisher
+                        InstallDate    = $s.InstallDate
+                        InstallLocation = $s.InstallLocation
+                        Architecture   = $s.Architecture
+                        Source         = 'Match'
+                    })
+                }
             }
         }
 
-        # Sort: diffs first, then only-in-scan, then only-in-import
+        # Sort: diffs first, then only-in-scan, then only-in-import, then matches
         $sorted = @($comparisonResults | Sort-Object @{Expression = {
             switch ($_.Source) {
                 'Version Diff'   { 0 }
                 'Only in Scan'   { 1 }
                 'Only in Import' { 2 }
-                default          { 3 }
+                'Match'          { 3 }
+                default          { 4 }
             }
         }}, DisplayName)
 
@@ -539,14 +692,14 @@ function global:Invoke-CompareSoftware {
         $onlyScan = @($sorted | Where-Object { $_.Source -eq 'Only in Scan' }).Count
         $onlyImport = @($sorted | Where-Object { $_.Source -eq 'Only in Import' }).Count
         $versionDiff = @($sorted | Where-Object { $_.Source -eq 'Version Diff' }).Count
-        $common = $scanLookup.Count - $onlyScan - $versionDiff
+        $matchCount = @($sorted | Where-Object { $_.Source -eq 'Match' }).Count
 
         $statusText = $Window.FindName('TxtSoftwareStatus')
         if ($statusText) {
-            $statusText.Text = "Comparison: $versionDiff version diff(s), $onlyScan only in scan, $onlyImport only in import, $common identical"
+            $statusText.Text = "Comparison: $versionDiff version diff(s), $onlyScan only in scan, $onlyImport only in import, $matchCount match"
         }
 
-        Show-Toast -Message "Comparison complete: $($sorted.Count) differences found ($versionDiff version, $onlyScan scan-only, $onlyImport import-only)." -Type 'Success'
+        Show-Toast -Message "Comparison complete: $matchCount match, $versionDiff version diff(s), $onlyScan scan-only, $onlyImport import-only." -Type 'Success'
     }
     catch {
         Write-AppLockerLog -Message "Software comparison failed: $($_.Exception.Message)" -Level 'ERROR'
@@ -567,18 +720,24 @@ function global:Invoke-ClearSoftwareComparison {
     $script:SoftwareImportedData = @()
     $script:SoftwareImportedFile = ''
     $script:SoftwareInventory = @()
+    $script:CurrentSoftwareSourceFilter = 'All'
+
+    # Reset filter button highlights
+    Update-SoftwareSourceFilter -Window $Window -Filter 'All'
 
     Update-SoftwareDataGrid -Window $Window
     Update-SoftwareStats -Window $Window
 
-    $importedFileText = $Window.FindName('TxtSoftwareImportedFile')
-    if ($importedFileText) { $importedFileText.Text = 'None' }
+    if ($Window) {
+        $importedFileText = $Window.FindName('TxtSoftwareImportedFile')
+        if ($importedFileText) { $importedFileText.Text = 'None' }
 
-    $lastScan = $Window.FindName('TxtSoftwareLastScan')
-    if ($lastScan) { $lastScan.Text = 'None' }
+        $lastScan = $Window.FindName('TxtSoftwareLastScan')
+        if ($lastScan) { $lastScan.Text = 'None' }
 
-    $statusText = $Window.FindName('TxtSoftwareStatus')
-    if ($statusText) { $statusText.Text = 'Ready - scan local machine or import a CSV to get started.' }
+        $statusText = $Window.FindName('TxtSoftwareStatus')
+        if ($statusText) { $statusText.Text = 'Ready - scan local machine or import a CSV to get started.' }
+    }
 
     Show-Toast -Message 'Cleared all software inventory data.' -Type 'Info'
 }
@@ -587,6 +746,70 @@ function global:Invoke-ClearSoftwareComparison {
 
 #region ===== DATAGRID UPDATE =====
 
+function global:Update-SoftwareSourceFilter {
+    <#
+    .SYNOPSIS
+        Updates the source filter and refreshes the DataGrid + button highlights.
+    #>
+    param(
+        [System.Windows.Window]$Window,
+        [string]$Filter
+    )
+
+    # Map filter tag values to Source column values
+    $script:CurrentSoftwareSourceFilter = switch ($Filter) {
+        'All'          { 'All' }
+        'Match'        { 'Match' }
+        'VersionDiff'  { 'Version Diff' }
+        'OnlyScan'     { 'Only in Scan' }
+        'OnlyImport'   { 'Only in Import' }
+        default        { 'All' }
+    }
+
+    # Update button highlight states
+    $allButtons = @(
+        'BtnFilterSoftwareAll', 'BtnFilterSoftwareMatch', 'BtnFilterSoftwareVersionDiff',
+        'BtnFilterSoftwareOnlyScan', 'BtnFilterSoftwareOnlyImport'
+    )
+
+    # Determine which button matches current filter
+    $activeBtn = switch ($Filter) {
+        'All'          { 'BtnFilterSoftwareAll' }
+        'Match'        { 'BtnFilterSoftwareMatch' }
+        'VersionDiff'  { 'BtnFilterSoftwareVersionDiff' }
+        'OnlyScan'     { 'BtnFilterSoftwareOnlyScan' }
+        'OnlyImport'   { 'BtnFilterSoftwareOnlyImport' }
+        default        { 'BtnFilterSoftwareAll' }
+    }
+
+    if (-not $Window) {
+        Update-SoftwareDataGrid -Window $Window
+        return
+    }
+
+    foreach ($btnName in $allButtons) {
+        $btn = $Window.FindName($btnName)
+        if ($btn) {
+            if ($btnName -eq $activeBtn) {
+                $btn.Background = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#3E3E42')
+                $btn.Foreground = [System.Windows.Media.Brushes]::White
+            } else {
+                $btn.Background = [System.Windows.Media.Brushes]::Transparent
+                # Restore original foreground color
+                $btn.Foreground = switch ($btnName) {
+                    'BtnFilterSoftwareAll'          { [System.Windows.Media.Brushes]::White }
+                    'BtnFilterSoftwareMatch'        { [System.Windows.Media.BrushConverter]::new().ConvertFromString('#1565C0') }
+                    'BtnFilterSoftwareVersionDiff'  { [System.Windows.Media.BrushConverter]::new().ConvertFromString('#E6A100') }
+                    'BtnFilterSoftwareOnlyScan'     { [System.Windows.Media.BrushConverter]::new().ConvertFromString('#4CAF50') }
+                    'BtnFilterSoftwareOnlyImport'   { [System.Windows.Media.BrushConverter]::new().ConvertFromString('#EF5350') }
+                }
+            }
+        }
+    }
+
+    Update-SoftwareDataGrid -Window $Window
+}
+
 function global:Update-SoftwareDataGrid {
     <#
     .SYNOPSIS
@@ -594,10 +817,17 @@ function global:Update-SoftwareDataGrid {
     #>
     param([System.Windows.Window]$Window)
 
+    if (-not $Window) { return }
     $dataGrid = $Window.FindName('SoftwareDataGrid')
     if (-not $dataGrid) { return }
 
     $data = $script:SoftwareInventory
+
+    # Apply source filter (comparison category)
+    if ($script:CurrentSoftwareSourceFilter -and $script:CurrentSoftwareSourceFilter -ne 'All') {
+        $sourceFilter = $script:CurrentSoftwareSourceFilter
+        $data = @($data | Where-Object { $_.Source -eq $sourceFilter })
+    }
 
     # Apply text filter
     $filterBox = $Window.FindName('TxtSoftwareFilter')
@@ -621,13 +851,14 @@ function global:Update-SoftwareDataGrid {
     if ($filteredCount) { $filteredCount.Text = @($data).Count.ToString() }
 }
 
-function script:Update-SoftwareStats {
+function global:Update-SoftwareStats {
     <#
     .SYNOPSIS
         Updates the sidebar stats displays.
     #>
     param([System.Windows.Window]$Window)
 
+    if (-not $Window) { return }
     $totalCount = $Window.FindName('TxtSoftwareTotalCount')
     if ($totalCount) { $totalCount.Text = $script:SoftwareInventory.Count.ToString() }
 

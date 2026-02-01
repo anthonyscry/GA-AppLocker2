@@ -3,18 +3,21 @@
 function Initialize-SetupPanel {
     param([System.Windows.Window]$Window)
 
-    # Wire up Setup tab buttons
+    # Wire up Setup tab buttons - WinRM GPOs
     $btnInitWinRM = $Window.FindName('BtnInitializeWinRM')
     if ($btnInitWinRM) { $btnInitWinRM.Add_Click({ Invoke-ButtonAction -Action 'InitializeWinRM' }) }
 
-    $btnToggleWinRM = $Window.FindName('BtnToggleWinRM')
-    if ($btnToggleWinRM) { $btnToggleWinRM.Add_Click({ Invoke-ButtonAction -Action 'ToggleWinRM' }) }
+    $btnToggleEnable = $Window.FindName('BtnToggleEnableWinRM')
+    if ($btnToggleEnable) { $btnToggleEnable.Add_Click({ Invoke-ButtonAction -Action 'ToggleEnableWinRM' }) }
 
-    $btnRemoveWinRM = $Window.FindName('BtnRemoveWinRM')
-    if ($btnRemoveWinRM) { $btnRemoveWinRM.Add_Click({ Invoke-ButtonAction -Action 'RemoveWinRM' }) }
+    $btnRemoveEnable = $Window.FindName('BtnRemoveEnableWinRM')
+    if ($btnRemoveEnable) { $btnRemoveEnable.Add_Click({ Invoke-ButtonAction -Action 'RemoveEnableWinRM' }) }
 
-    $btnDisableWinRM = $Window.FindName('BtnDisableWinRMGPO')
-    if ($btnDisableWinRM) { $btnDisableWinRM.Add_Click({ Invoke-ButtonAction -Action 'DisableWinRMGPO' }) }
+    $btnToggleDisable = $Window.FindName('BtnToggleDisableWinRM')
+    if ($btnToggleDisable) { $btnToggleDisable.Add_Click({ Invoke-ButtonAction -Action 'ToggleDisableWinRM' }) }
+
+    $btnRemoveDisable = $Window.FindName('BtnRemoveDisableWinRM')
+    if ($btnRemoveDisable) { $btnRemoveDisable.Add_Click({ Invoke-ButtonAction -Action 'RemoveDisableWinRM' }) }
 
     $btnInitGPOs = $Window.FindName('BtnInitializeAppLockerGPOs')
     if ($btnInitGPOs) { $btnInitGPOs.Add_Click({ Invoke-ButtonAction -Action 'InitializeAppLockerGPOs' }) }
@@ -39,28 +42,45 @@ function Update-SetupStatus {
         if (-not $status) { return }
 
         if ($status.Success -and $status.Data) {
-            # Update WinRM status
-            $winrmStatus = $Window.FindName('TxtWinRMStatus')
-            if ($winrmStatus -and $status.Data.WinRM) {
-                $winrmStatus.Text = $status.Data.WinRM.Status
-                $winrmStatus.Foreground = switch ($status.Data.WinRM.Status) {
+            # Update EnableWinRM GPO status
+            $enableStatus = $Window.FindName('TxtEnableWinRMStatus')
+            if ($enableStatus -and $status.Data.WinRM) {
+                $enableStatus.Text = $status.Data.WinRM.Status
+                $enableStatus.Foreground = switch ($status.Data.WinRM.Status) {
                     'Enabled' { [System.Windows.Media.Brushes]::LightGreen }
                     'Disabled' { [System.Windows.Media.Brushes]::Orange }
                     default { [System.Windows.Media.Brushes]::Gray }
                 }
             }
 
-            # Update Toggle button label based on current state
-            $btnToggle = $Window.FindName('BtnToggleWinRM')
-            if ($btnToggle -and $status.Data.WinRM) {
+            # Update EnableWinRM toggle button label
+            $btnToggleEnable = $Window.FindName('BtnToggleEnableWinRM')
+            if ($btnToggleEnable -and $status.Data.WinRM) {
                 if ($status.Data.WinRM.Status -eq 'Enabled') {
-                    $btnToggle.Content = 'Disable Link'
+                    $btnToggleEnable.Content = 'Disable Link'
+                } else {
+                    $btnToggleEnable.Content = 'Enable Link'
                 }
-                elseif ($status.Data.WinRM.Exists) {
-                    $btnToggle.Content = 'Enable Link'
+            }
+
+            # Update DisableWinRM GPO status
+            $disableStatus = $Window.FindName('TxtDisableWinRMStatus')
+            if ($disableStatus -and $status.Data.DisableWinRM) {
+                $disableStatus.Text = $status.Data.DisableWinRM.Status
+                $disableStatus.Foreground = switch ($status.Data.DisableWinRM.Status) {
+                    'Enabled' { [System.Windows.Media.Brushes]::LightGreen }
+                    'Disabled' { [System.Windows.Media.Brushes]::Orange }
+                    default { [System.Windows.Media.Brushes]::Gray }
                 }
-                else {
-                    $btnToggle.Content = 'Enable Link'
+            }
+
+            # Update DisableWinRM toggle button label
+            $btnToggleDisable = $Window.FindName('BtnToggleDisableWinRM')
+            if ($btnToggleDisable -and $status.Data.DisableWinRM) {
+                if ($status.Data.DisableWinRM.Status -eq 'Enabled') {
+                    $btnToggleDisable.Content = 'Disable Link'
+                } else {
+                    $btnToggleDisable.Content = 'Enable Link'
                 }
             }
 
@@ -89,57 +109,90 @@ function global:Invoke-InitializeWinRM {
 
     try {
         $confirm = [System.Windows.MessageBox]::Show(
-            "This will create the 'AppLocker-EnableWinRM' GPO and link it to the domain root.`n`nThis enables WinRM on ALL computers in the domain.`n`nContinue?",
-            'Initialize WinRM GPO',
+            "This will create two WinRM GPOs linked to the domain root:`n`n" +
+            "1. AppLocker-EnableWinRM - enables WinRM on all computers`n" +
+            "2. AppLocker-DisableWinRM - tattoo removal (link starts disabled)`n`n" +
+            "Requires Domain Admin permissions.`n`nContinue?",
+            'Initialize WinRM GPOs',
             'YesNo',
             'Warning'
         )
 
         if ($confirm -ne 'Yes') { return }
 
-        $result = Initialize-WinRMGPO
+        Show-LoadingOverlay -Message 'Creating WinRM GPOs...' -SubMessage 'Setting up Enable + Disable GPOs'
 
-        if ($result.Success) {
+        # Create Enable GPO (linked + enabled)
+        $enableResult = Initialize-WinRMGPO
+
+        # Create Disable GPO (linked + enforced - but Initialize-DisableWinRMGPO also disables the Enable link)
+        $disableResult = Initialize-DisableWinRMGPO
+
+        # Fix link states: Enable GPO active, Disable GPO inactive (ready but not applied)
+        try {
+            Enable-WinRMGPO -GPOName 'AppLocker-EnableWinRM' -ErrorAction SilentlyContinue
+            Disable-WinRMGPO -GPOName 'AppLocker-DisableWinRM' -ErrorAction SilentlyContinue
+        } catch { }
+
+        Hide-LoadingOverlay
+
+        $summary = @()
+        if ($enableResult.Success) { $summary += "EnableWinRM: Created" } else { $summary += "EnableWinRM: Failed - $($enableResult.Error)" }
+        if ($disableResult.Success) { $summary += "DisableWinRM: Created (link disabled)" } else { $summary += "DisableWinRM: Failed - $($disableResult.Error)" }
+
+        if ($enableResult.Success -or $disableResult.Success) {
             [System.Windows.MessageBox]::Show(
-                "WinRM GPO created successfully!`n`nGPO: $($result.Data.GPOName)`nLinked to: $($result.Data.LinkedTo)",
+                "WinRM GPOs initialized!`n`n$($summary -join "`n")",
                 'Success',
                 'OK',
                 'Information'
             )
-            Update-SetupStatus -Window $Window
         }
         else {
-            [System.Windows.MessageBox]::Show("Failed: $($result.Error)", 'Error', 'OK', 'Error')
+            [System.Windows.MessageBox]::Show("Both GPOs failed:`n`n$($summary -join "`n")", 'Error', 'OK', 'Error')
         }
+
+        Update-SetupStatus -Window $Window
     }
     catch {
+        Hide-LoadingOverlay
         [System.Windows.MessageBox]::Show("Error: $($_.Exception.Message)", 'Error', 'OK', 'Error')
     }
 }
 
-function global:Invoke-ToggleWinRM {
-    param([System.Windows.Window]$Window)
+function global:Invoke-ToggleWinRMGPO {
+    param(
+        [System.Windows.Window]$Window,
+        [string]$GPOName,
+        [string]$StatusProperty
+    )
 
     try {
         $status = Get-SetupStatus
-        if (-not $status.Success -or -not $status.Data.WinRM.Exists) {
-            [System.Windows.MessageBox]::Show('WinRM GPO does not exist. Initialize it first.', 'Not Found', 'OK', 'Warning')
+        if (-not $status.Success) {
+            [System.Windows.MessageBox]::Show('Could not read GPO status.', 'Error', 'OK', 'Error')
             return
         }
 
-        $isEnabled = $status.Data.WinRM.Status -eq 'Enabled'
+        $gpoStatus = $status.Data.$StatusProperty
+        if (-not $gpoStatus -or -not $gpoStatus.Exists) {
+            [System.Windows.MessageBox]::Show("GPO '$GPOName' does not exist. Initialize WinRM GPOs first.", 'Not Found', 'OK', 'Warning')
+            return
+        }
+
+        $isEnabled = $gpoStatus.Status -eq 'Enabled'
 
         if ($isEnabled) {
-            $result = Disable-WinRMGPO
+            $result = Disable-WinRMGPO -GPOName $GPOName
             $action = 'disabled'
         }
         else {
-            $result = Enable-WinRMGPO
+            $result = Enable-WinRMGPO -GPOName $GPOName
             $action = 'enabled'
         }
 
         if ($result.Success) {
-            [System.Windows.MessageBox]::Show("WinRM GPO link $action.", 'Success', 'OK', 'Information')
+            [System.Windows.MessageBox]::Show("$GPOName link $action.", 'Success', 'OK', 'Information')
             Update-SetupStatus -Window $Window
         }
         else {
@@ -151,32 +204,41 @@ function global:Invoke-ToggleWinRM {
     }
 }
 
-function global:Invoke-RemoveWinRMGPO {
-    param([System.Windows.Window]$Window)
+function global:Invoke-RemoveWinRMGPOByName {
+    param(
+        [System.Windows.Window]$Window,
+        [string]$GPOName,
+        [string]$StatusProperty,
+        [string]$RemoveFunction
+    )
 
     try {
         $status = Get-SetupStatus
-        if (-not $status.Success -or -not $status.Data.WinRM.Exists) {
-            [System.Windows.MessageBox]::Show('WinRM GPO does not exist. Nothing to remove.', 'Not Found', 'OK', 'Warning')
+        if (-not $status.Success) {
+            [System.Windows.MessageBox]::Show('Could not read GPO status.', 'Error', 'OK', 'Error')
+            return
+        }
+
+        $gpoStatus = $status.Data.$StatusProperty
+        if (-not $gpoStatus -or -not $gpoStatus.Exists) {
+            [System.Windows.MessageBox]::Show("GPO '$GPOName' does not exist. Nothing to remove.", 'Not Found', 'OK', 'Warning')
             return
         }
 
         $confirm = [System.Windows.MessageBox]::Show(
-            "This will PERMANENTLY remove the 'AppLocker-EnableWinRM' GPO and all its links.`n`n" +
-            "WinRM service auto-start settings may persist on target machines until manually changed or gpupdate /force is run.`n`n" +
-            "Are you sure?",
-            'Remove WinRM GPO',
+            "This will PERMANENTLY remove '$GPOName' and all its links.`n`nAre you sure?",
+            "Remove $GPOName",
             'YesNo',
             'Warning'
         )
 
         if ($confirm -ne 'Yes') { return }
 
-        $result = Remove-WinRMGPO
+        $result = & $RemoveFunction -GPOName $GPOName
 
         if ($result.Success) {
             [System.Windows.MessageBox]::Show(
-                "WinRM GPO removed.`n`n$($result.Data.Note)",
+                "$GPOName removed.",
                 'Removed',
                 'OK',
                 'Information'
@@ -188,57 +250,6 @@ function global:Invoke-RemoveWinRMGPO {
         }
     }
     catch {
-        [System.Windows.MessageBox]::Show("Error: $($_.Exception.Message)", 'Error', 'OK', 'Error')
-    }
-}
-
-function global:Invoke-DisableWinRMGPO {
-    param([System.Windows.Window]$Window)
-
-    try {
-        $confirm = [System.Windows.MessageBox]::Show(
-            "This will create 'AppLocker-DisableWinRM' GPO that ACTIVELY reverses all WinRM settings:`n`n" +
-            "1. WinRM service set to Manual (reverses auto-start tattoo)`n" +
-            "2. AllowAutoConfig disabled (stops WinRM listener)`n" +
-            "3. LocalAccountTokenFilterPolicy = 0 (re-enables UAC filtering)`n" +
-            "4. Firewall blocks port 5985 inbound`n`n" +
-            "The AppLocker-EnableWinRM link will be disabled.`n`n" +
-            "After gpupdate propagates, remove both GPOs.`n`n" +
-            "Continue?",
-            'Create Disable-WinRM GPO (Tattoo Removal)',
-            'YesNo',
-            'Warning'
-        )
-
-        if ($confirm -ne 'Yes') { return }
-
-        Show-LoadingOverlay -Message 'Creating AppLocker-DisableWinRM GPO...' -SubMessage 'Applying counter-settings'
-
-        $result = Initialize-DisableWinRMGPO
-
-        Hide-LoadingOverlay
-
-        if ($result.Success) {
-            $settings = $result.Data.SettingsApplied -join "`n- "
-            [System.Windows.MessageBox]::Show(
-                "AppLocker-DisableWinRM GPO created!`n`n" +
-                "Settings applied:`n- $settings`n`n" +
-                "Next steps:`n" +
-                "1. Run gpupdate /force on target machines (or wait for GP cycle)`n" +
-                "2. Verify WinRM is disabled: Test-WSMan <hostname>`n" +
-                "3. When confirmed, remove both WinRM GPOs",
-                'Disable GPO Created',
-                'OK',
-                'Information'
-            )
-            Update-SetupStatus -Window $Window
-        }
-        else {
-            [System.Windows.MessageBox]::Show("Failed: $($result.Error)", 'Error', 'OK', 'Error')
-        }
-    }
-    catch {
-        Hide-LoadingOverlay
         [System.Windows.MessageBox]::Show("Error: $($_.Exception.Message)", 'Error', 'OK', 'Error')
     }
 }

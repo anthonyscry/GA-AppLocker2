@@ -2180,14 +2180,14 @@ Width="1450"
                                                 Style="{StaticResource ButtonStyle}" Margin="0,0,0,5"
                                                 Background="#1565C0" Tag="BackupGpoPolicy"
                                                 ToolTip="Export current AppLocker policy from a GPO to XML backup"/>
-                                        <Button x:Name="BtnExportPolicyXml" Content="Export Policy to XML" 
-                                                Style="{StaticResource ButtonStyle}" Margin="0,0,0,5"
-                                                Tag="ExportDeployPolicyXml"
-                                                ToolTip="Export a GA-AppLocker policy to AppLocker XML"/>
                                         <Button x:Name="BtnImportPolicyXml" Content="Import Policy from XML" 
                                                 Style="{StaticResource ButtonStyle}" Margin="0,0,0,5"
                                                 Tag="ImportDeployPolicyXml"
                                                 ToolTip="Import an AppLocker XML policy as rules"/>
+                                        <Button x:Name="BtnExportPolicyXml" Content="Export Policy to XML" 
+                                                Style="{StaticResource ButtonStyle}" Margin="0,0,0,5"
+                                                Tag="ExportDeployPolicyXml"
+                                                ToolTip="Export a GA-AppLocker policy to AppLocker XML"/>
                                     </StackPanel>
                                     </ScrollViewer>
                                 </TabItem>
@@ -2538,38 +2538,59 @@ Width="1450"
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
                             <!-- Card 1: WinRM Configuration -->
                             <Border Grid.Row="0" Grid.Column="0" Background="{StaticResource SidebarBrush}" CornerRadius="8" Padding="20" Margin="0,0,0,15">
                                 <StackPanel>
                                     <TextBlock Text="WINRM CONFIGURATION" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
-                                    <TextBlock Text="Enable WinRM across the domain for remote management via GPO." Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,0,0,15"/>
-
                                     <Grid Margin="0,0,0,15">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0">
-                                            <TextBlock Text="Status:" Foreground="{StaticResource MutedBrush}" FontSize="11"/>
-                                            <TextBlock x:Name="TxtWinRMStatus" Text="Not Configured" Foreground="{StaticResource WarningBrush}" FontWeight="SemiBold"/>
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="1">
-                                            <TextBlock Text="GPO Name:" Foreground="{StaticResource MutedBrush}" FontSize="11"/>
-                                            <TextBlock Text="AppLocker-EnableWinRM" Foreground="{StaticResource ForegroundBrush}"/>
-                                        </StackPanel>
+                                        <TextBlock Grid.Column="0" Text="Create both WinRM GPOs (Enable + Disable) for remote management." Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                                        <Button Grid.Column="1" x:Name="BtnInitializeWinRM" Content="Initialize WinRM GPOs" Style="{StaticResource PrimaryButtonStyle}" Padding="15,8" VerticalAlignment="Center" Margin="15,0,0,0"/>
                                     </Grid>
 
-                                    <StackPanel Orientation="Horizontal">
-                                        <Button x:Name="BtnInitializeWinRM" Content="Initialize" Style="{StaticResource PrimaryButtonStyle}" Padding="15,8" Margin="0,0,10,0"/>
-                                        <Button x:Name="BtnToggleWinRM" Content="Toggle Link" Style="{StaticResource ButtonStyle}" Padding="15,8" Margin="0,0,10,0"/>
-                                        <Button x:Name="BtnRemoveWinRM" Content="Remove GPO" Style="{StaticResource ButtonStyle}" Padding="15,8" Margin="0,0,10,0"
-                                                Foreground="{StaticResource ErrorBrush}" ToolTip="Completely remove the WinRM GPO and clean up tattooed settings"/>
-                                        <Button x:Name="BtnDisableWinRMGPO" Content="Disable GPO" Style="{StaticResource ButtonStyle}" Padding="15,8"
-                                                Foreground="{StaticResource WarningBrush}" ToolTip="Create AppLocker-DisableWinRM GPO to actively reverse all WinRM settings (tattoo removal)"/>
-                                    </StackPanel>
+                                    <!-- EnableWinRM GPO row -->
+                                    <Border Background="#252526" CornerRadius="6" Padding="12" Margin="0,0,0,8">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                <TextBlock Text="AppLocker-EnableWinRM" FontWeight="SemiBold" Foreground="{StaticResource ForegroundBrush}"/>
+                                                <TextBlock Text="Enables WinRM service across domain" Foreground="{StaticResource MutedBrush}" FontSize="10" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1" x:Name="TxtEnableWinRMStatus" Text="Not Created" Foreground="Gray" FontWeight="SemiBold" FontSize="11" VerticalAlignment="Center" Margin="10,0,15,0"/>
+                                            <Button Grid.Column="2" x:Name="BtnToggleEnableWinRM" Content="Toggle Link" Style="{StaticResource ButtonStyle}" Padding="10,5" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                            <Button Grid.Column="3" x:Name="BtnRemoveEnableWinRM" Content="Remove" Style="{StaticResource ButtonStyle}" Padding="10,5" VerticalAlignment="Center" Foreground="{StaticResource ErrorBrush}"/>
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- DisableWinRM GPO row -->
+                                    <Border Background="#252526" CornerRadius="6" Padding="12">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                <TextBlock Text="AppLocker-DisableWinRM" FontWeight="SemiBold" Foreground="{StaticResource ForegroundBrush}"/>
+                                                <TextBlock Text="Tattoo removal - reverses all WinRM settings" Foreground="{StaticResource MutedBrush}" FontSize="10" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1" x:Name="TxtDisableWinRMStatus" Text="Not Created" Foreground="Gray" FontWeight="SemiBold" FontSize="11" VerticalAlignment="Center" Margin="10,0,15,0"/>
+                                            <Button Grid.Column="2" x:Name="BtnToggleDisableWinRM" Content="Toggle Link" Style="{StaticResource ButtonStyle}" Padding="10,5" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                            <Button Grid.Column="3" x:Name="BtnRemoveDisableWinRM" Content="Remove" Style="{StaticResource ButtonStyle}" Padding="10,5" VerticalAlignment="Center" Foreground="{StaticResource ErrorBrush}"/>
+                                        </Grid>
+                                    </Border>
                                 </StackPanel>
                             </Border>
 
@@ -2925,12 +2946,12 @@ Width="1450"
 
                                     <!-- Import / Export -->
                                     <TextBlock Text="IMPORT / EXPORT" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
-                                    <Button x:Name="BtnExportSoftwareCsv" Content="Export to CSV"
-                                            Style="{StaticResource ButtonStyle}" Margin="0,0,0,5"
-                                            Tag="ExportSoftwareCsv"/>
                                     <Button x:Name="BtnImportSoftwareCsv" Content="Import CSV"
-                                            Style="{StaticResource ButtonStyle}" Margin="0,0,0,15"
+                                            Style="{StaticResource ButtonStyle}" Margin="0,0,0,5"
                                             Tag="ImportSoftwareCsv"/>
+                                    <Button x:Name="BtnExportSoftwareCsv" Content="Export to CSV"
+                                            Style="{StaticResource ButtonStyle}" Margin="0,0,0,15"
+                                            Tag="ExportSoftwareCsv"/>
 
                                     <!-- Compare -->
                                     <TextBlock Text="COMPARE" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
@@ -2975,6 +2996,14 @@ Width="1450"
                                         <TextBox x:Name="TxtSoftwareFilter" Width="150" Background="#1E1E1E" Foreground="{StaticResource ForegroundBrush}" BorderBrush="#3E3E42" Padding="6,4" FontSize="11"/>
                                     </StackPanel>
                                 </DockPanel>
+                                <!-- Source filter buttons (comparison legend) -->
+                                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                    <Button x:Name="BtnFilterSoftwareAll" Content="All" Background="#3E3E42" Foreground="White" Padding="10,4" BorderThickness="0" Margin="0,0,4,0" FontSize="11" Tag="FilterSoftwareAll"/>
+                                    <Button x:Name="BtnFilterSoftwareMatch" Content="Match" Background="Transparent" Foreground="#1565C0" Padding="10,4" BorderThickness="0" Margin="0,0,4,0" FontSize="11" Tag="FilterSoftwareMatch"/>
+                                    <Button x:Name="BtnFilterSoftwareVersionDiff" Content="Version Diff" Background="Transparent" Foreground="#E6A100" Padding="10,4" BorderThickness="0" Margin="0,0,4,0" FontSize="11" Tag="FilterSoftwareVersionDiff"/>
+                                    <Button x:Name="BtnFilterSoftwareOnlyScan" Content="Only in Scan" Background="Transparent" Foreground="#4CAF50" Padding="10,4" BorderThickness="0" Margin="0,0,4,0" FontSize="11" Tag="FilterSoftwareOnlyScan"/>
+                                    <Button x:Name="BtnFilterSoftwareOnlyImport" Content="Only in Import" Background="Transparent" Foreground="#EF5350" Padding="10,4" BorderThickness="0" FontSize="11" Tag="FilterSoftwareOnlyImport"/>
+                                </StackPanel>
                             </StackPanel>
 
                             <!-- DataGrid -->
@@ -2982,6 +3011,24 @@ Width="1450"
                                       Style="{StaticResource DataGridStyle}"
                                       AutoGenerateColumns="False" IsReadOnly="True"
                                       SelectionMode="Extended">
+                                <DataGrid.RowStyle>
+                                    <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Source}" Value="Version Diff">
+                                                <Setter Property="Background" Value="#33E6A100"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Source}" Value="Only in Scan">
+                                                <Setter Property="Background" Value="#334CAF50"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Source}" Value="Only in Import">
+                                                <Setter Property="Background" Value="#33EF5350"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Source}" Value="Match">
+                                                <Setter Property="Background" Value="#331565C0"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </DataGrid.RowStyle>
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="Machine" Binding="{Binding Machine}" Width="120"/>
                                     <DataGridTextColumn Header="Name" Binding="{Binding DisplayName}" Width="*" MinWidth="200"/>
@@ -2989,7 +3036,34 @@ Width="1450"
                                     <DataGridTextColumn Header="Publisher" Binding="{Binding Publisher}" Width="180"/>
                                     <DataGridTextColumn Header="Install Date" Binding="{Binding InstallDate}" Width="90"/>
                                     <DataGridTextColumn Header="Arch" Binding="{Binding Architecture}" Width="55"/>
-                                    <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="70"/>
+                                    <DataGridTemplateColumn Header="Source" Width="100" SortMemberPath="Source">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Border CornerRadius="3" Padding="5,2" HorizontalAlignment="Center">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Background" Value="Transparent"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Source}" Value="Version Diff">
+                                                                    <Setter Property="Background" Value="#E65100"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Source}" Value="Only in Scan">
+                                                                    <Setter Property="Background" Value="#1B5E20"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Source}" Value="Only in Import">
+                                                                    <Setter Property="Background" Value="#8B0000"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Source}" Value="Match">
+                                                                    <Setter Property="Background" Value="#1565C0"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <TextBlock Text="{Binding Source}" Foreground="White" FontSize="10"/>
+                                                </Border>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
                                 </DataGrid.Columns>
                             </DataGrid>
                         </Grid>

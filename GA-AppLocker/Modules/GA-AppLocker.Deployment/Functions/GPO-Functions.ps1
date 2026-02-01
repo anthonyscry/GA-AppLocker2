@@ -198,15 +198,16 @@ function Import-PolicyToGPO {
         # Set AppLocker policy using PowerShell
         # Note: Set-AppLockerPolicy requires AppLocker module
         if (Get-Command -Name 'Set-AppLockerPolicy' -ErrorAction SilentlyContinue) {
-            # Read XML content using .NET to avoid BOM/encoding issues from Get-Content
-            $xmlContent = [System.IO.File]::ReadAllText((Resolve-Path $XmlPath).Path)
-            Write-AppLockerLog -Message "Import-PolicyToGPO: XML content length = $($xmlContent.Length) chars"
+            # -XmlPolicy expects a FILE PATH, not XML content
+            # Export-PolicyToXml already writes BOM-free UTF-8 so the file is clean
+            $resolvedPath = (Resolve-Path $XmlPath).Path
+            Write-AppLockerLog -Message "Import-PolicyToGPO: Importing XML from $resolvedPath"
 
             if ($Merge) {
-                Set-AppLockerPolicy -XmlPolicy $xmlContent -Ldap $ldapPath -Merge
+                Set-AppLockerPolicy -XmlPolicy $resolvedPath -Ldap $ldapPath -Merge
             }
             else {
-                Set-AppLockerPolicy -XmlPolicy $xmlContent -Ldap $ldapPath
+                Set-AppLockerPolicy -XmlPolicy $resolvedPath -Ldap $ldapPath
             }
         }
         else {

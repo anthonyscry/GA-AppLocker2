@@ -2,6 +2,65 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.29] - 2026-01-31
+
+### Documentation
+
+- **Version bump to 1.2.29** -- Updated module manifest, CLAUDE.md, README.md, TODO.md, CHANGELOG.md, and DEVELOPMENT.md.
+- **Test count update** -- 550/550 tests passing (100%), up from 397. 17 unit test files covering all 10 sub-modules. New test files include SoftwareComparison.Tests.ps1 and V1228Regression.Tests.ps1.
+
+### Stats
+
+- **Tests:** 550/550 passing (100%)
+- **Test files:** 17
+- **Exported Commands:** ~200
+
+---
+
+## [1.2.28] - 2026-01-31
+
+### Bug Fixes
+
+- **Deployment: Pass file path not XML content to Set-AppLockerPolicy** -- Fixed deployment error where XML string content was passed instead of the file path.
+- **Per-host CSV export null ComputerName crash** -- Fixed null reference when ComputerName was missing during per-host CSV artifact export.
+
+### Enhanced
+
+- **Software Inventory: Background runspace for remote scan** -- Remote software scan now runs in a background runspace so the UI no longer freezes.
+- **Software panel: Auto-populate remote machines from AD Discovery** -- Machines that are online and have WinRM available are automatically listed.
+- **Deploy panel: Auto-refresh on navigation** -- Policy combo and jobs list refresh every time the Deploy panel is navigated to.
+
+### Stats
+
+- **Tests:** 550/550 passing (100%)
+- **Exported Commands:** ~200
+
+---
+
+## [1.2.27] - 2026-01-31
+
+### Features
+
+- **Auto-export per-host CSV artifact files** -- After every scan, per-host CSV files are saved as `{HostName}_artifacts_{date}.csv` in the Scans folder.
+
+### Stats
+
+- **Tests:** 550/550 passing (100%)
+
+---
+
+## [1.2.26] - 2026-01-31
+
+### Bug Fixes & Code Quality
+
+- **Code quality sweep (17 fixes)** -- Remove destructive startup rule deletion, fix .psd1/.psm1 export mismatches, fix scheduled scan hardcoded dev paths, consolidate Get-MachineTypeFromOU, fix Backup-AppLockerData settings path, fix AuditTrail APPDATA fallback, Event System global->script scope, Test-Prerequisites .NET domain check, Test-CredentialProfile WMI ping, scanning scriptblock sync, ConvertFrom-Artifact O(1) List growth, Setup module .psd1 manifest, Remove-Rule export ambiguity, LDAP RequireSSL config option, scheduled scan runner ACL, Write-AuditLog JSONL format, dynamic APP_VERSION from manifest.
+
+### Stats
+
+- **Tests:** 550/550 passing (100%)
+
+---
+
 ## [1.2.25] - 2026-01-31
 
 ### Bug Fixes

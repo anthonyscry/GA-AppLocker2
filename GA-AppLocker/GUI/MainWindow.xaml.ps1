@@ -159,11 +159,12 @@ function global:Invoke-ButtonAction {
         'ImportSoftwareCsv' { Invoke-ImportSoftwareCsv -Window $win }
         'CompareSoftware' { Invoke-CompareSoftware -Window $win }
         'ClearSoftwareComparison' { Invoke-ClearSoftwareComparison -Window $win }
-        # Setup panel (Settings > Setup tab)
+        # Setup panel - WinRM GPOs
         'InitializeWinRM' { Invoke-InitializeWinRM -Window $win }
-        'ToggleWinRM' { Invoke-ToggleWinRM -Window $win }
-        'RemoveWinRM' { Invoke-RemoveWinRMGPO -Window $win }
-        'DisableWinRMGPO' { Invoke-DisableWinRMGPO -Window $win }
+        'ToggleEnableWinRM' { Invoke-ToggleWinRMGPO -Window $win -GPOName 'AppLocker-EnableWinRM' -StatusProperty 'WinRM' }
+        'RemoveEnableWinRM' { Invoke-RemoveWinRMGPOByName -Window $win -GPOName 'AppLocker-EnableWinRM' -StatusProperty 'WinRM' -RemoveFunction 'Remove-WinRMGPO' }
+        'ToggleDisableWinRM' { Invoke-ToggleWinRMGPO -Window $win -GPOName 'AppLocker-DisableWinRM' -StatusProperty 'DisableWinRM' }
+        'RemoveDisableWinRM' { Invoke-RemoveWinRMGPOByName -Window $win -GPOName 'AppLocker-DisableWinRM' -StatusProperty 'DisableWinRM' -RemoveFunction 'Remove-DisableWinRMGPO' }
         'InitializeAppLockerGPOs' { Invoke-InitializeAppLockerGPOs -Window $win }
         'InitializeADStructure' { Invoke-InitializeADStructure -Window $win }
         'InitializeAll' { Invoke-InitializeAll -Window $win }
@@ -293,9 +294,24 @@ function global:Set-ActivePanel {
         Invoke-DomainRefresh -Window $Window
     }
 
-    # Auto-refresh Deploy policy combo on every navigation to Deploy panel
+    # Auto-refresh Deploy panel on every navigation (policy combo + jobs list)
     if ($PanelName -eq 'PanelDeploy') {
         Refresh-DeployPolicyCombo -Window $Window
+        Update-DeploymentJobsDataGrid -Window $Window
+    }
+
+    # Auto-populate Software remote machines from AD Discovery (online + WinRM)
+    if ($PanelName -eq 'PanelSoftware') {
+        $machineBox = $Window.FindName('TxtSoftwareRemoteMachines')
+        if ($machineBox -and [string]::IsNullOrWhiteSpace($machineBox.Text)) {
+            $winrmMachines = @($script:DiscoveredMachines | Where-Object {
+                $_.IsOnline -eq $true -and $_.WinRMStatus -eq 'Available'
+            } | ForEach-Object { $_.Hostname })
+            if ($winrmMachines.Count -gt 0) {
+                $machineBox.Text = $winrmMachines -join "`n"
+                Write-Log -Message "Software panel: auto-populated $($winrmMachines.Count) online+WinRM machines from AD Discovery"
+            }
+        }
     }
     
     # Auto-save session state on panel change

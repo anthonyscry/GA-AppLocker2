@@ -379,20 +379,32 @@ function Start-ArtifactScan {
 
         #region --- Auto-Export Per-Host CSVs ---
         # Always export one CSV per host to the Scans folder
-        if ($allArtifacts.Count -gt 0) {
-            $scanPath = Get-ScanStoragePath
-            $hostGroups = $allArtifacts | Group-Object -Property ComputerName
-            $dateStamp = Get-Date -Format 'ddMMMyy'
-            foreach ($group in $hostGroups) {
-                $hostName = if ($group.Name) { $group.Name } else { 'Unknown' }
-                $safeHost = $hostName -replace '[\\/:*?"<>|]', '_'
-                $hostFile = Join-Path $scanPath "${safeHost}_artifacts_${dateStamp}.csv"
-                $group.Group | Select-Object FileName, FilePath, ArtifactType, CollectionType,
-                    Publisher, ProductName, FileVersion, IsSigned, SHA256Hash, FileSize, ComputerName |
-                    Export-Csv -Path $hostFile -NoTypeInformation -Encoding UTF8
-                Write-ScanLog -Message "Per-host CSV export: $hostFile ($($group.Count) artifacts)"
+        # Wrapped in try/catch so export failures never crash the scan
+        try {
+            if ($allArtifacts.Count -gt 0) {
+                $scanPath = Get-ScanStoragePath
+                # Ensure every artifact has a ComputerName (Appx/local may be null)
+                foreach ($a in $allArtifacts) {
+                    if (-not $a.ComputerName) {
+                        $a | Add-Member -NotePropertyName 'ComputerName' -NotePropertyValue $env:COMPUTERNAME -Force
+                    }
+                }
+                $hostGroups = $allArtifacts | Group-Object -Property ComputerName
+                $dateStamp = Get-Date -Format 'ddMMMyy'
+                foreach ($group in $hostGroups) {
+                    $hostName = if ($group.Name) { $group.Name } else { $env:COMPUTERNAME }
+                    $safeHost = $hostName -replace '[\\/:*?"<>|]', '_'
+                    $hostFile = Join-Path $scanPath "${safeHost}_artifacts_${dateStamp}.csv"
+                    $group.Group | Select-Object FileName, FilePath, ArtifactType, CollectionType,
+                        Publisher, ProductName, FileVersion, IsSigned, SHA256Hash, FileSize, ComputerName |
+                        Export-Csv -Path $hostFile -NoTypeInformation -Encoding UTF8
+                    Write-ScanLog -Message "Per-host CSV export: $hostFile ($($group.Count) artifacts)"
+                }
+                Write-ScanLog -Message "Exported CSVs for $($hostGroups.Count) host(s) to $scanPath"
             }
-            Write-ScanLog -Message "Exported CSVs for $($hostGroups.Count) host(s) to $scanPath"
+        }
+        catch {
+            Write-ScanLog -Level Warning -Message "Per-host CSV export failed (scan results unaffected): $($_.Exception.Message)"
         }
         #endregion
 

@@ -37,6 +37,7 @@ function Get-SetupStatus {
                 ActiveDirectory = $hasAD
             }
             WinRM            = $null
+            DisableWinRM     = $null
             AppLockerGPOs    = @()
             ADStructure      = $null
             LastChecked      = Get-Date
@@ -69,7 +70,35 @@ function Get-SetupStatus {
             else {
                 $status.WinRM = [PSCustomObject]@{
                     Exists  = $false
-                    Status  = 'Not Configured'
+                    Status  = 'Not Created'
+                }
+            }
+
+            # Check DisableWinRM GPO
+            $disableGPO = Get-GPO -Name 'AppLocker-DisableWinRM' -ErrorAction SilentlyContinue
+            if ($disableGPO) {
+                $domainDN2 = Get-DomainDN
+                $disableLink = $null
+                try {
+                    $disableLink = Get-GPInheritance -Target $domainDN2 -ErrorAction SilentlyContinue |
+                            Select-Object -ExpandProperty GpoLinks |
+                            Where-Object { $_.DisplayName -eq 'AppLocker-DisableWinRM' }
+                }
+                catch { }
+
+                $status.DisableWinRM = [PSCustomObject]@{
+                    Exists    = $true
+                    GPOName   = $disableGPO.DisplayName
+                    GPOId     = $disableGPO.Id
+                    Linked    = [bool]$disableLink
+                    Enabled   = if ($disableLink) { $disableLink.Enabled } else { $false }
+                    Status    = if ($disableLink -and $disableLink.Enabled) { 'Enabled' } elseif ($disableLink) { 'Disabled' } else { 'Not Linked' }
+                }
+            }
+            else {
+                $status.DisableWinRM = [PSCustomObject]@{
+                    Exists  = $false
+                    Status  = 'Not Created'
                 }
             }
 
@@ -89,6 +118,7 @@ function Get-SetupStatus {
         }
         else {
             $status.WinRM = [PSCustomObject]@{ Exists = $false; Status = 'Module Not Available' }
+            $status.DisableWinRM = [PSCustomObject]@{ Exists = $false; Status = 'Module Not Available' }
         }
 
         # Check AD Structure
