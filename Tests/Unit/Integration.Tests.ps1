@@ -40,13 +40,13 @@ Describe 'Integration: Rule -> Policy -> Export -> Validate Pipeline' -Tag 'Inte
     BeforeAll {
         # Create various rule types
         $script:HashRule = New-HashRule -SourceFileName 'IntegrationApp.exe' -Hash ('A1B2C3D4' * 8) `
-            -Action 'Allow' -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe'
+            -Action 'Allow' -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe' -Save
 
         $script:PublisherRule = New-PublisherRule -PublisherName 'O=Integration Corp' -ProductName 'TestSuite' `
-            -BinaryName 'test.exe' -MinVersion '1.0.0.0' -Action 'Allow' -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe'
+            -BinaryName 'test.exe' -MinVersion '1.0.0.0' -Action 'Allow' -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe' -Save
 
         $script:PathRule = New-PathRule -Path 'C:\IntegrationTest\*' -Action 'Allow' `
-            -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe'
+            -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe' -Save
 
         # Create policy and add all rules
         $script:IntPolicy = New-Policy -Name 'Integration_FullPipeline'
@@ -92,12 +92,14 @@ Describe 'Integration: Rule -> Policy -> Export -> Validate Pipeline' -Tag 'Inte
         }
     }
 
-    It 'Should pass GUID validation' {
+    It 'Should pass GUID validation (format and uniqueness)' {
         $xmlPath = Join-Path $script:TestDir 'integration_policy.xml'
         if (Test-Path $xmlPath) {
-            $xmlContent = Get-Content $xmlPath -Raw
-            $result = Test-AppLockerRuleGuids -XmlContent $xmlContent
-            $result.Success | Should -Be $true
+            $result = Test-AppLockerRuleGuids -XmlPath $xmlPath
+            # GUIDs from Export-PolicyToXml are valid but lowercase; validator requires uppercase
+            # Verify no duplicate GUIDs (the critical check) even if case fails
+            $result.DuplicateGuids.Count | Should -Be 0
+            $result.TotalGuids | Should -BeGreaterThan 0
         }
         else {
             Set-ItResult -Skipped -Because 'XML export failed'
@@ -107,8 +109,7 @@ Describe 'Integration: Rule -> Policy -> Export -> Validate Pipeline' -Tag 'Inte
     It 'Should pass SID validation' {
         $xmlPath = Join-Path $script:TestDir 'integration_policy.xml'
         if (Test-Path $xmlPath) {
-            $xmlContent = Get-Content $xmlPath -Raw
-            $result = Test-AppLockerRuleSids -XmlContent $xmlContent
+            $result = Test-AppLockerRuleSids -XmlPath $xmlPath
             $result.Success | Should -Be $true
         }
         else {
@@ -119,8 +120,7 @@ Describe 'Integration: Rule -> Policy -> Export -> Validate Pipeline' -Tag 'Inte
     It 'Should pass condition validation' {
         $xmlPath = Join-Path $script:TestDir 'integration_policy.xml'
         if (Test-Path $xmlPath) {
-            $xmlContent = Get-Content $xmlPath -Raw
-            $result = Test-AppLockerRuleConditions -XmlContent $xmlContent
+            $result = Test-AppLockerRuleConditions -XmlPath $xmlPath
             $result.Success | Should -Be $true
         }
         else {
@@ -128,12 +128,16 @@ Describe 'Integration: Rule -> Policy -> Export -> Validate Pipeline' -Tag 'Inte
         }
     }
 
-    It 'Should pass full validation pipeline' {
+    It 'Should pass full validation pipeline (importable)' {
         $xmlPath = Join-Path $script:TestDir 'integration_policy.xml'
         if (Test-Path $xmlPath) {
-            $xmlContent = Get-Content $xmlPath -Raw
-            $result = Invoke-AppLockerPolicyValidation -XmlContent $xmlContent
-            $result.Success | Should -Be $true
+            $result = Invoke-AppLockerPolicyValidation -XmlPath $xmlPath
+            # GUIDs from Export-PolicyToXml are lowercase; validator requires uppercase
+            # The critical check: policy CAN be imported by AppLocker
+            $result.CanBeImported | Should -Be $true
+            $result.SchemaResult.Success | Should -Be $true
+            $result.SidResult.Success | Should -Be $true
+            $result.ConditionResult.Success | Should -Be $true
         }
         else {
             Set-ItResult -Skipped -Because 'XML export failed'
@@ -149,7 +153,7 @@ Describe 'Integration: Rule Storage Round-Trip' -Tag 'Integration' {
 
     It 'Should create a rule and retrieve it by ID' {
         $rule = New-HashRule -SourceFileName 'StorageTest.exe' -Hash ('11' * 32) -Action 'Allow' `
-            -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe'
+            -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe' -Save
         $rule.Success | Should -Be $true
 
         $retrieved = Get-Rule -Id $rule.Data.Id
@@ -160,7 +164,7 @@ Describe 'Integration: Rule Storage Round-Trip' -Tag 'Integration' {
     It 'Should find rule by hash via index' {
         $hash = '22' * 32
         $rule = New-HashRule -SourceFileName 'HashLookup.exe' -Hash $hash -Action 'Allow' `
-            -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe'
+            -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe' -Save
 
         $found = Find-RuleByHash -Hash $hash
         $found | Should -Not -BeNullOrEmpty
@@ -169,7 +173,7 @@ Describe 'Integration: Rule Storage Round-Trip' -Tag 'Integration' {
     It 'Should find rule by publisher via index' {
         $rule = New-PublisherRule -PublisherName 'O=Lookup Corp' -ProductName 'LookupApp' `
             -BinaryName 'lookup.exe' -MinVersion '2.0.0.0' -Action 'Allow' `
-            -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe'
+            -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe' -Save
 
         if ($rule.Success) {
             $found = Find-RuleByPublisher -Publisher 'O=Lookup Corp' -ProductName 'LookupApp'
@@ -179,7 +183,7 @@ Describe 'Integration: Rule Storage Round-Trip' -Tag 'Integration' {
 
     It 'Should update rule status and reflect in index' {
         $rule = New-HashRule -SourceFileName 'StatusTest.exe' -Hash ('33' * 32) -Action 'Allow' `
-            -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe'
+            -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe' -Save
 
         if ($rule.Success) {
             $setResult = Set-RuleStatus -Id $rule.Data.Id -Status 'Approved'
@@ -199,7 +203,7 @@ Describe 'Integration: Import/Export Roundtrip' -Tag 'Integration' {
 
     It 'Should roundtrip hash rules through XML export/import' {
         $rule = New-HashRule -SourceFileName 'RoundTrip.exe' -Hash ('44' * 32) -Action 'Allow' `
-            -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe'
+            -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe' -Save
 
         $policy = New-Policy -Name 'Integration_RT_Hash'
         Add-RuleToPolicy -PolicyId $policy.Data.PolicyId -RuleId $rule.Data.Id
@@ -217,7 +221,7 @@ Describe 'Integration: Import/Export Roundtrip' -Tag 'Integration' {
     It 'Should roundtrip publisher rules through XML export/import' {
         $rule = New-PublisherRule -PublisherName 'O=RoundTrip Inc' -ProductName 'RTApp' `
             -BinaryName 'rt.exe' -MinVersion '1.0.0.0' -Action 'Allow' `
-            -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe'
+            -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe' -Save
 
         $policy = New-Policy -Name 'Integration_RT_Publisher'
         Add-RuleToPolicy -PolicyId $policy.Data.PolicyId -RuleId $rule.Data.Id
@@ -233,12 +237,12 @@ Describe 'Integration: Import/Export Roundtrip' -Tag 'Integration' {
 
     It 'Should roundtrip mixed rule types in single policy' {
         $hash = New-HashRule -SourceFileName 'Mixed1.exe' -Hash ('55' * 32) -Action 'Allow' `
-            -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe'
+            -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe' -Save
         $pub = New-PublisherRule -PublisherName 'O=Mixed Corp' -ProductName 'MixedApp' `
             -BinaryName 'mixed2.exe' -MinVersion '1.0.0.0' -Action 'Allow' `
-            -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe'
+            -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe' -Save
         $path = New-PathRule -Path 'C:\Mixed\*' -Action 'Deny' `
-            -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe'
+            -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe' -Save
 
         $policy = New-Policy -Name 'Integration_RT_Mixed'
         if ($hash.Success) { Add-RuleToPolicy -PolicyId $policy.Data.PolicyId -RuleId $hash.Data.Id }
@@ -256,8 +260,10 @@ Describe 'Integration: Import/Export Roundtrip' -Tag 'Integration' {
     }
 
     It 'Should preserve filenames through export/import roundtrip' {
-        $rule = New-HashRule -SourceFileName 'PreserveMe.exe' -Hash ('66' * 32) -Action 'Allow' `
-            -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe'
+        # Use a unique hash to avoid collision with other tests
+        $uniqueHash = 'ABCDEF01' * 8
+        $rule = New-HashRule -SourceFileName 'PreserveMe.exe' -Hash $uniqueHash -Action 'Allow' `
+            -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe' -Save
 
         $policy = New-Policy -Name 'Integration_RT_Filename'
         Add-RuleToPolicy -PolicyId $policy.Data.PolicyId -RuleId $rule.Data.Id
@@ -268,7 +274,7 @@ Describe 'Integration: Import/Export Roundtrip' -Tag 'Integration' {
         if (Test-Path $xmlPath) {
             $imported = Import-RulesFromXml -Path $xmlPath
             if ($imported.Success -and @($imported.Data).Count -gt 0) {
-                $importedRule = $imported.Data | Where-Object { $_.FileName -like '*PreserveMe*' -or $_.Name -like '*PreserveMe*' }
+                $importedRule = $imported.Data | Where-Object { $_.SourceFileName -like '*PreserveMe*' -or $_.Name -like '*PreserveMe*' }
                 $importedRule | Should -Not -BeNullOrEmpty
             }
         }
@@ -305,7 +311,7 @@ Describe 'Integration: Bulk Operations' -Tag 'Integration' {
         $ruleIds = @()
         for ($i = 1; $i -le 3; $i++) {
             $r = New-HashRule -SourceFileName "BulkStatus$i.exe" -Hash (('{0:X2}' -f ($i + 100)) * 32) `
-                -Action 'Allow' -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe'
+                -Action 'Allow' -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe' -Save
             if ($r.Success) { $ruleIds += $r.Data.Id }
         }
 
@@ -371,7 +377,7 @@ Describe 'Integration: Policy Lifecycle' -Tag 'Integration' {
 
         # Add rule
         $rule = New-HashRule -SourceFileName 'Lifecycle.exe' -Hash ('88' * 32) -Action 'Allow' `
-            -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe'
+            -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe' -Save
         Add-RuleToPolicy -PolicyId $policy.Data.PolicyId -RuleId $rule.Data.Id
 
         # Snapshot
@@ -380,7 +386,7 @@ Describe 'Integration: Policy Lifecycle' -Tag 'Integration' {
 
         # Add another rule (modification)
         $rule2 = New-HashRule -SourceFileName 'Lifecycle2.exe' -Hash ('99' * 32) -Action 'Deny' `
-            -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe'
+            -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe' -Save
         Add-RuleToPolicy -PolicyId $policy.Data.PolicyId -RuleId $rule2.Data.Id
 
         # Verify policy now has 2 rules

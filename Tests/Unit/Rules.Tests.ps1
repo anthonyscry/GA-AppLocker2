@@ -284,7 +284,7 @@ Describe 'Rules Module - Deduplication' {
         }
 
         It 'Should return null for non-existent hash' {
-            $found = Find-ExistingHashRule -Hash ('9' * 64) -CollectionType 'Exe'
+            $found = Find-ExistingHashRule -Hash ('DEADBEEF' * 8) -CollectionType 'Exe'
             $found | Should -BeNullOrEmpty
         }
     }

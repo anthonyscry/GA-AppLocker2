@@ -113,7 +113,7 @@ function Compare-Policies {
         # Index source rules by ID
         if ($source.RuleIds) {
             foreach ($ruleId in $source.RuleIds) {
-                $ruleResult = Get-Rule -RuleId $ruleId
+                $ruleResult = Get-Rule -Id $ruleId
                 if ($ruleResult.Success) {
                     $sourceRules[$ruleId] = $ruleResult.Data
                 }
@@ -123,7 +123,7 @@ function Compare-Policies {
         # Index target rules by ID
         if ($target.RuleIds) {
             foreach ($ruleId in $target.RuleIds) {
-                $ruleResult = Get-Rule -RuleId $ruleId
+                $ruleResult = Get-Rule -Id $ruleId
                 if ($ruleResult.Success) {
                     $targetRules[$ruleId] = $ruleResult.Data
                 }

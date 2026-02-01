@@ -74,7 +74,7 @@ function New-PolicySnapshot {
         $rules = @()
         if ($policy.RuleIds) {
             foreach ($ruleId in $policy.RuleIds) {
-                $ruleResult = Get-Rule -RuleId $ruleId
+                $ruleResult = Get-Rule -Id $ruleId
                 if ($ruleResult.Success) {
                     $rules += $ruleResult.Data
                 }
@@ -122,7 +122,7 @@ function New-PolicySnapshot {
                 SnapshotId  = $snapshotId
                 PolicyId    = $PolicyId
                 Description = $Description
-            }
+            } | Out-Null
         }
 
         $result.Data = [PSCustomObject]@{
@@ -394,13 +394,13 @@ function Restore-PolicySnapshot {
                 SnapshotId      = $SnapshotId
                 BackupId        = $backupSnapshotId
                 RulesRestored   = $restoredRuleCount
-            }
+            } | Out-Null
         }
 
         # Clear cache if available
         if (Get-Command -Name 'Clear-AppLockerCache' -ErrorAction SilentlyContinue) {
-            Clear-AppLockerCache -Pattern "Policy:$policyId*"
-            Clear-AppLockerCache -Pattern "Rule:*"
+            Clear-AppLockerCache -Pattern "Policy:$policyId*" | Out-Null
+            Clear-AppLockerCache -Pattern "Rule:*" | Out-Null
         }
 
         $result.Data = [PSCustomObject]@{

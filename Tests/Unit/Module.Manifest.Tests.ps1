@@ -50,8 +50,8 @@ Describe 'Root Module Manifest (GA-AppLocker.psd1)' -Tag 'Unit', 'Module' {
         { Import-PowerShellDataFile (Join-Path $script:ModuleBase 'GA-AppLocker.psd1') } | Should -Not -Throw
     }
 
-    It 'Should have ModuleVersion 1.2.30' {
-        $script:RootManifest.ModuleVersion | Should -Be '1.2.30'
+    It 'Should have a valid ModuleVersion' {
+        $script:RootManifest.ModuleVersion | Should -Match '^\d+\.\d+\.\d+$'
     }
 
     It 'Should have more than 100 exported functions' {

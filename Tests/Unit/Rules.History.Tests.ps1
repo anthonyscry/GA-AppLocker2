@@ -20,8 +20,8 @@ BeforeAll {
     Import-Module $modulePath -Force -ErrorAction Stop
 
     # Create a test rule for version history tests
-    $script:TestRule = New-HashRule -FileName 'HistoryTest.exe' -Hash ('A' * 64) -Action 'Allow' -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe'
-    $script:TestRuleId = $script:TestRule.Data.RuleId
+    $script:TestRule = New-HashRule -SourceFileName 'HistoryTest.exe' -Hash ('A' * 64) -Action 'Allow' -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe'
+    $script:TestRuleId = $script:TestRule.Data.Id
 }
 
 # ============================================================================
@@ -66,31 +66,35 @@ Describe 'Rules History - Function Exports' -Tag 'Unit', 'Rules', 'History' {
 Describe 'Save-RuleVersion' -Tag 'Unit', 'Rules', 'History' {
 
     It 'Should save a version of a rule' {
-        $result = Save-RuleVersion -RuleId $script:TestRuleId -ChangeType 'Created' -ChangeSummary 'Initial creation'
+        $result = Save-RuleVersion -Rule $script:TestRule.Data -ChangeType 'Created' -ChangeSummary 'Initial creation'
         $result.Success | Should -Be $true
     }
 
     It 'Should auto-increment version numbers' {
-        Save-RuleVersion -RuleId $script:TestRuleId -ChangeType 'Updated' -ChangeSummary 'First update'
-        $result = Save-RuleVersion -RuleId $script:TestRuleId -ChangeType 'Updated' -ChangeSummary 'Second update'
+        Save-RuleVersion -Rule $script:TestRule.Data -ChangeType 'Updated' -ChangeSummary 'First update' | Out-Null
+        $result = Save-RuleVersion -Rule $script:TestRule.Data -ChangeType 'Updated' -ChangeSummary 'Second update'
         $result.Success | Should -Be $true
-        if ($result.Data) {
-            $result.Data.Version | Should -BeGreaterThan 1
-        }
+        $result.Version | Should -BeGreaterThan 1
     }
 
     It 'Should record the ChangeType' {
-        $result = Save-RuleVersion -RuleId $script:TestRuleId -ChangeType 'StatusChanged' -ChangeSummary 'Status change'
-        if ($result.Success -and $result.Data) {
-            $result.Data.ChangeType | Should -Be 'StatusChanged'
+        $result = Save-RuleVersion -Rule $script:TestRule.Data -ChangeType 'StatusChanged' -ChangeSummary 'Status change'
+        $result.Success | Should -Be $true
+        # Save-RuleVersion returns Version directly, verify via Get-RuleHistory
+        $history = Get-RuleHistory -RuleId $script:TestRuleId
+        if ($history.Success -and @($history.Data).Count -gt 0) {
+            $history.Data[0].ChangeType | Should -Be 'StatusChanged'
         }
     }
 
     It 'Should record ModifiedBy and ModifiedAt' {
-        $result = Save-RuleVersion -RuleId $script:TestRuleId -ChangeType 'Updated' -ChangeSummary 'Meta check'
-        if ($result.Success -and $result.Data) {
-            $result.Data.ModifiedBy | Should -Not -BeNullOrEmpty
-            $result.Data.ModifiedAt | Should -Not -BeNullOrEmpty
+        $result = Save-RuleVersion -Rule $script:TestRule.Data -ChangeType 'Updated' -ChangeSummary 'Meta check'
+        $result.Success | Should -Be $true
+        # Verify via Get-RuleHistory
+        $history = Get-RuleHistory -RuleId $script:TestRuleId
+        if ($history.Success -and @($history.Data).Count -gt 0) {
+            $history.Data[0].ModifiedBy | Should -Not -BeNullOrEmpty
+            $history.Data[0].ModifiedAt | Should -Not -BeNullOrEmpty
         }
     }
 }
@@ -165,15 +169,15 @@ Describe 'Compare-RuleVersions' -Tag 'Unit', 'Rules', 'History' {
         }
     }
 
-    It 'Should return differences array' {
+    It 'Should return differences property' {
         $history = Get-RuleHistory -RuleId $script:TestRuleId
         if ($history.Success -and @($history.Data).Count -ge 2) {
             $v1 = $history.Data[-1].Version
             $v2 = $history.Data[0].Version
             $result = Compare-RuleVersions -RuleId $script:TestRuleId -Version1 $v1 -Version2 $v2
-            if ($result.Success) {
-                $result.Data | Should -Not -BeNullOrEmpty
-            }
+            $result.Success | Should -Be $true
+            # Differences property should exist (empty array is valid for identical rule content)
+            $result.PSObject.Properties.Name | Should -Contain 'Differences'
         }
         else {
             Set-ItResult -Skipped -Because 'Not enough versions'
@@ -189,14 +193,14 @@ Describe 'Remove-RuleHistory' -Tag 'Unit', 'Rules', 'History' {
 
     It 'Should remove history for a rule' {
         # Create a disposable rule for this test
-        $tempRule = New-HashRule -FileName 'TempHistory.exe' -Hash ('B' * 64) -Action 'Allow' -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe'
+        $tempRule = New-HashRule -SourceFileName 'TempHistory.exe' -Hash ('B' * 64) -Action 'Allow' -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe'
         if ($tempRule.Success) {
-            Save-RuleVersion -RuleId $tempRule.Data.RuleId -ChangeType 'Created' -ChangeSummary 'Test'
-            $result = Remove-RuleHistory -RuleId $tempRule.Data.RuleId
+            Save-RuleVersion -Rule $tempRule.Data -ChangeType 'Created' -ChangeSummary 'Test' | Out-Null
+            $result = Remove-RuleHistory -RuleId $tempRule.Data.Id
             $result.Success | Should -Be $true
 
             # History should be empty now
-            $check = Get-RuleHistory -RuleId $tempRule.Data.RuleId
+            $check = Get-RuleHistory -RuleId $tempRule.Data.Id
             @($check.Data).Count | Should -Be 0
         }
     }

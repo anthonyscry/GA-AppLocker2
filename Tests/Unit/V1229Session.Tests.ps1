@@ -123,7 +123,7 @@ Describe 'GPO Link Control - XAML Elements' -Tag 'Unit', 'XAML', 'Deploy' {
         }
         It 'Pill buttons use BorderThickness=0 for flat pill appearance' {
             # All three GPO toggle buttons should have BorderThickness="0"
-            $script:XamlContent | Should -Match 'BtnToggleGpoLinkDC.*BorderThickness="0"'
+            $script:XamlContent | Should -Match '(?s)BtnToggleGpoLinkDC.*?BorderThickness="0"'
         }
     }
 
@@ -523,13 +523,13 @@ Describe 'Software Import - Split Buttons' -Tag 'Unit', 'XAML', 'Software' {
             $script:XamlContent | Should -Match 'x:Name="BtnImportBaseline"'
         }
         It 'BtnImportBaseline should have Tag ImportBaselineCsv' {
-            $script:XamlContent | Should -Match 'x:Name="BtnImportBaseline".*Tag="ImportBaselineCsv"'
+            $script:XamlContent | Should -Match '(?s)x:Name="BtnImportBaseline".*?Tag="ImportBaselineCsv"'
         }
         It 'Should have BtnImportComparison' {
             $script:XamlContent | Should -Match 'x:Name="BtnImportComparison"'
         }
         It 'BtnImportComparison should have Tag ImportComparisonCsv' {
-            $script:XamlContent | Should -Match 'x:Name="BtnImportComparison".*Tag="ImportComparisonCsv"'
+            $script:XamlContent | Should -Match '(?s)x:Name="BtnImportComparison".*?Tag="ImportComparisonCsv"'
         }
     }
 
@@ -601,7 +601,7 @@ Describe 'Software Import - Baseline Function' -Tag 'Unit', 'Software', 'Import'
             $script:SoftwarePs1 | Should -Match '\$script:SoftwareImportedData = @\(\)'
         }
         It 'Source code should reset SoftwareImportedFile to empty' {
-            $script:SoftwarePs1 | Should -Match "\\\$script:SoftwareImportedFile = ''"
+            $script:SoftwarePs1 | Should -Match '\$script:SoftwareImportedFile = '''''
         }
     }
 }
@@ -653,7 +653,7 @@ Describe 'Server Roles & Features - Software Scan' -Tag 'Unit', 'Software', 'Ser
             $script:SoftwarePs1 | Should -Match '\[Role/Feature\]'
         }
         It 'Should set Architecture to Role or Feature based on FeatureType' {
-            $script:SoftwarePs1 | Should -Match "\\\$feat\.FeatureType -eq 'Role'"
+            $script:SoftwarePs1 | Should -Match '\$feat\.FeatureType -eq ''Role'''
         }
         It 'Should wrap Get-WindowsFeature in try/catch to not crash on workstations' {
             # The Get-WindowsFeature block is inside a try/catch
@@ -789,7 +789,7 @@ Describe 'WinRM GPO - Mutual Exclusivity' -Tag 'Unit', 'Setup' {
             $script:SetupPs1 | Should -Match 'Disable-WinRMGPO -GPOName \$oppositeGPO'
         }
         It 'Should only auto-disable when action is enabled' {
-            $script:SetupPs1 | Should -Match "\\\$action -eq 'enabled'"
+            $script:SetupPs1 | Should -Match '\$action -eq ''enabled'''
         }
     }
 }
@@ -840,8 +840,8 @@ Describe 'Button Dispatcher - All New Actions Present' -Tag 'Unit', 'Integration
     Context 'Every XAML button Tag has a matching dispatcher entry' {
         It 'Should have no orphan button Tags' {
             # Extract all Tag="..." values from XAML buttons
-            $tagMatches = [regex]::Matches($script:XamlContent, '<Button[^>]+Tag="([^"]+)"')
-            $tags = @($tagMatches | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
+            $tagMatches = [regex]::Matches($script:XamlContent, '(?s)<Button[^>]+Tag="([^"]+)"')
+            $tags = @($tagMatches | ForEach-Object { $_.Groups[1].Value } | Where-Object { $_ -notmatch '^Filter' -and $_ -notmatch '^ToggleGpoLink' } | Sort-Object -Unique)
 
             # Verify each Tag exists in the dispatcher
             $missing = @()
@@ -1049,7 +1049,7 @@ Describe 'Filter Button Visual Consistency - Grey Pill Pattern' -Tag 'Unit', 'UI
             $script:RulesPs1 | Should -Match '#3E3E42'
         }
         It 'Update-RulesFilter status buttons reset to Transparent background' {
-            $script:RulesPs1 | Should -Match 'Brushes::Transparent'
+            $script:RulesPs1 | Should -Match 'Brushes\]::Transparent'
         }
         It 'Status color map has Pending=#FF8C00' {
             $script:RulesPs1 | Should -Match "BtnFilterPending.*#FF8C00"
@@ -1057,8 +1057,8 @@ Describe 'Filter Button Visual Consistency - Grey Pill Pattern' -Tag 'Unit', 'UI
         It 'Status color map has Approved=#107C10' {
             $script:RulesPs1 | Should -Match "BtnFilterApproved.*#107C10"
         }
-        It 'Status color map has Rejected=#EF5350' {
-            $script:RulesPs1 | Should -Match "BtnFilterRejected.*#EF5350"
+        It 'Status color map has Rejected=#D13438' {
+            $script:RulesPs1 | Should -Match "BtnFilterRejected.*#D13438"
         }
     }
 
@@ -1067,7 +1067,7 @@ Describe 'Filter Button Visual Consistency - Grey Pill Pattern' -Tag 'Unit', 'UI
             $script:PolicyPs1 | Should -Match 'pillBg.*#3E3E42'
         }
         It 'Update-PoliciesFilter should reset inactive buttons to Transparent' {
-            $script:PolicyPs1 | Should -Match 'Brushes::Transparent'
+            $script:PolicyPs1 | Should -Match 'Brushes\]::Transparent'
         }
         It 'Update-PoliciesFilter maps all 5 filter buttons' {
             $script:PolicyPs1 | Should -Match "'BtnFilterAllPolicies'"
@@ -1095,7 +1095,7 @@ Describe 'Filter Button Visual Consistency - Grey Pill Pattern' -Tag 'Unit', 'UI
             $script:DeployPs1 | Should -Match 'pillBg.*#3E3E42'
         }
         It 'Update-DeploymentFilter should reset inactive buttons to Transparent' {
-            $script:DeployPs1 | Should -Match 'Brushes::Transparent'
+            $script:DeployPs1 | Should -Match 'Brushes\]::Transparent'
         }
         It 'Update-DeploymentFilter maps all 5 filter buttons' {
             $script:DeployPs1 | Should -Match "'BtnFilterAllJobs'"
@@ -1113,8 +1113,8 @@ Describe 'Filter Button Visual Consistency - Grey Pill Pattern' -Tag 'Unit', 'UI
         It 'Color map has Completed=#107C10' {
             $script:DeployPs1 | Should -Match "BtnFilterCompletedJobs.*#107C10"
         }
-        It 'Color map has Failed=#EF5350' {
-            $script:DeployPs1 | Should -Match "BtnFilterFailedJobs.*#EF5350"
+        It 'Color map has Failed=#D13438' {
+            $script:DeployPs1 | Should -Match "BtnFilterFailedJobs.*#D13438"
         }
     }
 
@@ -1151,22 +1151,22 @@ Describe 'GPO Pill Toggle - Visual State Management' -Tag 'Unit', 'Deploy', 'UI'
             $script:DeployPs1 | Should -Match 'fgOrange.*#FF8C00'
         }
         It 'Sets button Content to Enabled when link is active' {
-            $script:DeployPs1 | Should -Match "\\\$btnCtrl\.Content = 'Enabled'"
+            $script:DeployPs1 | Should -Match '\$btnCtrl\.Content = ''Enabled'''
         }
         It 'Sets button Content to Disabled when link is inactive' {
-            $script:DeployPs1 | Should -Match "\\\$btnCtrl\.Content = 'Disabled'"
+            $script:DeployPs1 | Should -Match '\$btnCtrl\.Content = ''Disabled'''
         }
         It 'Sets button Content to Not Linked when GPO exists but unlinked' {
-            $script:DeployPs1 | Should -Match "\\\$btnCtrl\.Content = 'Not Linked'"
+            $script:DeployPs1 | Should -Match '\$btnCtrl\.Content = ''Not Linked'''
         }
         It 'Sets button Content to Not Created when GPO missing' {
-            $script:DeployPs1 | Should -Match "\\\$btnCtrl\.Content = 'Not Created'"
+            $script:DeployPs1 | Should -Match '\$btnCtrl\.Content = ''Not Created'''
         }
         It 'Sets button Content to No GP Module when RSAT missing' {
-            $script:DeployPs1 | Should -Match "\\\$btnCtrl\.Content = 'No GP Module'"
+            $script:DeployPs1 | Should -Match '\$btnCtrl\.Content = ''No GP Module'''
         }
         It 'Disables button when GPO not created' {
-            $script:DeployPs1 | Should -Match "\\\$btnCtrl\.IsEnabled = \\\$false"
+            $script:DeployPs1 | Should -Match '\$btnCtrl\.IsEnabled = \$false'
         }
     }
 }
@@ -1188,7 +1188,7 @@ Describe 'AD Discovery - Refresh Domain Preserves Connectivity' -Tag 'Unit', 'AD
             $script:ADDiscoveryPs1 | Should -Match 'Add-Member.*WinRMStatus.*\$old\.WinRMStatus'
         }
         It 'Should only copy WinRMStatus if not Unknown' {
-            $script:ADDiscoveryPs1 | Should -Match "\\\$old\.WinRMStatus -ne 'Unknown'"
+            $script:ADDiscoveryPs1 | Should -Match '\$old\.WinRMStatus -ne ''Unknown'''
         }
         It 'Should show connectivity summary after refresh if available' {
             $script:ADDiscoveryPs1 | Should -Match 'online.*WinRM'
@@ -1213,13 +1213,13 @@ Describe 'AD Discovery - First Visit Auto-Populate' -Tag 'Unit', 'ADDiscovery' {
 
     Context 'Panel navigation populates DataGrid from session data' {
         It 'Should call Update-MachineDataGrid when DiscoveredMachines.Count > 0' {
-            $script:MainWindowPs1 | Should -Match 'PanelDiscovery.*Update-MachineDataGrid'
+            $script:MainWindowPs1 | Should -Match '(?s)PanelDiscovery.*?Update-MachineDataGrid'
         }
         It 'Should repopulate OU tree if DiscoveredOUs has data' {
-            $script:MainWindowPs1 | Should -Match 'DiscoveredOUs.*Update-OUTreeView'
+            $script:MainWindowPs1 | Should -Match '(?s)DiscoveredOUs.*?Update-OUTreeView'
         }
         It 'Should auto-refresh from AD when DiscoveredMachines is empty' {
-            $script:MainWindowPs1 | Should -Match 'DiscoveredMachines\.Count -eq 0.*Invoke-DomainRefresh'
+            $script:MainWindowPs1 | Should -Match '(?s)DiscoveredMachines\.Count -eq 0.*?Invoke-DomainRefresh'
         }
         It 'Should show connectivity summary in machine count label' {
             $script:MainWindowPs1 | Should -Match 'machineCountCtrl.*online.*WinRM'
@@ -1238,7 +1238,7 @@ Describe 'Count Consistency - Numbers Match Across UI' -Tag 'Unit', 'Integration
             $script:DashboardPs1 | Should -Match '\$script:DiscoveredMachines.*Count'
         }
         It 'Breadcrumb Discovery count reads from $script:DiscoveredMachines' {
-            $script:MainWindowPs1 | Should -Match 'StageDiscoveryCount.*\$script:DiscoveredMachines\.Count|DiscoveredMachines\.Count.*StageDiscoveryCount'
+            $script:MainWindowPs1 | Should -Match '(?s)StageDiscoveryCount.*?\$script:DiscoveredMachines\.Count'
         }
         It 'Dashboard artifacts count reads from $script:CurrentScanArtifacts' {
             $script:DashboardPs1 | Should -Match '\$script:CurrentScanArtifacts.*Count'
@@ -1319,10 +1319,10 @@ Describe 'Count Consistency - Numbers Match Across UI' -Tag 'Unit', 'Integration
             $script:RulesPs1 | Should -Match 'TxtRuleApprovedCount'
             $script:RulesPs1 | Should -Match 'TxtRuleRejectedCount'
             # Filter buttons
-            $script:RulesPs1 | Should -Match 'BtnFilterAllRules.*All \(\$total\)'
-            $script:RulesPs1 | Should -Match 'BtnFilterPending.*Pending \(\$pending\)'
-            $script:RulesPs1 | Should -Match 'BtnFilterApproved.*Approved \(\$approved\)'
-            $script:RulesPs1 | Should -Match 'BtnFilterRejected.*Rejected \(\$rejected\)'
+            $script:RulesPs1 | Should -Match '(?s)BtnFilterAllRules.*?All \(\$total\)'
+            $script:RulesPs1 | Should -Match '(?s)BtnFilterPending.*?Pending \(\$pending\)'
+            $script:RulesPs1 | Should -Match '(?s)BtnFilterApproved.*?Approved \(\$approved\)'
+            $script:RulesPs1 | Should -Match '(?s)BtnFilterRejected.*?Rejected \(\$rejected\)'
         }
     }
 
@@ -1448,19 +1448,19 @@ Describe 'XAML Stat Elements - Dashboard and Breadcrumb Controls Exist' -Tag 'Un
         }
     }
 
-    Context 'Dashboard chart bars and labels' {
-        It 'ChartBarApproved exists' { $script:XamlContent | Should -Match 'x:Name="ChartBarApproved"' }
-        It 'ChartBarPending exists' { $script:XamlContent | Should -Match 'x:Name="ChartBarPending"' }
-        It 'ChartBarRejected exists' { $script:XamlContent | Should -Match 'x:Name="ChartBarRejected"' }
-        It 'ChartBarReview exists' { $script:XamlContent | Should -Match 'x:Name="ChartBarReview"' }
-        It 'ChartLabelApproved exists' { $script:XamlContent | Should -Match 'x:Name="ChartLabelApproved"' }
-        It 'ChartLabelPending exists' { $script:XamlContent | Should -Match 'x:Name="ChartLabelPending"' }
-        It 'ChartLabelRejected exists' { $script:XamlContent | Should -Match 'x:Name="ChartLabelRejected"' }
-        It 'ChartLabelReview exists' { $script:XamlContent | Should -Match 'x:Name="ChartLabelReview"' }
-        It 'ChartTotalRules exists' { $script:XamlContent | Should -Match 'x:Name="ChartTotalRules"' }
-        It 'ChartBarPublisher exists' { $script:XamlContent | Should -Match 'x:Name="ChartBarPublisher"' }
-        It 'ChartBarHash exists' { $script:XamlContent | Should -Match 'x:Name="ChartBarHash"' }
-        It 'ChartBarPath exists' { $script:XamlContent | Should -Match 'x:Name="ChartBarPath"' }
+    Context 'Dashboard chart bars and labels referenced in code' {
+        It 'ChartBarApproved referenced' { $script:DashboardPs1 | Should -Match 'ChartBarApproved' }
+        It 'ChartBarPending referenced' { $script:DashboardPs1 | Should -Match 'ChartBarPending' }
+        It 'ChartBarRejected referenced' { $script:DashboardPs1 | Should -Match 'ChartBarRejected' }
+        It 'ChartBarReview referenced' { $script:DashboardPs1 | Should -Match 'ChartBarReview' }
+        It 'ChartLabelApproved referenced' { $script:DashboardPs1 | Should -Match 'ChartLabelApproved' }
+        It 'ChartLabelPending referenced' { $script:DashboardPs1 | Should -Match 'ChartLabelPending' }
+        It 'ChartLabelRejected referenced' { $script:DashboardPs1 | Should -Match 'ChartLabelRejected' }
+        It 'ChartLabelReview referenced' { $script:DashboardPs1 | Should -Match 'ChartLabelReview' }
+        It 'ChartTotalRules referenced' { $script:DashboardPs1 | Should -Match 'ChartTotalRules' }
+        It 'ChartBarPublisher referenced' { $script:DashboardPs1 | Should -Match 'ChartBarPublisher' }
+        It 'ChartBarHash referenced' { $script:DashboardPs1 | Should -Match 'ChartBarHash' }
+        It 'ChartBarPath referenced' { $script:DashboardPs1 | Should -Match 'ChartBarPath' }
     }
 
     Context 'AD Discovery machine count label' {

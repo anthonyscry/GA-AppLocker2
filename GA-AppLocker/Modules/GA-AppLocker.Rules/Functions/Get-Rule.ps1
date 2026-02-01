@@ -322,13 +322,13 @@ function Set-RuleStatus {
 
         # Save version history
         if (Get-Command -Name 'Save-RuleVersion' -ErrorAction SilentlyContinue) {
-            Save-RuleVersion -Rule $rule -ChangeType 'StatusChanged' -ChangeSummary "Status changed from $oldStatus to $Status"
+            Save-RuleVersion -Rule $rule -ChangeType 'StatusChanged' -ChangeSummary "Status changed from $oldStatus to $Status" | Out-Null
         }
         
         # Write audit log
         if (Get-Command -Name 'Write-AuditLog' -ErrorAction SilentlyContinue) {
             Write-AuditLog -Action "Rule$Status" -Category 'Rule' -Target $rule.Name -TargetId $Id `
-                -Details "Status changed from $oldStatus to $Status" -OldValue $oldStatus -NewValue $Status
+                -Details "Status changed from $oldStatus to $Status" -OldValue $oldStatus -NewValue $Status | Out-Null
         }
 
         $result.Success = $true

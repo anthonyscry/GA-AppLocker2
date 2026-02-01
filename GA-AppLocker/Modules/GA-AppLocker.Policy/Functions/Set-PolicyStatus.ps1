@@ -50,7 +50,7 @@ function Set-PolicyStatus {
         # Write audit log
         if (Get-Command -Name 'Write-AuditLog' -ErrorAction SilentlyContinue) {
             Write-AuditLog -Action "Policy$Status" -Category 'Policy' -Target $policy.Name -TargetId $PolicyId `
-                -Details "Policy status changed from $oldStatus to $Status" -OldValue $oldStatus -NewValue $Status
+                -Details "Policy status changed from $oldStatus to $Status" -OldValue $oldStatus -NewValue $Status | Out-Null
         }
 
         return @{
@@ -120,7 +120,7 @@ function Remove-Policy {
         # Write audit log
         if (Get-Command -Name 'Write-AuditLog' -ErrorAction SilentlyContinue) {
             Write-AuditLog -Action 'PolicyDeleted' -Category 'Policy' -Target $policy.Name -TargetId $PolicyId `
-                -Details "Policy removed (Force: $Force)"
+                -Details "Policy removed (Force: $Force)" | Out-Null
         }
 
         return @{

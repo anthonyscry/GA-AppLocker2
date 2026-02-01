@@ -36,10 +36,9 @@ Describe 'Policy Module - Function Exports' -Tag 'Unit', 'Policy' {
         'Restore-PolicySnapshot', 'Remove-PolicySnapshot', 'Invoke-PolicySnapshotCleanup'
     )
 
-    foreach ($fn in $functions) {
-        It "$fn should be exported" {
-            Get-Command $fn -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
-        }
+    It '<Fn> should be exported' -TestCases ($functions | ForEach-Object { @{ Fn = $_ } }) {
+        param($Fn)
+        Get-Command $Fn -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
     }
 }
 
@@ -50,7 +49,7 @@ Describe 'Policy Module - Function Exports' -Tag 'Unit', 'Policy' {
 Describe 'Policy CRUD Operations' -Tag 'Unit', 'Policy' {
 
     BeforeAll {
-        $script:TestPolicy = New-Policy -Name 'UnitTest_CRUDPolicy' -CollectionType 'Exe' -TargetGPO 'Test-GPO'
+        $script:TestPolicy = New-Policy -Name 'UnitTest_CRUDPolicy'
     }
 
     It 'New-Policy should create a policy successfully' {
@@ -76,7 +75,7 @@ Describe 'Policy CRUD Operations' -Tag 'Unit', 'Policy' {
 
     It 'Update-Policy should change name' {
         if (-not $script:TestPolicy.Success) { Set-ItResult -Skipped; return }
-        $result = Update-Policy -PolicyId $script:TestPolicy.Data.PolicyId -Name 'UnitTest_CRUDPolicy_Renamed'
+        $result = Update-Policy -Id $script:TestPolicy.Data.PolicyId -Name 'UnitTest_CRUDPolicy_Renamed'
         $result.Success | Should -Be $true
 
         $check = Get-Policy -PolicyId $script:TestPolicy.Data.PolicyId
@@ -85,13 +84,13 @@ Describe 'Policy CRUD Operations' -Tag 'Unit', 'Policy' {
 
     It 'Update-Policy should change description' {
         if (-not $script:TestPolicy.Success) { Set-ItResult -Skipped; return }
-        $result = Update-Policy -PolicyId $script:TestPolicy.Data.PolicyId -Description 'Updated desc'
+        $result = Update-Policy -Id $script:TestPolicy.Data.PolicyId -Description 'Updated desc'
         $result.Success | Should -Be $true
     }
 
     It 'Update-Policy should change TargetGPO' {
         if (-not $script:TestPolicy.Success) { Set-ItResult -Skipped; return }
-        $result = Update-Policy -PolicyId $script:TestPolicy.Data.PolicyId -TargetGPO 'New-Target-GPO'
+        $result = Update-Policy -Id $script:TestPolicy.Data.PolicyId -TargetGPO 'New-Target-GPO'
         $result.Success | Should -Be $true
     }
 
@@ -108,25 +107,25 @@ Describe 'Policy CRUD Operations' -Tag 'Unit', 'Policy' {
 Describe 'Policy Rule Management' -Tag 'Unit', 'Policy' {
 
     BeforeAll {
-        $script:RulePolicy = New-Policy -Name 'UnitTest_RulePolicy' -CollectionType 'Exe'
-        $script:TestHashRule = New-HashRule -FileName 'PolicyTest.exe' -Hash ('C' * 64) -Action 'Allow' -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe'
+        $script:RulePolicy = New-Policy -Name 'UnitTest_RulePolicy'
+        $script:TestHashRule = New-HashRule -SourceFileName 'PolicyTest.exe' -Hash ('C' * 64) -Action 'Allow' -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe' -Save
     }
 
     It 'Should add a rule to a policy' {
         if (-not $script:RulePolicy.Success -or -not $script:TestHashRule.Success) { Set-ItResult -Skipped; return }
-        $result = Add-RuleToPolicy -PolicyId $script:RulePolicy.Data.PolicyId -RuleId $script:TestHashRule.Data.RuleId
+        $result = Add-RuleToPolicy -PolicyId $script:RulePolicy.Data.PolicyId -RuleId $script:TestHashRule.Data.Id
         $result.Success | Should -Be $true
     }
 
     It 'Should include the rule in policy after adding' {
         if (-not $script:RulePolicy.Success -or -not $script:TestHashRule.Success) { Set-ItResult -Skipped; return }
         $policy = Get-Policy -PolicyId $script:RulePolicy.Data.PolicyId
-        $policy.Data.RuleIds | Should -Contain $script:TestHashRule.Data.RuleId
+        $policy.Data.RuleIds | Should -Contain $script:TestHashRule.Data.Id
     }
 
     It 'Should remove a rule from a policy' {
         if (-not $script:RulePolicy.Success -or -not $script:TestHashRule.Success) { Set-ItResult -Skipped; return }
-        $result = Remove-RuleFromPolicy -PolicyId $script:RulePolicy.Data.PolicyId -RuleId $script:TestHashRule.Data.RuleId
+        $result = Remove-RuleFromPolicy -PolicyId $script:RulePolicy.Data.PolicyId -RuleId $script:TestHashRule.Data.Id
         $result.Success | Should -Be $true
     }
 
@@ -144,20 +143,20 @@ Describe 'Compare-Policies' -Tag 'Unit', 'Policy' {
 
     BeforeAll {
         # Create two policies with different rules
-        $script:Policy1 = New-Policy -Name 'UnitTest_CompareA' -CollectionType 'Exe'
-        $script:Policy2 = New-Policy -Name 'UnitTest_CompareB' -CollectionType 'Exe'
+        $script:Policy1 = New-Policy -Name 'UnitTest_CompareA'
+        $script:Policy2 = New-Policy -Name 'UnitTest_CompareB'
 
-        $rule1 = New-HashRule -FileName 'SharedApp.exe' -Hash ('D' * 64) -Action 'Allow' -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe'
-        $rule2 = New-HashRule -FileName 'OnlyInA.exe' -Hash ('E' * 64) -Action 'Allow' -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe'
-        $rule3 = New-HashRule -FileName 'OnlyInB.exe' -Hash ('F' * 64) -Action 'Allow' -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe'
+        $rule1 = New-HashRule -SourceFileName 'SharedApp.exe' -Hash ('D' * 64) -Action 'Allow' -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe' -Save
+        $rule2 = New-HashRule -SourceFileName 'OnlyInA.exe' -Hash ('E' * 64) -Action 'Allow' -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe' -Save
+        $rule3 = New-HashRule -SourceFileName 'OnlyInB.exe' -Hash ('F' * 64) -Action 'Allow' -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe' -Save
 
         if ($script:Policy1.Success -and $rule1.Success) {
-            Add-RuleToPolicy -PolicyId $script:Policy1.Data.PolicyId -RuleId $rule1.Data.RuleId
-            Add-RuleToPolicy -PolicyId $script:Policy1.Data.PolicyId -RuleId $rule2.Data.RuleId
+            Add-RuleToPolicy -PolicyId $script:Policy1.Data.PolicyId -RuleId $rule1.Data.Id
+            Add-RuleToPolicy -PolicyId $script:Policy1.Data.PolicyId -RuleId $rule2.Data.Id
         }
         if ($script:Policy2.Success -and $rule1.Success) {
-            Add-RuleToPolicy -PolicyId $script:Policy2.Data.PolicyId -RuleId $rule1.Data.RuleId
-            Add-RuleToPolicy -PolicyId $script:Policy2.Data.PolicyId -RuleId $rule3.Data.RuleId
+            Add-RuleToPolicy -PolicyId $script:Policy2.Data.PolicyId -RuleId $rule1.Data.Id
+            Add-RuleToPolicy -PolicyId $script:Policy2.Data.PolicyId -RuleId $rule3.Data.Id
         }
     }
 
@@ -241,10 +240,10 @@ Describe 'Get-PolicyDiffReport' -Tag 'Unit', 'Policy' {
 Describe 'Policy Snapshots' -Tag 'Unit', 'Policy' {
 
     BeforeAll {
-        $script:SnapPolicy = New-Policy -Name 'UnitTest_SnapPolicy' -CollectionType 'Exe'
-        $snapRule = New-HashRule -FileName 'SnapApp.exe' -Hash ('A1' * 32) -Action 'Allow' -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe'
+        $script:SnapPolicy = New-Policy -Name 'UnitTest_SnapPolicy'
+        $snapRule = New-HashRule -SourceFileName 'SnapApp.exe' -Hash ('A1' * 32) -Action 'Allow' -UserOrGroupSid 'S-1-1-0' -CollectionType 'Exe' -Save
         if ($script:SnapPolicy.Success -and $snapRule.Success) {
-            Add-RuleToPolicy -PolicyId $script:SnapPolicy.Data.PolicyId -RuleId $snapRule.Data.RuleId
+            Add-RuleToPolicy -PolicyId $script:SnapPolicy.Data.PolicyId -RuleId $snapRule.Data.Id
         }
     }
 
@@ -283,7 +282,7 @@ Describe 'Policy Snapshots' -Tag 'Unit', 'Policy' {
     }
 
     It 'Get-PolicySnapshots should return empty for policy with no snapshots' {
-        $fakePolicy = New-Policy -Name 'UnitTest_NoSnaps' -CollectionType 'Script'
+        $fakePolicy = New-Policy -Name 'UnitTest_NoSnaps'
         if ($fakePolicy.Success) {
             $result = Get-PolicySnapshots -PolicyId $fakePolicy.Data.PolicyId
             $result.Success | Should -Be $true
@@ -303,7 +302,7 @@ Describe 'Policy Snapshots' -Tag 'Unit', 'Policy' {
 Describe 'Set-PolicyStatus' -Tag 'Unit', 'Policy' {
 
     BeforeAll {
-        $script:StatusPolicy = New-Policy -Name 'UnitTest_StatusPolicy' -CollectionType 'Exe'
+        $script:StatusPolicy = New-Policy -Name 'UnitTest_StatusPolicy'
     }
 
     It 'Should change policy status' {
@@ -316,7 +315,7 @@ Describe 'Set-PolicyStatus' -Tag 'Unit', 'Policy' {
 Describe 'Remove-Policy' -Tag 'Unit', 'Policy' {
 
     It 'Should remove a policy' {
-        $tempPolicy = New-Policy -Name 'UnitTest_RemoveMe' -CollectionType 'Script'
+        $tempPolicy = New-Policy -Name 'UnitTest_RemoveMe'
         if ($tempPolicy.Success) {
             $result = Remove-Policy -PolicyId $tempPolicy.Data.PolicyId
             $result.Success | Should -Be $true
@@ -339,19 +338,20 @@ Describe 'Remove-Policy' -Tag 'Unit', 'Policy' {
 Describe 'Compare-RuleProperties' -Tag 'Unit', 'Policy' {
 
     It 'Should detect property differences between two rules' {
-        $rule1 = @{ Name = 'Rule1'; Action = 'Allow'; Status = 'Pending' }
-        $rule2 = @{ Name = 'Rule1'; Action = 'Deny'; Status = 'Approved' }
+        $rule1 = [PSCustomObject]@{ Name = 'Rule1'; Action = 'Allow'; Status = 'Pending' }
+        $rule2 = [PSCustomObject]@{ Name = 'Rule1'; Action = 'Deny'; Status = 'Approved' }
         $result = Compare-RuleProperties -SourceRule $rule1 -TargetRule $rule2
-        $result.Success | Should -Be $true
-        @($result.Data).Count | Should -BeGreaterOrEqual 1
+        # Compare-RuleProperties returns an array of change objects directly (not wrapped in Success/Data)
+        $result | Should -Not -BeNullOrEmpty
+        @($result).Count | Should -BeGreaterOrEqual 1
     }
 
     It 'Should return no differences for identical rules' {
-        $rule1 = @{ Name = 'Same'; Action = 'Allow'; Status = 'Pending' }
-        $rule2 = @{ Name = 'Same'; Action = 'Allow'; Status = 'Pending' }
+        $rule1 = [PSCustomObject]@{ Name = 'Same'; Action = 'Allow'; Status = 'Pending' }
+        $rule2 = [PSCustomObject]@{ Name = 'Same'; Action = 'Allow'; Status = 'Pending' }
         $result = Compare-RuleProperties -SourceRule $rule1 -TargetRule $rule2
-        $result.Success | Should -Be $true
-        @($result.Data).Count | Should -Be 0
+        # Compare-RuleProperties returns empty array when no differences
+        @($result).Count | Should -Be 0
     }
 }
 
