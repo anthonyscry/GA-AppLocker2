@@ -4,7 +4,7 @@
 
 GA-AppLocker is a PowerShell 5.1 WPF application for enterprise AppLocker policy management in air-gapped, classified, or highly secure environments. Complete workflow: AD Discovery → Artifact Scanning → Rule Generation → Policy Building → GPO Deployment.
 
-**Version:** 1.2.32 | **Tests:** 1209/1209 passing (100%) | **Exported Commands:** ~200
+**Version:** 1.2.33 | **Tests:** 1209/1209 passing (100%) | **Exported Commands:** ~200
 
 ## Quick Start
 
@@ -262,6 +262,7 @@ All rule modifications auto-sync the JSON index:
 
 | Version | Date | Key Changes |
 |---------|------|-------------|
+| 1.2.33 | Jan 31, 2026 | Fix 15 bugs from comprehensive audit — 8 CRITICAL (Approve-TrustedVendorRules broken call, Rule Wizard null data, Setup Wizard config not saving, Get-Rule filter always empty, Scanner exclusion dead code, ThemeManager PS5.1 incompat + frozen brush, BackupHistory always invalid), 7 HIGH (Compare-Policies null IDs, policy Version null crash in 4 places, IndexWatcher scope bug, Validation UniqueGuids wrong, #EF5350→#D13438, GlobalSearch UI freeze, stray Export-ModuleMember) |
 | 1.2.32 | Jan 31, 2026 | Fix all 113 test failures (1209/1209 passing) — source bugs (Get-Rule -RuleId→-Id, pipeline output leaks in Set-RuleStatus/Policy-Snapshots/Set-PolicyStatus), test fixes (Save-RuleVersion -RuleId→-Rule, Update-Policy -PolicyId→-Id, Validation -XmlContent→-XmlPath, add -Save to rule creation, V1229Session regex/color fixes, hash collision fix) |
 | 1.2.31 | Jan 31, 2026 | Deep polish pass — fix duplicate GUIDs/functions, XAML phantom rows, dispatcher duplicate, test param fixes (Integration+Manifest), code quality (Get-Command→try/catch, null guards, empty catches→logging, dead code removal, O(n²) fix, Read-Host→ShouldContinue, ValidateSet fixes), UX polish (disabled button states, Dashboard/Policy nav refresh, Cursor=Hand on 35 filter pills, filter pill consistency, sidebar version, color standardization #EF5350→#D13438) |
 | 1.2.30 | Jan 31, 2026 | Phase 5 support (APPX+DLL phased rollout), GPO Link pill toggles, filter visual consistency (grey pill pattern across Rules/Policy/Deploy), Software Import split (Baseline vs Comparison), server roles/features in software scan, AD Discovery refresh preserves connectivity + auto-populates on first visit, WinRM GPO mutual exclusivity, Deploy/Policy tab reordering, Deploy Edit policy dropdown, comprehensive V1229 tests |
