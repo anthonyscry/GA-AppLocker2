@@ -107,12 +107,25 @@ function Get-SetupStatus {
                 $gpoName = $script:DefaultGPONames[$gpoType]
                 $gpo = Get-GPO -Name $gpoName -ErrorAction SilentlyContinue
                 
+                # Derive friendly GpoStatus label (AllSettingsEnabled -> Enabled, AllSettingsDisabled -> Disabled)
+                $gpoStateLabel = $null
+                if ($gpo) {
+                    $gpoStateLabel = switch ($gpo.GpoStatus.ToString()) {
+                        'AllSettingsEnabled'  { 'Enabled' }
+                        'AllSettingsDisabled' { 'Disabled' }
+                        'UserSettingsDisabled' { 'User Disabled' }
+                        'ComputerSettingsDisabled' { 'Computer Disabled' }
+                        default { $gpo.GpoStatus.ToString() }
+                    }
+                }
+
                 $status.AppLockerGPOs += [PSCustomObject]@{
-                    Type    = $gpoType
-                    Name    = $gpoName
-                    Exists  = [bool]$gpo
-                    GPOId   = if ($gpo) { $gpo.Id } else { $null }
-                    Status  = if ($gpo) { 'Configured' } else { 'Not Configured' }
+                    Type      = $gpoType
+                    Name      = $gpoName
+                    Exists    = [bool]$gpo
+                    GPOId     = if ($gpo) { $gpo.Id } else { $null }
+                    GpoState  = $gpoStateLabel
+                    Status    = if ($gpo -and $gpoStateLabel) { "Configured - $gpoStateLabel" } elseif ($gpo) { 'Configured' } else { 'Not Configured' }
                 }
             }
         }

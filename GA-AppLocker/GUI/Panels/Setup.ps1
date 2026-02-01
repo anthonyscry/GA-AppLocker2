@@ -89,11 +89,17 @@ function Update-SetupStatus {
                 $statusControl = $Window.FindName("TxtGPO_$($gpo.Type)_Status")
                 if ($statusControl) {
                     $statusControl.Text = $gpo.Status
-                    $statusControl.Foreground = if ($gpo.Exists) { 
-                        [System.Windows.Media.Brushes]::LightGreen 
+                    $statusControl.Foreground = if (-not $gpo.Exists) {
+                        [System.Windows.Media.Brushes]::Gray
                     }
-                    else { 
-                        [System.Windows.Media.Brushes]::Gray 
+                    elseif ($gpo.GpoState -eq 'Enabled') {
+                        [System.Windows.Media.Brushes]::LightGreen
+                    }
+                    elseif ($gpo.GpoState -eq 'Disabled') {
+                        [System.Windows.Media.Brushes]::Orange
+                    }
+                    else {
+                        [System.Windows.Media.Brushes]::LightGreen
                     }
                 }
             }
