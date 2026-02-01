@@ -6,9 +6,9 @@
 .DESCRIPTION
     Tests the following behaviors:
     - New-Policy Phase parameter creates correct enforcement mode
-    - Phase 1-3 always set AuditOnly regardless of user preference
-    - Phase 4 respects user's EnforcementMode setting
-    - Backward compatibility: policies without Phase default to Phase 4 behavior
+    - Phase 1-4 always set AuditOnly regardless of user preference
+    - Phase 5 (Full Enforcement) respects user's EnforcementMode setting
+    - Backward compatibility: policies without Phase default to Phase 5 behavior
 
 .NOTES
     Run with: Invoke-Pester -Path .\Tests\Unit\Policy.Phase.Tests.ps1 -Output Detailed
@@ -88,7 +88,7 @@ Describe 'New-Policy Phase Parameter' -Tag 'Unit', 'Policy', 'Phase' {
         }
     }
 
-    Context 'Phase 4 (Full Enforcement)' {
+    Context 'Phase 4 (EXE + Script + MSI + APPX)' {
         It 'Creates policy with Phase = 4' {
             $result = New-Policy -Name "TestPhase4_$(Get-Random)" -Phase 4
             $script:testPolicyId = $result.Data.PolicyId
@@ -97,22 +97,46 @@ Describe 'New-Policy Phase Parameter' -Tag 'Unit', 'Policy', 'Phase' {
             $result.Data.Phase | Should -Be 4
         }
 
+        It 'Forces AuditOnly even when Enabled requested' {
+            $result = New-Policy -Name "TestPhase4Enforce_$(Get-Random)" -Phase 4 -EnforcementMode Enabled
+            $script:testPolicyId = $result.Data.PolicyId
+            
+            $result.Data.EnforcementMode | Should -Be 'AuditOnly'
+        }
+
+        It 'Respects explicit AuditOnly setting' {
+            $result = New-Policy -Name "TestPhase4Audit_$(Get-Random)" -Phase 4 -EnforcementMode AuditOnly
+            $script:testPolicyId = $result.Data.PolicyId
+            
+            $result.Data.EnforcementMode | Should -Be 'AuditOnly'
+        }
+    }
+
+    Context 'Phase 5 (All + DLL - Full Enforcement)' {
+        It 'Creates policy with Phase = 5' {
+            $result = New-Policy -Name "TestPhase5_$(Get-Random)" -Phase 5
+            $script:testPolicyId = $result.Data.PolicyId
+            
+            $result.Success | Should -BeTrue
+            $result.Data.Phase | Should -Be 5
+        }
+
         It 'Respects Enabled enforcement mode' {
-            $result = New-Policy -Name "TestPhase4Enabled_$(Get-Random)" -Phase 4 -EnforcementMode Enabled
+            $result = New-Policy -Name "TestPhase5Enabled_$(Get-Random)" -Phase 5 -EnforcementMode Enabled
             $script:testPolicyId = $result.Data.PolicyId
             
             $result.Data.EnforcementMode | Should -Be 'Enabled'
         }
 
         It 'Respects AuditOnly enforcement mode' {
-            $result = New-Policy -Name "TestPhase4Audit_$(Get-Random)" -Phase 4 -EnforcementMode AuditOnly
+            $result = New-Policy -Name "TestPhase5Audit_$(Get-Random)" -Phase 5 -EnforcementMode AuditOnly
             $script:testPolicyId = $result.Data.PolicyId
             
             $result.Data.EnforcementMode | Should -Be 'AuditOnly'
         }
 
         It 'Respects NotConfigured enforcement mode' {
-            $result = New-Policy -Name "TestPhase4NotConfig_$(Get-Random)" -Phase 4 -EnforcementMode NotConfigured
+            $result = New-Policy -Name "TestPhase5NotConfig_$(Get-Random)" -Phase 5 -EnforcementMode NotConfigured
             $script:testPolicyId = $result.Data.PolicyId
             
             $result.Data.EnforcementMode | Should -Be 'NotConfigured'
@@ -133,8 +157,8 @@ Describe 'New-Policy Phase Parameter' -Tag 'Unit', 'Policy', 'Phase' {
             { New-Policy -Name "TestPhase0" -Phase 0 } | Should -Throw
         }
 
-        It 'Rejects Phase 5' {
-            { New-Policy -Name "TestPhase5" -Phase 5 } | Should -Throw
+        It 'Rejects Phase 6' {
+            { New-Policy -Name "TestPhase6" -Phase 6 } | Should -Throw
         }
 
         It 'Rejects negative Phase' {
@@ -220,7 +244,7 @@ Describe 'Policy Schema Backward Compatibility' -Tag 'Unit', 'Policy', 'Backward
                 $result = Get-Policy -PolicyId $legacyPolicyJson.PolicyId
                 
                 $result.Success | Should -BeTrue
-                # Phase should be null/missing, but export should default to 4
+                # Phase should be null/missing, but export should default to 5
                 $result.Data.Phase | Should -BeNullOrEmpty -Because 'Legacy policy has no Phase field'
             }
             finally {

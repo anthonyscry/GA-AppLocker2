@@ -12,7 +12,8 @@ function Export-PolicyToXml {
         - Phase 1: EXE rules only (AuditOnly)
         - Phase 2: EXE + Script rules (AuditOnly)
         - Phase 3: EXE + Script + MSI rules (AuditOnly)
-        - Phase 4: All rules including DLL/Appx (Enabled)
+        - Phase 4: EXE + Script + MSI + APPX rules (AuditOnly)
+        - Phase 5: All rules including DLL (Enabled)
 
     .PARAMETER PolicyId
         The unique identifier of the policy.
@@ -52,7 +53,7 @@ function Export-PolicyToXml {
         [switch]$IncludeRejected,
 
         [Parameter(Mandatory = $false)]
-        [ValidateRange(1, 4)]
+        [ValidateRange(1, 5)]
         [int]$PhaseOverride,
 
         [Parameter(Mandatory = $false)]
@@ -99,7 +100,7 @@ function Export-PolicyToXml {
         } elseif ($policy.Phase) {
             $policy.Phase
         } else {
-            4  # Default to full export if no phase specified
+            5  # Default to full export if no phase specified
         }
 
         # Group rules by collection type (use CollectionType from Rules schema)
@@ -113,7 +114,8 @@ function Export-PolicyToXml {
         # Phase 1: EXE only
         # Phase 2: EXE + Script
         # Phase 3: EXE + Script + MSI
-        # Phase 4: All (EXE + Script + MSI + DLL + Appx)
+        # Phase 4: EXE + Script + MSI + Appx
+        # Phase 5: All (EXE + Script + MSI + Appx + DLL)
         switch ($effectivePhase) {
             1 {
                 # Phase 1: EXE only
@@ -133,12 +135,16 @@ function Export-PolicyToXml {
                 $dllRules = @()
                 $appxRules = @()
             }
-            # Phase 4: All rules (no filtering)
+            4 {
+                # Phase 4: EXE + Script + MSI + Appx
+                $dllRules = @()
+            }
+            # Phase 5: All rules (no filtering)
         }
 
         # Determine enforcement mode based on phase
-        # Phase 1-3: AuditOnly, Phase 4: Enabled (unless explicitly overridden in policy)
-        $enforcementValue = if ($effectivePhase -lt 4) {
+        # Phase 1-4: AuditOnly, Phase 5: Enabled (unless explicitly overridden in policy)
+        $enforcementValue = if ($effectivePhase -lt 5) {
             'AuditOnly'
         } elseif ($policy.EnforcementMode -eq 'Enabled') {
             'Enabled'

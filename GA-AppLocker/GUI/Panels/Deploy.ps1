@@ -28,7 +28,8 @@ function Initialize-DeploymentPanel {
         'BtnCreateDeployment', 'BtnRefreshDeployments', 'BtnDeployJob',
         'BtnStopDeployment', 'BtnCancelSelected', 'BtnViewDeployLog',
         'BtnBackupGpoPolicy', 'BtnExportPolicyXml', 'BtnImportPolicyXml',
-        'BtnSaveDeployPolicyChanges'
+        'BtnSaveDeployPolicyChanges',
+        'BtnToggleGpoLinkDC', 'BtnToggleGpoLinkServers', 'BtnToggleGpoLinkWks'
     )
 
     foreach ($btnName in $actionButtons) {
@@ -72,12 +73,21 @@ function Initialize-DeploymentPanel {
             })
     }
 
-    # Wire up policy combo selection changed to load edit fields
+    # Wire up Create policy combo selection changed to load edit fields
     $policyCombo = $Window.FindName('CboDeployPolicy')
     if ($policyCombo) {
         $policyCombo.Add_SelectionChanged({
                 param($sender, $e)
-                Update-DeployPolicyEditTab -Window $global:GA_MainWindow
+                Update-DeployPolicyEditTab -Window $global:GA_MainWindow -Source 'Create'
+            })
+    }
+
+    # Wire up Edit policy combo selection changed to load edit fields
+    $editPolicyCombo = $Window.FindName('CboDeployEditPolicy')
+    if ($editPolicyCombo) {
+        $editPolicyCombo.Add_SelectionChanged({
+                param($sender, $e)
+                Update-DeployPolicyEditTab -Window $global:GA_MainWindow -Source 'Edit'
             })
     }
 
@@ -102,6 +112,9 @@ function Initialize-DeploymentPanel {
 
     # Check module status
     Update-ModuleStatus -Window $Window
+
+    # Check AppLocker GPO link status
+    Update-AppLockerGpoLinkStatus -Window $Window
 
     # Initial load - sync mode (async hangs on module import in runspace)
     Update-DeploymentJobsDataGrid -Window $Window
@@ -139,13 +152,15 @@ function Update-ModuleStatus {
 function global:Refresh-DeployPolicyCombo {
     <#
     .SYNOPSIS
-        Refreshes the policy dropdown on the Deployment panel.
+        Refreshes the policy dropdowns on the Deployment panel (Create + Edit tabs).
     #>
     param([System.Windows.Window]$Window)
 
     $policyCombo = $Window.FindName('CboDeployPolicy')
-    if (-not $policyCombo) {
-        Write-Log -Message 'Refresh-DeployPolicyCombo: CboDeployPolicy control not found' -Level 'Warning'
+    $editPolicyCombo = $Window.FindName('CboDeployEditPolicy')
+
+    if (-not $policyCombo -and -not $editPolicyCombo) {
+        Write-Log -Message 'Refresh-DeployPolicyCombo: No policy combo controls found' -Level 'Warning'
         return
     }
 
@@ -155,7 +170,8 @@ function global:Refresh-DeployPolicyCombo {
     }
 
     try {
-        $policyCombo.Items.Clear()
+        if ($policyCombo) { $policyCombo.Items.Clear() }
+        if ($editPolicyCombo) { $editPolicyCombo.Items.Clear() }
 
         # Load Active and Draft policies (anything deployable)
         $result = Get-AllPolicies
@@ -173,13 +189,24 @@ function global:Refresh-DeployPolicyCombo {
         Write-Log -Message "Refresh-DeployPolicyCombo: Found $(@($result.Data).Count) total policies, $($deployable.Count) deployable (Active/Draft)"
 
         foreach ($policy in $deployable) {
-            $item = [System.Windows.Controls.ComboBoxItem]::new()
-            $item.Content = "$($policy.Name) (Phase $($policy.Phase)) - $($policy.Status)"
-            $item.Tag = $policy
-            $policyCombo.Items.Add($item) | Out-Null
+            $displayText = "$($policy.Name) (Phase $($policy.Phase)) - $($policy.Status)"
+
+            if ($policyCombo) {
+                $item = [System.Windows.Controls.ComboBoxItem]::new()
+                $item.Content = $displayText
+                $item.Tag = $policy
+                $policyCombo.Items.Add($item) | Out-Null
+            }
+
+            if ($editPolicyCombo) {
+                $editItem = [System.Windows.Controls.ComboBoxItem]::new()
+                $editItem.Content = $displayText
+                $editItem.Tag = $policy
+                $editPolicyCombo.Items.Add($editItem) | Out-Null
+            }
         }
 
-        Write-Log -Message "Refresh-DeployPolicyCombo: Loaded $($deployable.Count) policies into dropdown"
+        Write-Log -Message "Refresh-DeployPolicyCombo: Loaded $($deployable.Count) policies into dropdown(s)"
     }
     catch {
         Write-Log -Message "Refresh-DeployPolicyCombo: Exception - $($_.Exception.Message)" -Level 'Error'
@@ -298,6 +325,47 @@ function global:Update-DeploymentFilter {
     )
 
     $script:CurrentDeploymentFilter = $Filter
+
+    # Grey pill visual toggle for filter buttons
+    $activePillBg = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#3E3E42')
+    $filterButtons = @(
+        'BtnFilterAllJobs', 'BtnFilterPendingJobs', 'BtnFilterRunningJobs',
+        'BtnFilterCompletedJobs', 'BtnFilterFailedJobs'
+    )
+    $colorMap = @{
+        'BtnFilterAllJobs'       = [System.Windows.Media.Brushes]::White
+        'BtnFilterPendingJobs'   = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#FF8C00')
+        'BtnFilterRunningJobs'   = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#0078D4')
+        'BtnFilterCompletedJobs' = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#107C10')
+        'BtnFilterFailedJobs'    = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#EF5350')
+    }
+    $btnNameMap = @{
+        'All'       = 'BtnFilterAllJobs'
+        'Pending'   = 'BtnFilterPendingJobs'
+        'Running'   = 'BtnFilterRunningJobs'
+        'Completed' = 'BtnFilterCompletedJobs'
+        'Failed'    = 'BtnFilterFailedJobs'
+    }
+
+    # Reset all to inactive (transparent bg + original color)
+    foreach ($btnName in $filterButtons) {
+        $btn = $Window.FindName($btnName)
+        if ($btn) {
+            $btn.Background = [System.Windows.Media.Brushes]::Transparent
+            $btn.Foreground = $colorMap[$btnName]
+        }
+    }
+
+    # Highlight active filter (grey pill bg + white text)
+    $activeBtnName = $btnNameMap[$Filter]
+    if ($activeBtnName) {
+        $btn = $Window.FindName($activeBtnName)
+        if ($btn) {
+            $btn.Background = $activePillBg
+            $btn.Foreground = [System.Windows.Media.Brushes]::White
+        }
+    }
+
     Update-DeploymentJobsDataGrid -Window $Window
 }
 
@@ -833,12 +901,18 @@ function global:Invoke-ImportDeployPolicyXml {
 function global:Update-DeployPolicyEditTab {
     <#
     .SYNOPSIS
-        Populates the Deploy Edit tab fields from the selected policy in the Create dropdown.
+        Populates the Deploy Edit tab fields from the selected policy.
+        Accepts -Source 'Edit' to use the Edit tab's own dropdown, or 'Create' for the Create tab's.
     #>
-    param([System.Windows.Window]$Window)
+    param(
+        [System.Windows.Window]$Window,
+        [string]$Source = 'Edit'
+    )
 
-    $policyCombo = $Window.FindName('CboDeployPolicy')
-    $hint = $Window.FindName('TxtDeployEditPolicyHint')
+    # Determine which combo triggered the update
+    $comboName = if ($Source -eq 'Create') { 'CboDeployPolicy' } else { 'CboDeployEditPolicy' }
+    $policyCombo = $Window.FindName($comboName)
+
     $txtName = $Window.FindName('TxtDeployEditPolicyName')
     $txtDesc = $Window.FindName('TxtDeployEditPolicyDesc')
     $cboGPO = $Window.FindName('CboDeployEditGPO')
@@ -846,7 +920,6 @@ function global:Update-DeployPolicyEditTab {
 
     if (-not $policyCombo -or -not $policyCombo.SelectedItem) {
         # No policy selected - clear fields
-        if ($hint) { $hint.Visibility = 'Visible' }
         if ($txtName) { $txtName.Text = '' }
         if ($txtDesc) { $txtDesc.Text = '' }
         if ($cboGPO) { $cboGPO.SelectedIndex = 0 }
@@ -857,7 +930,22 @@ function global:Update-DeployPolicyEditTab {
     $policy = $policyCombo.SelectedItem.Tag
     if (-not $policy) { return }
 
-    if ($hint) { $hint.Visibility = 'Collapsed' }
+    # Sync the other combo to match (so both tabs stay in sync)
+    $otherComboName = if ($Source -eq 'Create') { 'CboDeployEditPolicy' } else { 'CboDeployPolicy' }
+    $otherCombo = $Window.FindName($otherComboName)
+    if ($otherCombo -and $otherCombo.Items.Count -gt 0) {
+        # Find the matching policy by PolicyId in the other combo
+        for ($i = 0; $i -lt $otherCombo.Items.Count; $i++) {
+            $otherItem = $otherCombo.Items[$i]
+            if ($otherItem.Tag -and $otherItem.Tag.PolicyId -eq $policy.PolicyId) {
+                if ($otherCombo.SelectedIndex -ne $i) {
+                    $otherCombo.SelectedIndex = $i
+                }
+                break
+            }
+        }
+    }
+
     if ($txtName) { $txtName.Text = if ($policy.Name) { $policy.Name } else { '' } }
     if ($txtDesc) { $txtDesc.Text = if ($policy.Description) { $policy.Description } else { '' } }
 
@@ -900,10 +988,15 @@ function global:Invoke-SaveDeployPolicyChanges {
     #>
     param([System.Windows.Window]$Window)
 
-    # Get the selected policy from the Create tab combo
-    $policyCombo = $Window.FindName('CboDeployPolicy')
+    # Get the selected policy from the Edit tab combo (fall back to Create tab combo)
+    $editCombo = $Window.FindName('CboDeployEditPolicy')
+    $createCombo = $Window.FindName('CboDeployPolicy')
+    $policyCombo = if ($editCombo -and $editCombo.SelectedItem) { $editCombo } 
+                   elseif ($createCombo -and $createCombo.SelectedItem) { $createCombo }
+                   else { $null }
+
     if (-not $policyCombo -or -not $policyCombo.SelectedItem) {
-        Show-Toast -Message 'Please select a policy from the Create tab first.' -Type 'Warning'
+        Show-Toast -Message 'Please select a policy to edit.' -Type 'Warning'
         return
     }
 
@@ -954,6 +1047,176 @@ function global:Invoke-SaveDeployPolicyChanges {
         Show-Toast -Message "Error: $($_.Exception.Message)" -Type 'Error'
     }
 }
+
+#region GPO Link Control
+
+function global:Update-AppLockerGpoLinkStatus {
+    <#
+    .SYNOPSIS
+        Checks link status for the 3 AppLocker GPOs and updates the Deploy Actions pill toggles.
+    #>
+    param([System.Windows.Window]$Window)
+
+    # GPO name -> UI control suffix mapping
+    $gpoMap = @(
+        @{ Name = 'AppLocker-DC';           Suffix = 'DC';      Target = 'OU=Domain Controllers' }
+        @{ Name = 'AppLocker-Servers';      Suffix = 'Servers';  Target = 'CN=Computers' }
+        @{ Name = 'AppLocker-Workstations'; Suffix = 'Wks';      Target = 'CN=Computers' }
+    )
+
+    # Pill color palette
+    $pillEnabled  = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#107C10')   # green
+    $pillDisabled = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#3E3E42')   # dark grey
+    $pillNotLinked = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#3E3E42')
+    $fgWhite  = [System.Windows.Media.Brushes]::White
+    $fgOrange = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#FF8C00')
+    $fgGray   = [System.Windows.Media.Brushes]::Gray
+
+    $hasGP = Get-Module -ListAvailable -Name GroupPolicy
+    if (-not $hasGP) {
+        foreach ($gpo in $gpoMap) {
+            $btnCtrl = $Window.FindName("BtnToggleGpoLink$($gpo.Suffix)")
+            if ($btnCtrl) {
+                $btnCtrl.Content = 'No GP Module'
+                $btnCtrl.Background = $pillDisabled
+                $btnCtrl.Foreground = $fgGray
+                $btnCtrl.IsEnabled = $false
+            }
+        }
+        return
+    }
+
+    try {
+        Import-Module GroupPolicy -ErrorAction SilentlyContinue
+
+        # Get domain DN for building full OU paths
+        $domainDN = $null
+        try {
+            $domainDN = ([adsi]"LDAP://RootDSE").defaultNamingContext[0]
+        } catch { }
+
+        foreach ($gpo in $gpoMap) {
+            $btnCtrl = $Window.FindName("BtnToggleGpoLink$($gpo.Suffix)")
+            if (-not $btnCtrl) { continue }
+
+            $gpoObj = Get-GPO -Name $gpo.Name -ErrorAction SilentlyContinue
+            if (-not $gpoObj) {
+                $btnCtrl.Content = 'Not Created'
+                $btnCtrl.Background = $pillDisabled
+                $btnCtrl.Foreground = $fgGray
+                $btnCtrl.IsEnabled = $false
+                continue
+            }
+
+            $btnCtrl.IsEnabled = $true
+
+            # Try to find the link at the default target OU
+            $link = $null
+            if ($domainDN) {
+                $fullTarget = "$($gpo.Target),$domainDN"
+                try {
+                    $link = Get-GPInheritance -Target $fullTarget -ErrorAction SilentlyContinue |
+                            Select-Object -ExpandProperty GpoLinks |
+                            Where-Object { $_.DisplayName -eq $gpo.Name }
+                } catch { }
+            }
+
+            if ($link) {
+                if ($link.Enabled) {
+                    $btnCtrl.Content = 'Enabled'
+                    $btnCtrl.Background = $pillEnabled
+                    $btnCtrl.Foreground = $fgWhite
+                }
+                else {
+                    $btnCtrl.Content = 'Disabled'
+                    $btnCtrl.Background = $pillDisabled
+                    $btnCtrl.Foreground = $fgOrange
+                }
+            }
+            else {
+                # GPO exists but not linked at default OU
+                $btnCtrl.Content = 'Not Linked'
+                $btnCtrl.Background = $pillNotLinked
+                $btnCtrl.Foreground = $fgGray
+            }
+        }
+    }
+    catch {
+        Write-Log -Message "Update-AppLockerGpoLinkStatus: $($_.Exception.Message)" -Level 'Error'
+    }
+}
+
+function global:Invoke-ToggleAppLockerGpoLink {
+    <#
+    .SYNOPSIS
+        Toggles the link state for an AppLocker GPO (DC, Servers, or Workstations).
+    #>
+    param(
+        [System.Windows.Window]$Window,
+        [ValidateSet('DC', 'Servers', 'Workstations')]
+        [string]$GPOType
+    )
+
+    $nameMap = @{ DC = 'AppLocker-DC'; Servers = 'AppLocker-Servers'; Workstations = 'AppLocker-Workstations' }
+    $targetMap = @{ DC = 'OU=Domain Controllers'; Servers = 'CN=Computers'; Workstations = 'CN=Computers' }
+    $suffixMap = @{ DC = 'DC'; Servers = 'Servers'; Workstations = 'Wks' }
+
+    $gpoName = $nameMap[$GPOType]
+    $suffix = $suffixMap[$GPOType]
+
+    try {
+        $hasGP = Get-Module -ListAvailable -Name GroupPolicy
+        if (-not $hasGP) {
+            [System.Windows.MessageBox]::Show('GroupPolicy module not available. Install RSAT.', 'Missing Module', 'OK', 'Warning')
+            return
+        }
+        Import-Module GroupPolicy -ErrorAction Stop
+
+        $gpoObj = Get-GPO -Name $gpoName -ErrorAction SilentlyContinue
+        if (-not $gpoObj) {
+            [System.Windows.MessageBox]::Show("GPO '$gpoName' does not exist.`nCreate it from the Setup panel first.", 'Not Found', 'OK', 'Warning')
+            return
+        }
+
+        $domainDN = ([adsi]"LDAP://RootDSE").defaultNamingContext[0]
+        $fullTarget = "$($targetMap[$GPOType]),$domainDN"
+
+        # Check current link state
+        $link = $null
+        try {
+            $link = Get-GPInheritance -Target $fullTarget -ErrorAction SilentlyContinue |
+                    Select-Object -ExpandProperty GpoLinks |
+                    Where-Object { $_.DisplayName -eq $gpoName }
+        } catch { }
+
+        if (-not $link) {
+            # GPO exists but isn't linked — offer to create link
+            $answer = [System.Windows.MessageBox]::Show(
+                "'$gpoName' is not linked to '$fullTarget'.`n`nCreate the link now?",
+                'Not Linked', 'YesNo', 'Question')
+            if ($answer -ne 'Yes') { return }
+
+            New-GPLink -Name $gpoName -Target $fullTarget -ErrorAction Stop
+            Show-Toast -Message "$gpoName linked and enabled" -Type 'Success'
+        }
+        elseif ($link.Enabled) {
+            Set-GPLink -Name $gpoName -Target $fullTarget -LinkEnabled No -ErrorAction Stop
+            Show-Toast -Message "$gpoName link disabled" -Type 'Info'
+        }
+        else {
+            Set-GPLink -Name $gpoName -Target $fullTarget -LinkEnabled Yes -ErrorAction Stop
+            Show-Toast -Message "$gpoName link enabled" -Type 'Success'
+        }
+
+        # Refresh status display
+        Update-AppLockerGpoLinkStatus -Window $Window
+    }
+    catch {
+        [System.Windows.MessageBox]::Show("Error toggling $gpoName link:`n$($_.Exception.Message)", 'Error', 'OK', 'Error')
+    }
+}
+
+#endregion
 
 #endregion
 

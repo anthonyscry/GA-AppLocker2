@@ -274,14 +274,43 @@ function global:Invoke-DomainRefresh {
                 $treeView.Items.Add($ouErrorItem)
             }
 
-            # Update machine grid
+            # Update machine grid — merge new AD data with existing connectivity status
             if ($Result.ComputerResult -and $Result.ComputerResult.Success) {
-                $script:DiscoveredMachines = $Result.ComputerResult.Data
-                Update-MachineDataGrid -Window $Window -Machines $Result.ComputerResult.Data
+                $newMachines = $Result.ComputerResult.Data
+
+                # Preserve connectivity results (IsOnline, WinRMStatus) from prior Test-MachineConnectivity
+                if ($script:DiscoveredMachines -and $script:DiscoveredMachines.Count -gt 0) {
+                    $oldByHost = @{}
+                    foreach ($m in $script:DiscoveredMachines) {
+                        if ($m.Hostname) { $oldByHost[$m.Hostname] = $m }
+                    }
+                    foreach ($m in $newMachines) {
+                        $old = $oldByHost[$m.Hostname]
+                        if ($old) {
+                            # Copy connectivity fields from previous test results
+                            if ($null -ne $old.IsOnline) {
+                                $m | Add-Member -NotePropertyName 'IsOnline' -NotePropertyValue $old.IsOnline -Force
+                            }
+                            if ($old.WinRMStatus -and $old.WinRMStatus -ne 'Unknown') {
+                                $m | Add-Member -NotePropertyName 'WinRMStatus' -NotePropertyValue $old.WinRMStatus -Force
+                            }
+                        }
+                    }
+                }
+
+                $script:DiscoveredMachines = $newMachines
+                Update-MachineDataGrid -Window $Window -Machines $newMachines
                 Update-WorkflowBreadcrumb -Window $Window
 
                 if ($machineCount) {
-                    $machineCount.Text = "$($Result.ComputerResult.Data.Count) machines discovered"
+                    # Show connectivity summary if we have test results, otherwise just count
+                    $onlineCount = @($newMachines | Where-Object { $_.IsOnline -eq $true }).Count
+                    $winrmCount = @($newMachines | Where-Object { $_.WinRMStatus -eq 'Available' }).Count
+                    if ($onlineCount -gt 0) {
+                        $machineCount.Text = "$($newMachines.Count) machines ($onlineCount online, $winrmCount WinRM)"
+                    } else {
+                        $machineCount.Text = "$($newMachines.Count) machines discovered"
+                    }
                 }
             }
         }

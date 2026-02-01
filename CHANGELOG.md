@@ -2,6 +2,44 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.30] - 2026-01-31
+
+### New Features
+
+- **Phase 5 support (APPX + DLL phased rollout)** -- Policy pipeline expanded from 4 to 5 phases: Phase 4 adds APPX (AuditOnly), Phase 5 enables all collections including DLL (respects user enforcement mode). Updated New-Policy, Update-Policy, Export-PolicyToXml, and all XAML dropdowns.
+- **GPO Link pill toggles** -- Deploy Actions tab GPO link status replaced with interactive pill-style toggle buttons (green=Enabled, orange=Disabled, grey=Not Linked/Not Created). Removes separate status TextBlocks.
+- **Software Import split (Baseline vs Comparison)** -- Single "Import CSV" button replaced with "Import Baseline CSV" and "Import Comparison CSV" for clearer cross-system comparison workflow.
+- **Server roles & features in software scan** -- Local and remote software scans now enumerate installed Windows Server roles and features via Get-WindowsFeature.
+- **Deploy Edit tab policy dropdown** -- Deploy Edit tab gets its own policy ComboBox (CboDeployEditPolicy), synced with Create tab dropdown.
+
+### Enhanced
+
+- **Filter visual consistency (grey pill pattern)** -- Rules, Policy, and Deploy panels all use consistent grey pill toggle buttons (#3E3E42 bg + white fg for active, transparent + color fg for inactive). Replaces opacity-based toggling.
+- **AD Discovery refresh preserves connectivity** -- Domain refresh merges new AD data with existing connectivity test results (IsOnline, WinRMStatus) instead of replacing them. Machine count shows online/WinRM summary.
+- **AD Discovery first-visit auto-populates DataGrid** -- Navigating to Discovery panel with session-restored machines immediately populates the DataGrid and OU tree without requiring a manual refresh.
+- **WinRM GPO mutual exclusivity** -- Enabling AppLocker-EnableWinRM automatically disables AppLocker-DisableWinRM (and vice versa) to prevent conflicting GPOs.
+- **Policy tab reordering** -- Tabs reordered from Create→Rules→Edit to Create→Edit→Rules for better workflow.
+- **Deploy tab reordering** -- Tabs reordered from Create→Actions→Edit→Status to Create→Edit→Actions→Status.
+- **Deploy message area scrollable** -- Deployment message TextBlock now wrapped in ScrollViewer with MaxHeight constraint.
+
+### Bug Fixes
+
+- **Import XML missing dashboard refresh** -- Importing rules from XML now triggers Update-DashboardStats, Update-WorkflowBreadcrumb, and Reset-RulesSelectionState.
+- **Pending rules invisible after session restore** -- Rules panel filter buttons now dynamically sync with CurrentRulesFilter on initialization instead of always highlighting "All".
+
+### Tests
+
+- **Comprehensive V1229 session tests** -- ~260 new test lines covering filter consistency, GPO pill states, AD Discovery merge logic, count consistency across Dashboard/breadcrumb/panels, and XAML stat element verification.
+- **Phase 5 policy tests** -- Updated Policy.Phase.Tests.ps1 for 5-phase model with Phase 4 APPX and Phase 5 full enforcement tests.
+
+### Stats
+
+- **Version:** 1.2.30
+- **Tests:** 550/550 passing (100%)
+- **Exported Commands:** ~200
+
+---
+
 ## [1.2.29] - 2026-01-31
 
 ### Documentation

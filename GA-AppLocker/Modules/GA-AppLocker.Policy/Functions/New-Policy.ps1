@@ -17,15 +17,16 @@ function New-Policy {
     .PARAMETER EnforcementMode
         The enforcement mode: NotConfigured, AuditOnly, or Enabled.
         Note: When using Phase parameter, enforcement is auto-set:
-        - Phase 1-3: AuditOnly
-        - Phase 4: Enabled
+        - Phase 1-4: AuditOnly
+        - Phase 5: Enabled
 
     .PARAMETER Phase
-        The deployment phase (1-4). Controls which rule types are exported:
+        The deployment phase (1-5). Controls which rule types are exported:
         - Phase 1: EXE rules only (AuditOnly) - Initial testing
         - Phase 2: EXE + Script rules (AuditOnly)
         - Phase 3: EXE + Script + MSI rules (AuditOnly)
-        - Phase 4: All rules including DLL (Enabled) - Full enforcement
+        - Phase 4: EXE + Script + MSI + APPX rules (AuditOnly)
+        - Phase 5: All rules including DLL (Enabled) - Full enforcement
 
     .PARAMETER RuleIds
         Optional array of rule IDs to include in the policy.
@@ -35,8 +36,8 @@ function New-Policy {
         Creates a Phase 1 policy (EXE only, AuditOnly mode)
 
     .EXAMPLE
-        New-Policy -Name "Production Policy" -Phase 4
-        Creates a Phase 4 policy (all rules, Enabled mode)
+        New-Policy -Name "Production Policy" -Phase 5
+        Creates a Phase 5 policy (all rules, Enabled mode)
     #>
     [CmdletBinding()]
     param(
@@ -52,7 +53,7 @@ function New-Policy {
         [string]$EnforcementMode = 'AuditOnly',
 
         [Parameter(Mandatory = $false)]
-        [ValidateRange(1, 4)]
+        [ValidateRange(1, 5)]
         [int]$Phase = 1,
 
         [Parameter(Mandatory = $false)]
@@ -68,16 +69,16 @@ function New-Policy {
         }
 
         # Determine effective enforcement mode based on Phase
-        # SAFETY RULE: Phase 1-3 ALWAYS use AuditOnly (no exceptions)
-        # Phase 4 respects user's EnforcementMode setting
-        $effectiveEnforcement = if ($Phase -lt 4) {
-            # Phase 1-3: Force AuditOnly regardless of user request
+        # SAFETY RULE: Phase 1-4 ALWAYS use AuditOnly (no exceptions)
+        # Phase 5 respects user's EnforcementMode setting
+        $effectiveEnforcement = if ($Phase -lt 5) {
+            # Phase 1-4: Force AuditOnly regardless of user request
             'AuditOnly'
         } elseif ($PSBoundParameters.ContainsKey('EnforcementMode')) {
-            # Phase 4 with explicit EnforcementMode: respect user's choice
+            # Phase 5 with explicit EnforcementMode: respect user's choice
             $EnforcementMode
         } else {
-            # Phase 4 without explicit mode: default to Enabled
+            # Phase 5 without explicit mode: default to Enabled
             'Enabled'
         }
 

@@ -19,7 +19,7 @@ function Update-Policy {
         The enforcement mode: NotConfigured, AuditOnly, or Enabled.
 
     .PARAMETER Phase
-        The deployment phase (1-4).
+        The deployment phase (1-5).
 
     .PARAMETER TargetGPO
         The GPO name to target for deployment.
@@ -46,7 +46,7 @@ function Update-Policy {
         [string]$EnforcementMode,
 
         [Parameter(Mandatory = $false)]
-        [ValidateRange(1, 4)]
+        [ValidateRange(1, 5)]
         [int]$Phase,
 
         [Parameter(Mandatory = $false)]
@@ -79,9 +79,9 @@ function Update-Policy {
 
         # Update enforcement mode if provided
         if ($PSBoundParameters.ContainsKey('EnforcementMode')) {
-            # SAFETY RULE: Phase 1-3 ALWAYS use AuditOnly
+            # SAFETY RULE: Phase 1-4 ALWAYS use AuditOnly
             $effectivePhase = if ($PSBoundParameters.ContainsKey('Phase')) { $Phase } else { $policy.Phase }
-            if ($effectivePhase -lt 4 -and $EnforcementMode -eq 'Enabled') {
+            if ($effectivePhase -lt 5 -and $EnforcementMode -eq 'Enabled') {
                 $policy.EnforcementMode = 'AuditOnly'
             } else {
                 $policy.EnforcementMode = $EnforcementMode
@@ -92,7 +92,7 @@ function Update-Policy {
         if ($PSBoundParameters.ContainsKey('Phase')) {
             $policy.Phase = $Phase
             # Apply safety rule for phase change
-            if ($Phase -lt 4) {
+            if ($Phase -lt 5) {
                 $policy.EnforcementMode = 'AuditOnly'
             }
         }

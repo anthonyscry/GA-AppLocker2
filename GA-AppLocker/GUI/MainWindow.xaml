@@ -1850,11 +1850,12 @@ Width="1450"
                                             <ComboBoxItem Content="Phase 1: EXE Only" IsSelected="True" Tag="1"/>
                                             <ComboBoxItem Content="Phase 2: EXE + Script" Tag="2"/>
                                             <ComboBoxItem Content="Phase 3: EXE + Script + MSI" Tag="3"/>
-                                            <ComboBoxItem Content="Phase 4: All (Full Enforcement)" Tag="4"/>
+                                            <ComboBoxItem Content="Phase 4: EXE + Script + MSI + APPX" Tag="4"/>
+                                            <ComboBoxItem Content="Phase 5: All + DLL (Full Enforcement)" Tag="5"/>
                                         </ComboBox>
-                                        <TextBlock Text="Phases 1-3 always use Audit mode" 
+                                        <TextBlock Text="Phase controls which collection types are added to the policy. DLL is Phase 5 only." 
                                                    Foreground="{StaticResource MutedBrush}" 
-                                                   FontSize="10" FontStyle="Italic" Margin="0,0,0,15"/>
+                                                   FontSize="10" FontStyle="Italic" TextWrapping="Wrap" Margin="0,0,0,15"/>
 
                                         <Button x:Name="BtnCreatePolicy" 
                                                 Content="Create New Policy"
@@ -1863,34 +1864,7 @@ Width="1450"
                                     </StackPanel>
                                 </TabItem>
                                 
-                                <!-- Tab 2: Policy Rules -->
-                                <TabItem Header="Rules">
-                                    <StackPanel Margin="15">
-                                        <TextBlock Text="POLICY RULES" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
-
-                                        <TextBlock Text="Selected Policy:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <TextBlock x:Name="TxtSelectedPolicyName" 
-                                                   Text="(Select a policy)" 
-                                                   Foreground="{StaticResource MutedBrush}" 
-                                                   FontStyle="Italic" Margin="0,0,0,10"/>
-
-                                        <TextBlock Text="Rules in Policy:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <TextBlock x:Name="TxtPolicyRuleCount" 
-                                                   Text="0 rules" 
-                                                   Foreground="{StaticResource MutedBrush}" Margin="0,0,0,15"/>
-
-                                        <StackPanel Orientation="Horizontal">
-                                            <Button x:Name="BtnAddRulesToPolicy" Content="Add Rules" 
-                                                    Style="{StaticResource ButtonStyle}" MinWidth="90" Margin="0,0,5,0"
-                                                    Tag="AddRulesToPolicy"/>
-                                            <Button x:Name="BtnRemoveRulesFromPolicy" Content="Remove" 
-                                                    Style="{StaticResource ButtonStyle}" MinWidth="70"
-                                                    Tag="RemoveRulesFromPolicy"/>
-                                        </StackPanel>
-                                    </StackPanel>
-                                </TabItem>
-                                
-                                <!-- Tab 3: Edit Policy -->
+                                <!-- Tab 2: Edit Policy -->
                                 <TabItem Header="Edit">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                                     <StackPanel Margin="15">
@@ -1918,7 +1892,8 @@ Width="1450"
                                             <ComboBoxItem Content="Phase 1: EXE Only" Tag="1"/>
                                             <ComboBoxItem Content="Phase 2: EXE + Script" Tag="2"/>
                                             <ComboBoxItem Content="Phase 3: EXE + Script + MSI" Tag="3"/>
-                                            <ComboBoxItem Content="Phase 4: All (Full)" Tag="4"/>
+                                            <ComboBoxItem Content="Phase 4: EXE + Script + MSI + APPX" Tag="4"/>
+                                            <ComboBoxItem Content="Phase 5: All + DLL (Full)" Tag="5"/>
                                         </ComboBox>
 
                                         <TextBlock Text="Target GPO:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
@@ -1940,6 +1915,33 @@ Width="1450"
                                                 Tag="SavePolicyChanges"/>
                                     </StackPanel>
                                     </ScrollViewer>
+                                </TabItem>
+                                
+                                <!-- Tab 3: Policy Rules -->
+                                <TabItem Header="Rules">
+                                    <StackPanel Margin="15">
+                                        <TextBlock Text="POLICY RULES" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
+
+                                        <TextBlock Text="Selected Policy:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                        <TextBlock x:Name="TxtSelectedPolicyName" 
+                                                   Text="(Select a policy)" 
+                                                   Foreground="{StaticResource MutedBrush}" 
+                                                   FontStyle="Italic" Margin="0,0,0,10"/>
+
+                                        <TextBlock Text="Rules in Policy:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                        <TextBlock x:Name="TxtPolicyRuleCount" 
+                                                   Text="0 rules" 
+                                                   Foreground="{StaticResource MutedBrush}" Margin="0,0,0,15"/>
+
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button x:Name="BtnAddRulesToPolicy" Content="Add Rules" 
+                                                    Style="{StaticResource ButtonStyle}" MinWidth="90" Margin="0,0,5,0"
+                                                    Tag="AddRulesToPolicy"/>
+                                            <Button x:Name="BtnRemoveRulesFromPolicy" Content="Remove" 
+                                                    Style="{StaticResource ButtonStyle}" MinWidth="70"
+                                                    Tag="RemoveRulesFromPolicy"/>
+                                        </StackPanel>
+                                    </StackPanel>
                                 </TabItem>
                             </TabControl>
                         </Border>
@@ -2155,7 +2157,47 @@ Width="1450"
                                     </StackPanel>
                                 </TabItem>
                                 
-                                <!-- Tab 2: Quick Actions -->
+                                <!-- Tab 2: Edit Policy -->
+                                <TabItem Header="Edit">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel Margin="15">
+                                        <TextBlock Text="EDIT SELECTED POLICY" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
+
+                                        <TextBlock Text="Select Policy:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                        <ComboBox x:Name="CboDeployEditPolicy" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,10"/>
+
+                                        <TextBlock Text="Policy Name:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                        <TextBox x:Name="TxtDeployEditPolicyName" 
+                                                 Style="{StaticResource TextBoxStyle}" Margin="0,0,0,10"/>
+
+                                        <TextBlock Text="Description:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                        <TextBox x:Name="TxtDeployEditPolicyDesc" 
+                                                 Style="{StaticResource TextBoxStyle}"
+                                                 Height="50" TextWrapping="Wrap" AcceptsReturn="True"
+                                                 VerticalContentAlignment="Top" Margin="0,0,0,10"/>
+
+                                        <TextBlock Text="Target GPO:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                        <ComboBox x:Name="CboDeployEditGPO" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,5">
+                                            <ComboBoxItem Content="(None)" Tag="" IsSelected="True"/>
+                                            <ComboBoxItem Content="AppLocker-DC" Tag="AppLocker-DC"/>
+                                            <ComboBoxItem Content="AppLocker-Servers" Tag="AppLocker-Servers"/>
+                                            <ComboBoxItem Content="AppLocker-Workstations" Tag="AppLocker-Workstations"/>
+                                            <ComboBoxItem Content="Custom..." Tag="Custom"/>
+                                        </ComboBox>
+                                        <TextBox x:Name="TxtDeployEditCustomGPO" 
+                                                 Style="{StaticResource TextBoxStyle}" 
+                                                 Visibility="Collapsed"
+                                                 Tag="Enter custom GPO name..."
+                                                 Margin="0,0,0,10"/>
+
+                                        <Button x:Name="BtnSaveDeployPolicyChanges" Content="Save Changes" 
+                                                Style="{StaticResource PrimaryButtonStyle}"
+                                                Tag="SaveDeployPolicyChanges"/>
+                                    </StackPanel>
+                                    </ScrollViewer>
+                                </TabItem>
+
+                                <!-- Tab 3: Quick Actions -->
                                 <TabItem Header="Actions">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                                     <StackPanel Margin="15">
@@ -2188,44 +2230,59 @@ Width="1450"
                                                 Style="{StaticResource ButtonStyle}" Margin="0,0,0,5"
                                                 Tag="ExportDeployPolicyXml"
                                                 ToolTip="Export a GA-AppLocker policy to AppLocker XML"/>
-                                    </StackPanel>
-                                    </ScrollViewer>
-                                </TabItem>
-                                
-                                <!-- Tab 3: Edit Policy -->
-                                <TabItem Header="Edit">
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                    <StackPanel Margin="15">
-                                        <TextBlock Text="EDIT SELECTED POLICY" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
-                                        <TextBlock x:Name="TxtDeployEditPolicyHint" Text="Select a policy from the Create tab" Foreground="{StaticResource MutedBrush}" FontStyle="Italic" Margin="0,0,0,10"/>
 
-                                        <TextBlock Text="Policy Name:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <TextBox x:Name="TxtDeployEditPolicyName" 
-                                                 Style="{StaticResource TextBoxStyle}" Margin="0,0,0,10"/>
+                                        <TextBlock Text="GPO LINK CONTROL" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,15,0,10"/>
 
-                                        <TextBlock Text="Description:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <TextBox x:Name="TxtDeployEditPolicyDesc" 
-                                                 Style="{StaticResource TextBoxStyle}"
-                                                 Height="50" TextWrapping="Wrap" AcceptsReturn="True"
-                                                 VerticalContentAlignment="Top" Margin="0,0,0,10"/>
+                                        <!-- AppLocker-DC -->
+                                        <Border Background="#252526" CornerRadius="6" Padding="10" Margin="0,0,0,5">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                    <TextBlock Text="AppLocker-DC" FontWeight="SemiBold" Foreground="{StaticResource ForegroundBrush}" FontSize="11"/>
+                                                    <TextBlock Text="Domain Controllers" Foreground="{StaticResource MutedBrush}" FontSize="9" Margin="0,2,0,0"/>
+                                                </StackPanel>
+                                                <Button Grid.Column="1" x:Name="BtnToggleGpoLinkDC" Content="..." 
+                                                        Background="#3E3E42" Foreground="Gray" FontWeight="SemiBold" FontSize="10"
+                                                        Padding="14,5" BorderThickness="0" VerticalAlignment="Center" Tag="ToggleGpoLinkDC"/>
+                                            </Grid>
+                                        </Border>
 
-                                        <TextBlock Text="Target GPO:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <ComboBox x:Name="CboDeployEditGPO" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,5">
-                                            <ComboBoxItem Content="(None)" Tag="" IsSelected="True"/>
-                                            <ComboBoxItem Content="AppLocker-DC" Tag="AppLocker-DC"/>
-                                            <ComboBoxItem Content="AppLocker-Servers" Tag="AppLocker-Servers"/>
-                                            <ComboBoxItem Content="AppLocker-Workstations" Tag="AppLocker-Workstations"/>
-                                            <ComboBoxItem Content="Custom..." Tag="Custom"/>
-                                        </ComboBox>
-                                        <TextBox x:Name="TxtDeployEditCustomGPO" 
-                                                 Style="{StaticResource TextBoxStyle}" 
-                                                 Visibility="Collapsed"
-                                                 Tag="Enter custom GPO name..."
-                                                 Margin="0,0,0,10"/>
+                                        <!-- AppLocker-Servers -->
+                                        <Border Background="#252526" CornerRadius="6" Padding="10" Margin="0,0,0,5">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                    <TextBlock Text="AppLocker-Servers" FontWeight="SemiBold" Foreground="{StaticResource ForegroundBrush}" FontSize="11"/>
+                                                    <TextBlock Text="Member Servers" Foreground="{StaticResource MutedBrush}" FontSize="9" Margin="0,2,0,0"/>
+                                                </StackPanel>
+                                                <Button Grid.Column="1" x:Name="BtnToggleGpoLinkServers" Content="..." 
+                                                        Background="#3E3E42" Foreground="Gray" FontWeight="SemiBold" FontSize="10"
+                                                        Padding="14,5" BorderThickness="0" VerticalAlignment="Center" Tag="ToggleGpoLinkServers"/>
+                                            </Grid>
+                                        </Border>
 
-                                        <Button x:Name="BtnSaveDeployPolicyChanges" Content="Save Changes" 
-                                                Style="{StaticResource PrimaryButtonStyle}"
-                                                Tag="SaveDeployPolicyChanges"/>
+                                        <!-- AppLocker-Workstations -->
+                                        <Border Background="#252526" CornerRadius="6" Padding="10" Margin="0,0,0,5">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                    <TextBlock Text="AppLocker-Workstations" FontWeight="SemiBold" Foreground="{StaticResource ForegroundBrush}" FontSize="11"/>
+                                                    <TextBlock Text="Workstations / Computers" Foreground="{StaticResource MutedBrush}" FontSize="9" Margin="0,2,0,0"/>
+                                                </StackPanel>
+                                                <Button Grid.Column="1" x:Name="BtnToggleGpoLinkWks" Content="..." 
+                                                        Background="#3E3E42" Foreground="Gray" FontWeight="SemiBold" FontSize="10"
+                                                        Padding="14,5" BorderThickness="0" VerticalAlignment="Center" Tag="ToggleGpoLinkWks"/>
+                                            </Grid>
+                                        </Border>
                                     </StackPanel>
                                     </ScrollViewer>
                                 </TabItem>
@@ -2335,16 +2392,19 @@ Width="1450"
                                 </DataGrid>
 
                                 <!-- Progress/Message Area -->
-                                <Border Grid.Row="3" Background="#252526" CornerRadius="4" Padding="10" Margin="0,10,0,0">
+                                <Border Grid.Row="3" Background="#252526" CornerRadius="4" Padding="10" Margin="0,10,0,0" MaxHeight="80">
                                     <Grid>
                                         <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
                                             <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
 
-                                        <TextBlock x:Name="TxtDeploymentMessage" Grid.Row="0"
-                                                   Text="Select a deployment job to view details"
-                                                   Foreground="{StaticResource MutedBrush}" Margin="0,0,0,8"/>
+                                        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" MaxHeight="50">
+                                            <TextBlock x:Name="TxtDeploymentMessage"
+                                                       Text="Select a deployment job to view details"
+                                                       Foreground="{StaticResource MutedBrush}" Margin="0,0,0,8"
+                                                       TextWrapping="Wrap"/>
+                                        </ScrollViewer>
 
                                         <Grid Grid.Row="1">
                                             <ProgressBar x:Name="DeploymentProgressBar" 
@@ -2944,21 +3004,27 @@ Width="1450"
                                         </StackPanel>
                                     </Border>
 
-                                    <!-- Import / Export -->
-                                    <TextBlock Text="IMPORT / EXPORT" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
-                                    <Button x:Name="BtnImportSoftwareCsv" Content="Import CSV"
-                                            Style="{StaticResource ButtonStyle}" Margin="0,0,0,5"
-                                            Tag="ImportSoftwareCsv"/>
+                                    <!-- Export -->
+                                    <TextBlock Text="EXPORT" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
                                     <Button x:Name="BtnExportSoftwareCsv" Content="Export to CSV"
                                             Style="{StaticResource ButtonStyle}" Margin="0,0,0,15"
                                             Tag="ExportSoftwareCsv"/>
 
                                     <!-- Compare -->
                                     <TextBlock Text="COMPARE" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
-                                    <TextBlock Text="Import a CSV from another system, then compare against the current scan." 
+                                    <TextBlock Text="Import two CSVs and compare software across systems."
                                                Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                                    <Button x:Name="BtnImportBaseline" Content="Import Baseline CSV"
+                                            Style="{StaticResource ButtonStyle}" Margin="0,0,0,5"
+                                            Tag="ImportBaselineCsv"
+                                            ToolTip="Load a CSV as the baseline (left side of comparison)"/>
+                                    <Button x:Name="BtnImportComparison" Content="Import Comparison CSV"
+                                            Style="{StaticResource ButtonStyle}" Margin="0,0,0,5"
+                                            Tag="ImportComparisonCsv"
+                                            ToolTip="Load a second CSV to compare against the baseline"/>
                                     <Button x:Name="BtnCompareSoftware" Content="Compare Inventories"
                                             Style="{StaticResource ButtonStyle}" Margin="0,0,0,5"
+                                            Background="#1565C0"
                                             Tag="CompareSoftware"/>
                                     <Button x:Name="BtnClearComparison" Content="Clear Comparison"
                                             Style="{StaticResource ButtonStyle}" Margin="0,0,0,5"

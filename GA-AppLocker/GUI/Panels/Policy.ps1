@@ -211,6 +211,47 @@ function global:Update-PoliciesFilter {
     )
 
     $script:CurrentPoliciesFilter = $Filter
+
+    # Grey pill visual toggle for filter buttons
+    $activePillBg = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#3E3E42')
+    $filterButtons = @(
+        'BtnFilterAllPolicies', 'BtnFilterDraft', 'BtnFilterActive',
+        'BtnFilterDeployed', 'BtnFilterArchived'
+    )
+    $colorMap = @{
+        'BtnFilterAllPolicies' = [System.Windows.Media.Brushes]::White
+        'BtnFilterDraft'       = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#FF8C00')
+        'BtnFilterActive'      = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#0078D4')
+        'BtnFilterDeployed'    = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#107C10')
+        'BtnFilterArchived'    = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#E0E0E0')
+    }
+    $btnNameMap = @{
+        'All'      = 'BtnFilterAllPolicies'
+        'Draft'    = 'BtnFilterDraft'
+        'Active'   = 'BtnFilterActive'
+        'Deployed' = 'BtnFilterDeployed'
+        'Archived' = 'BtnFilterArchived'
+    }
+
+    # Reset all to inactive (transparent bg + original color)
+    foreach ($btnName in $filterButtons) {
+        $btn = $Window.FindName($btnName)
+        if ($btn) {
+            $btn.Background = [System.Windows.Media.Brushes]::Transparent
+            $btn.Foreground = $colorMap[$btnName]
+        }
+    }
+
+    # Highlight active filter (grey pill bg + white text)
+    $activeBtnName = $btnNameMap[$Filter]
+    if ($activeBtnName) {
+        $btn = $Window.FindName($activeBtnName)
+        if ($btn) {
+            $btn.Background = $activePillBg
+            $btn.Foreground = [System.Windows.Media.Brushes]::White
+        }
+    }
+
     Update-PoliciesDataGrid -Window $Window
 }
 
@@ -259,7 +300,7 @@ function global:Update-SelectedPolicyInfo {
         if ($cboPhase) {
             $phaseIndex = if ($selectedItem.Phase) { [int]$selectedItem.Phase - 1 } else { 0 }
             if ($phaseIndex -lt 0) { $phaseIndex = 0 }
-            if ($phaseIndex -gt 3) { $phaseIndex = 3 }
+            if ($phaseIndex -gt 4) { $phaseIndex = 4 }
             $cboPhase.SelectedIndex = $phaseIndex
         }
         
@@ -570,6 +611,30 @@ function global:Invoke-DeploySelectedPolicy {
     }
 }
 
+function script:Get-PhaseCollectionTypes {
+    <#
+    .SYNOPSIS
+        Returns the allowed collection types for a deployment phase.
+    .DESCRIPTION
+        Phase controls which AppLocker collection types are included in a policy:
+        Phase 1: Exe only
+        Phase 2: Exe + Script
+        Phase 3: Exe + Script + Msi
+        Phase 4: Exe + Script + Msi + Appx
+        Phase 5: All (Exe + Script + Msi + Appx + Dll)
+    #>
+    param([int]$Phase)
+
+    switch ($Phase) {
+        1 { @('Exe') }
+        2 { @('Exe', 'Script') }
+        3 { @('Exe', 'Script', 'Msi') }
+        4 { @('Exe', 'Script', 'Msi', 'Appx') }
+        5 { @('Exe', 'Script', 'Msi', 'Appx', 'Dll') }
+        default { @('Exe', 'Script', 'Msi', 'Appx', 'Dll') }
+    }
+}
+
 function global:Invoke-AddRulesToPolicy {
     param([System.Windows.Window]$Window)
 
@@ -585,21 +650,41 @@ function global:Invoke-AddRulesToPolicy {
     $policy = $policyResult.Data
     $currentRuleIds = @($policy.RuleIds)
 
+    # Determine allowed collection types from the policy phase
+    $phase = if ($policy.Phase) { [int]$policy.Phase } else { 5 }
+    $allowedCollections = Get-PhaseCollectionTypes -Phase $phase
+
     $rulesResult = Get-AllRules -Take 100000
     if (-not $rulesResult.Success) { return }
 
+    # Filter by approved status, not already in policy, AND matching collection types for this phase
     $availableRules = $rulesResult.Data | Where-Object { 
-        $_.Status -eq 'Approved' -and $_.Id -notin $currentRuleIds 
+        $_.Status -eq 'Approved' -and $_.Id -notin $currentRuleIds -and $_.CollectionType -in $allowedCollections
     }
 
+    # Also count how many approved rules were excluded by the phase filter
+    $excludedByPhase = @($rulesResult.Data | Where-Object {
+        $_.Status -eq 'Approved' -and $_.Id -notin $currentRuleIds -and $_.CollectionType -notin $allowedCollections
+    }).Count
+
     if ($availableRules.Count -eq 0) {
-        [System.Windows.MessageBox]::Show('No approved rules available to add.', 'No Rules', 'OK', 'Information')
+        $msg = 'No approved rules available to add.'
+        if ($excludedByPhase -gt 0) {
+            $msg += "`n`n$excludedByPhase rule(s) excluded by Phase $phase filter.`nAllowed types: $($allowedCollections -join ', ')"
+        }
+        [System.Windows.MessageBox]::Show($msg, 'No Rules', 'OK', 'Information')
         return
     }
 
-    # For now, add all approved rules
+    # Show breakdown by collection type
+    $breakdown = $availableRules | Group-Object CollectionType | ForEach-Object { "$($_.Name): $($_.Count)" }
+    $confirmMsg = "Add $($availableRules.Count) approved rule(s) to this policy?`n`nPhase $phase collections: $($allowedCollections -join ', ')`n`nBreakdown:`n$($breakdown -join "`n")"
+    if ($excludedByPhase -gt 0) {
+        $confirmMsg += "`n`n($excludedByPhase rule(s) excluded - not in Phase $phase)"
+    }
+
     $confirm = [System.Windows.MessageBox]::Show(
-        "Add $($availableRules.Count) approved rule(s) to this policy?",
+        $confirmMsg,
         'Add Rules',
         'YesNo',
         'Question'

@@ -152,11 +152,16 @@ function global:Invoke-ButtonAction {
         'ExportDeployPolicyXml' { Invoke-ExportDeployPolicyXml -Window $win }
         'ImportDeployPolicyXml' { Invoke-ImportDeployPolicyXml -Window $win }
         'SaveDeployPolicyChanges' { Invoke-SaveDeployPolicyChanges -Window $win }
+        'ToggleGpoLinkDC' { Invoke-ToggleAppLockerGpoLink -Window $win -GPOType 'DC' }
+        'ToggleGpoLinkServers' { Invoke-ToggleAppLockerGpoLink -Window $win -GPOType 'Servers' }
+        'ToggleGpoLinkWks' { Invoke-ToggleAppLockerGpoLink -Window $win -GPOType 'Workstations' }
         # Software Inventory panel
         'ScanLocalSoftware' { Invoke-ScanLocalSoftware -Window $win }
         'ScanRemoteSoftware' { Invoke-ScanRemoteSoftware -Window $win }
         'ExportSoftwareCsv' { Invoke-ExportSoftwareCsv -Window $win }
         'ImportSoftwareCsv' { Invoke-ImportSoftwareCsv -Window $win }
+        'ImportBaselineCsv' { Invoke-ImportBaselineCsv -Window $win }
+        'ImportComparisonCsv' { Invoke-ImportComparisonCsv -Window $win }
         'CompareSoftware' { Invoke-CompareSoftware -Window $win }
         'ClearSoftwareComparison' { Invoke-ClearSoftwareComparison -Window $win }
         # Setup panel - WinRM GPOs
@@ -288,10 +293,33 @@ function global:Set-ActivePanel {
     # Log navigation
     Write-Log -Message "Navigated to: $PanelName"
     
-    # Auto-refresh AD Discovery on first navigation (don't make user click Refresh manually)
-    if ($PanelName -eq 'PanelDiscovery' -and $script:DiscoveredMachines.Count -eq 0) {
-        Write-Log -Message 'Auto-triggering domain refresh on first Discovery panel visit'
-        Invoke-DomainRefresh -Window $Window
+    # Auto-refresh AD Discovery on navigation
+    if ($PanelName -eq 'PanelDiscovery') {
+        if ($script:DiscoveredMachines.Count -eq 0) {
+            # No machines at all — auto-discover from AD
+            Write-Log -Message 'Auto-triggering domain refresh on first Discovery panel visit'
+            Invoke-DomainRefresh -Window $Window
+        } else {
+            # Session-restored or previously discovered machines — populate the DataGrid
+            Update-MachineDataGrid -Window $Window -Machines $script:DiscoveredMachines
+            $machineCountCtrl = $Window.FindName('DiscoveryMachineCount')
+            if ($machineCountCtrl) {
+                $onlineCount = @($script:DiscoveredMachines | Where-Object { $_.IsOnline -eq $true }).Count
+                $winrmCount = @($script:DiscoveredMachines | Where-Object { $_.WinRMStatus -eq 'Available' }).Count
+                if ($onlineCount -gt 0) {
+                    $machineCountCtrl.Text = "$($script:DiscoveredMachines.Count) machines ($onlineCount online, $winrmCount WinRM)"
+                } else {
+                    $machineCountCtrl.Text = "$($script:DiscoveredMachines.Count) machines"
+                }
+            }
+            # Repopulate OU tree if we have OU data
+            if ($script:DiscoveredOUs -and $script:DiscoveredOUs.Count -gt 0) {
+                $treeView = $Window.FindName('OUTreeView')
+                if ($treeView -and $treeView.Items.Count -le 1) {
+                    Update-OUTreeView -TreeView $treeView -OUs $script:DiscoveredOUs
+                }
+            }
+        }
     }
 
     # Auto-refresh Deploy panel on every navigation (policy combo + jobs list)

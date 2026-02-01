@@ -86,16 +86,38 @@ function Initialize-RulesPanel {
         }
     }
 
-    # Set initial filter button state (All is active by default)
-    $btnAll = $Window.FindName('BtnFilterAllRules')
-    if ($btnAll) {
-        $btnAll.Background = [System.Windows.Media.SolidColorBrush]::new([System.Windows.Media.Color]::FromRgb(0, 122, 204))
+    # Sync filter button visuals with actual filter state (may have been restored from session)
+    $activeBg = [System.Windows.Media.SolidColorBrush]::new([System.Windows.Media.Color]::FromRgb(0, 122, 204))
+    $defaultBg = [System.Windows.Media.SolidColorBrush]::new([System.Windows.Media.Color]::FromRgb(45, 45, 48))
+    
+    # Set type filter button visuals
+    $typeButtonMap = @{ 'All' = 'BtnFilterAllRules'; 'Publisher' = 'BtnFilterPublisher'; 'Hash' = 'BtnFilterHash'; 'Path' = 'BtnFilterPath' }
+    foreach ($key in $typeButtonMap.Keys) {
+        $btn = $Window.FindName($typeButtonMap[$key])
+        if ($btn) {
+            $btn.Background = if ($script:CurrentRulesTypeFilter -eq $key) { $activeBg } else { $defaultBg }
+        }
     }
     
-    # Set initial opacity for status buttons (dimmed until selected)
-    foreach ($btnName in @('BtnFilterPending', 'BtnFilterApproved', 'BtnFilterRejected')) {
-        $btn = $Window.FindName($btnName)
-        if ($btn) { $btn.Opacity = 0.6 }
+    # Set status filter button visuals (grey pill on active, original color on inactive)
+    $statusButtonMap = @{ 'Pending' = 'BtnFilterPending'; 'Approved' = 'BtnFilterApproved'; 'Rejected' = 'BtnFilterRejected' }
+    $statusColorMap = @{
+        'BtnFilterPending'  = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#FF8C00')
+        'BtnFilterApproved' = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#107C10')
+        'BtnFilterRejected' = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#EF5350')
+    }
+    $activePillBg = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#3E3E42')
+    foreach ($key in $statusButtonMap.Keys) {
+        $btn = $Window.FindName($statusButtonMap[$key])
+        if ($btn) {
+            if ($script:CurrentRulesFilter -eq $key) {
+                $btn.Background = $activePillBg
+                $btn.Foreground = [System.Windows.Media.Brushes]::White
+            } else {
+                $btn.Background = [System.Windows.Media.Brushes]::Transparent
+                $btn.Foreground = $statusColorMap[$statusButtonMap[$key]]
+            }
+        }
     }
 
     # Initial load - use async to keep UI responsive
@@ -502,12 +524,17 @@ function global:Update-RulesFilter {
         # Reset status filter when changing type filter to 'All'
         if ($Filter -eq 'All') { 
             $script:CurrentRulesFilter = 'All' 
-            # Reset status button styles
+            # Reset status button styles to inactive (transparent bg + original color)
+            $statusColorMap = @{
+                'BtnFilterPending'  = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#FF8C00')
+                'BtnFilterApproved' = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#107C10')
+                'BtnFilterRejected' = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#EF5350')
+            }
             foreach ($btnName in $statusButtons) {
                 $btn = $Window.FindName($btnName)
                 if ($btn) {
-                    # Keep original colors for status buttons
-                    $btn.Opacity = 0.6
+                    $btn.Background = [System.Windows.Media.Brushes]::Transparent
+                    $btn.Foreground = $statusColorMap[$btnName]
                 }
             }
         }
@@ -534,11 +561,18 @@ function global:Update-RulesFilter {
     elseif ($Filter -in @('Pending', 'Approved', 'Rejected', 'Review')) {
         $script:CurrentRulesFilter = $Filter
         
-        # Update status button opacity to show active
+        $activePillBg = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#3E3E42')
+        # Reset all status buttons to inactive
+        $statusColorMap = @{
+            'BtnFilterPending'  = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#FF8C00')
+            'BtnFilterApproved' = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#107C10')
+            'BtnFilterRejected' = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#EF5350')
+        }
         foreach ($btnName in $statusButtons) {
             $btn = $Window.FindName($btnName)
             if ($btn) {
-                $btn.Opacity = 0.6
+                $btn.Background = [System.Windows.Media.Brushes]::Transparent
+                $btn.Foreground = $statusColorMap[$btnName]
             }
         }
         
@@ -549,7 +583,10 @@ function global:Update-RulesFilter {
             'Rejected' { 'BtnFilterRejected' }
         }
         $btn = $Window.FindName($activeBtn)
-        if ($btn) { $btn.Opacity = 1.0 }
+        if ($btn) {
+            $btn.Background = $activePillBg
+            $btn.Foreground = [System.Windows.Media.Brushes]::White
+        }
     }
 
     Update-RulesDataGrid -Window $Window
@@ -1058,7 +1095,12 @@ function global:Invoke-ImportRulesFromXmlFile {
         }
         
         Hide-LoadingOverlay
+        # Reset selection state before refreshing grid
+        Reset-RulesSelectionState -Window $Window
         Update-RulesDataGrid -Window $Window
+        # Refresh dashboard stats and sidebar counts
+        Update-DashboardStats -Window $Window
+        Update-WorkflowBreadcrumb -Window $Window
         
         $message = "Imported $totalImported rule(s)"
         if ($totalSkipped -gt 0) {

@@ -13,7 +13,8 @@ function Initialize-SoftwarePanel {
     # Wire up sidebar buttons via Tag -> Invoke-ButtonAction
     $buttons = @(
         'BtnScanLocalSoftware', 'BtnScanRemoteSoftware',
-        'BtnExportSoftwareCsv', 'BtnImportSoftwareCsv',
+        'BtnExportSoftwareCsv',
+        'BtnImportBaseline', 'BtnImportComparison',
         'BtnCompareSoftware', 'BtnClearComparison'
     )
     foreach ($btnName in $buttons) {
@@ -248,22 +249,42 @@ function global:Invoke-ScanRemoteSoftware {
                     $invokeParams = @{
                         ComputerName = $hostname
                         ScriptBlock  = {
+                            $items = [System.Collections.Generic.List[PSCustomObject]]::new()
+
+                            # Registry-based installed software
                             $paths = @(
                                 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
                                 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
                             )
-                            Get-ItemProperty -Path $paths -ErrorAction SilentlyContinue |
-                                Where-Object { $_.DisplayName -and $_.DisplayName.Trim() -ne '' } |
-                                ForEach-Object {
-                                    [PSCustomObject]@{
-                                        DisplayName     = $_.DisplayName
-                                        DisplayVersion  = $_.DisplayVersion
-                                        Publisher        = $_.Publisher
-                                        InstallDate      = $_.InstallDate
-                                        InstallLocation  = $_.InstallLocation
-                                        Architecture     = if ($_.PSPath -like '*WOW6432*') { 'x86' } else { 'x64' }
+                            foreach ($p in (Get-ItemProperty -Path $paths -ErrorAction SilentlyContinue |
+                                    Where-Object { $_.DisplayName -and $_.DisplayName.Trim() -ne '' })) {
+                                $items.Add([PSCustomObject]@{
+                                    DisplayName     = $p.DisplayName
+                                    DisplayVersion  = $p.DisplayVersion
+                                    Publisher        = $p.Publisher
+                                    InstallDate      = $p.InstallDate
+                                    InstallLocation  = $p.InstallLocation
+                                    Architecture     = if ($p.PSPath -like '*WOW6432*') { 'x86' } else { 'x64' }
+                                })
+                            }
+
+                            # Server Roles & Features (only available on Server OS)
+                            try {
+                                if (Get-Command 'Get-WindowsFeature' -ErrorAction SilentlyContinue) {
+                                    foreach ($feat in (Get-WindowsFeature -ErrorAction SilentlyContinue | Where-Object { $_.Installed })) {
+                                        $items.Add([PSCustomObject]@{
+                                            DisplayName     = "[Role/Feature] $($feat.DisplayName)"
+                                            DisplayVersion  = ''
+                                            Publisher        = 'Microsoft'
+                                            InstallDate      = ''
+                                            InstallLocation  = ''
+                                            Architecture     = if ($feat.FeatureType -eq 'Role') { 'Role' } else { 'Feature' }
+                                        })
                                     }
                                 }
+                            } catch { }
+
+                            $items
                         }
                         ErrorAction = 'Stop'
                     }
@@ -384,6 +405,7 @@ function script:Get-InstalledSoftware {
     <#
     .SYNOPSIS
         Enumerates installed software from the registry (local machine).
+        On Server OS, also includes installed Roles and Features.
     #>
     param([string]$MachineName = $env:COMPUTERNAME)
 
@@ -392,22 +414,42 @@ function script:Get-InstalledSoftware {
         'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
     )
 
-    $results = @(Get-ItemProperty -Path $paths -ErrorAction SilentlyContinue |
-        Where-Object { $_.DisplayName -and $_.DisplayName.Trim() -ne '' } |
-        ForEach-Object {
-            [PSCustomObject]@{
-                Machine        = $MachineName
-                DisplayName    = $_.DisplayName
-                DisplayVersion = if ($_.DisplayVersion) { $_.DisplayVersion } else { '' }
-                Publisher      = if ($_.Publisher) { $_.Publisher } else { '' }
-                InstallDate    = if ($_.InstallDate) { $_.InstallDate } else { '' }
-                InstallLocation = if ($_.InstallLocation) { $_.InstallLocation } else { '' }
-                Architecture   = if ($_.PSPath -like '*WOW6432*') { 'x86' } else { 'x64' }
-                Source         = 'Local'
-            }
-        } | Sort-Object DisplayName)
+    $results = [System.Collections.Generic.List[PSCustomObject]]::new()
 
-    return $results
+    foreach ($item in (Get-ItemProperty -Path $paths -ErrorAction SilentlyContinue |
+            Where-Object { $_.DisplayName -and $_.DisplayName.Trim() -ne '' })) {
+        $results.Add([PSCustomObject]@{
+            Machine         = $MachineName
+            DisplayName     = $item.DisplayName
+            DisplayVersion  = if ($item.DisplayVersion) { $item.DisplayVersion } else { '' }
+            Publisher        = if ($item.Publisher) { $item.Publisher } else { '' }
+            InstallDate      = if ($item.InstallDate) { $item.InstallDate } else { '' }
+            InstallLocation  = if ($item.InstallLocation) { $item.InstallLocation } else { '' }
+            Architecture     = if ($item.PSPath -like '*WOW6432*') { 'x86' } else { 'x64' }
+            Source           = 'Local'
+        })
+    }
+
+    # On Server OS, also enumerate installed Roles & Features
+    try {
+        if (Get-Command 'Get-WindowsFeature' -ErrorAction SilentlyContinue) {
+            $features = @(Get-WindowsFeature -ErrorAction SilentlyContinue | Where-Object { $_.Installed })
+            foreach ($feat in $features) {
+                $results.Add([PSCustomObject]@{
+                    Machine         = $MachineName
+                    DisplayName     = "[Role/Feature] $($feat.DisplayName)"
+                    DisplayVersion  = ''
+                    Publisher        = 'Microsoft'
+                    InstallDate      = ''
+                    InstallLocation  = ''
+                    Architecture     = if ($feat.FeatureType -eq 'Role') { 'Role' } else { 'Feature' }
+                    Source           = 'Local'
+                })
+            }
+        }
+    } catch { }
+
+    return @($results | Sort-Object DisplayName)
 }
 
 #endregion
@@ -453,107 +495,152 @@ function global:Invoke-ExportSoftwareCsv {
     }
 }
 
-function global:Invoke-ImportSoftwareCsv {
+function script:Import-SoftwareCsvFile {
     <#
     .SYNOPSIS
-        Imports a software inventory CSV file for viewing or comparison.
-        First import (or import when no scan/baseline exists) becomes the baseline.
-        Second import goes into the comparison slot for Compare Inventories.
+        Shared helper: opens a CSV file dialog, validates, normalizes rows.
+        Returns $null on cancel/error, or a hashtable with FileName and Data.
     #>
-    param([System.Windows.Window]$Window)
+    param(
+        [System.Windows.Window]$Window,
+        [string]$Title = 'Import Software Inventory CSV'
+    )
 
     $dialog = [Microsoft.Win32.OpenFileDialog]::new()
-    $dialog.Title = 'Import Software Inventory CSV'
+    $dialog.Title = $Title
     $dialog.Filter = 'CSV Files (*.csv)|*.csv|All Files (*.*)|*.*'
 
     $result = $dialog.ShowDialog($Window)
-    if (-not $result) { return }
+    if (-not $result) { return $null }
 
     try {
         $imported = @(Import-Csv -Path $dialog.FileName -Encoding UTF8)
 
         if ($imported.Count -eq 0) {
             Show-Toast -Message 'CSV file is empty.' -Type 'Warning'
-            return
+            return $null
         }
 
-        # Validate expected columns exist
         $firstRow = $imported[0]
-        $hasDisplayName = $null -ne $firstRow.PSObject.Properties['DisplayName']
-        if (-not $hasDisplayName) {
+        if ($null -eq $firstRow.PSObject.Properties['DisplayName']) {
             Show-Toast -Message 'CSV missing required "DisplayName" column. Expected columns: Machine, DisplayName, DisplayVersion, Publisher, InstallDate, Architecture.' -Type 'Error'
-            return
+            return $null
         }
 
-        $fileName = [System.IO.Path]::GetFileName($dialog.FileName)
-
-        # Normalize: ensure all expected properties exist
         $normalized = @($imported | ForEach-Object {
             [PSCustomObject]@{
-                Machine        = if ($_.Machine) { $_.Machine } else { 'Imported' }
-                DisplayName    = $_.DisplayName
-                DisplayVersion = if ($_.DisplayVersion) { $_.DisplayVersion } else { '' }
-                Publisher      = if ($_.Publisher) { $_.Publisher } else { '' }
-                InstallDate    = if ($_.InstallDate) { $_.InstallDate } else { '' }
+                Machine         = if ($_.Machine) { $_.Machine } else { 'Imported' }
+                DisplayName     = $_.DisplayName
+                DisplayVersion  = if ($_.DisplayVersion) { $_.DisplayVersion } else { '' }
+                Publisher       = if ($_.Publisher) { $_.Publisher } else { '' }
+                InstallDate     = if ($_.InstallDate) { $_.InstallDate } else { '' }
                 InstallLocation = if ($_.InstallLocation) { $_.InstallLocation } else { '' }
-                Architecture   = if ($_.Architecture) { $_.Architecture } else { '' }
-                Source         = 'Imported'
+                Architecture    = if ($_.Architecture) { $_.Architecture } else { '' }
+                Source          = 'Imported'
             }
         })
 
-        # Determine slot: if no baseline exists (no scan data and no prior import as baseline), this becomes the baseline.
-        # If baseline already exists (from scan or prior import), this goes into the comparison slot.
-        $hasBaseline = @($script:SoftwareInventory | Where-Object { $_.Source -ne 'Imported' -and $_.Source -ne 'Compare' }).Count -gt 0
-        $hasBaselineFromImport = $script:SoftwareInventory.Count -gt 0 -and $script:SoftwareImportedData.Count -eq 0
-
-        if (-not $hasBaseline -and -not $hasBaselineFromImport) {
-            # No baseline — this CSV becomes the baseline (shown in DataGrid as "CSV" source)
-            $baselineData = @($normalized | ForEach-Object {
-                [PSCustomObject]@{
-                    Machine        = $_.Machine
-                    DisplayName    = $_.DisplayName
-                    DisplayVersion = $_.DisplayVersion
-                    Publisher      = $_.Publisher
-                    InstallDate    = $_.InstallDate
-                    InstallLocation = $_.InstallLocation
-                    Architecture   = $_.Architecture
-                    Source         = 'CSV'
-                }
-            })
-            $script:SoftwareInventory = $baselineData
-            $script:SoftwareImportedData = @()
-            $script:SoftwareImportedFile = ''
-
-            Update-SoftwareDataGrid -Window $Window
-            Update-SoftwareStats -Window $Window
-
-            $statusText = $Window.FindName('TxtSoftwareStatus')
-            if ($statusText) { $statusText.Text = "Baseline: $($baselineData.Count) items from $fileName - import another CSV to compare." }
-
-            $lastScan = $Window.FindName('TxtSoftwareLastScan')
-            if ($lastScan) { $lastScan.Text = "CSV: $fileName" }
-
-            Show-Toast -Message "Loaded $($baselineData.Count) items as baseline from $fileName. Import another CSV to compare." -Type 'Success'
-            Write-AppLockerLog -Message "Imported software CSV as baseline: $($dialog.FileName) ($($baselineData.Count) items)" -Level 'INFO'
-        }
-        else {
-            # Baseline exists — this CSV goes into comparison slot
-            $script:SoftwareImportedData = $normalized
-            $script:SoftwareImportedFile = $fileName
-
-            $importedFileText = $Window.FindName('TxtSoftwareImportedFile')
-            if ($importedFileText) { $importedFileText.Text = "$fileName ($($normalized.Count) items)" }
-
-            $statusText = $Window.FindName('TxtSoftwareStatus')
-            if ($statusText) { $statusText.Text = "Comparison ready: $($normalized.Count) items from $fileName. Click Compare Inventories." }
-
-            Show-Toast -Message "Loaded $($normalized.Count) items for comparison from $fileName. Click Compare Inventories." -Type 'Success'
-            Write-AppLockerLog -Message "Imported software CSV for comparison: $($dialog.FileName) ($($normalized.Count) items)" -Level 'INFO'
+        return @{
+            FileName = [System.IO.Path]::GetFileName($dialog.FileName)
+            FullPath = $dialog.FileName
+            Data     = $normalized
         }
     }
     catch {
         Write-AppLockerLog -Message "CSV import failed: $($_.Exception.Message)" -Level 'ERROR'
         Show-Toast -Message "Import failed: $($_.Exception.Message)" -Type 'Error'
+        return $null
+    }
+}
+
+function global:Invoke-ImportBaselineCsv {
+    <#
+    .SYNOPSIS
+        Imports a CSV as the baseline (left side of comparison).
+        Replaces any existing scan/baseline data.
+    #>
+    param([System.Windows.Window]$Window)
+
+    $csv = Import-SoftwareCsvFile -Window $Window -Title 'Import Baseline CSV'
+    if (-not $csv) { return }
+
+    $baselineData = @($csv.Data | ForEach-Object {
+        [PSCustomObject]@{
+            Machine         = $_.Machine
+            DisplayName     = $_.DisplayName
+            DisplayVersion  = $_.DisplayVersion
+            Publisher       = $_.Publisher
+            InstallDate     = $_.InstallDate
+            InstallLocation = $_.InstallLocation
+            Architecture    = $_.Architecture
+            Source          = 'CSV'
+        }
+    })
+
+    $script:SoftwareInventory = $baselineData
+    $script:SoftwareImportedData = @()
+    $script:SoftwareImportedFile = ''
+
+    Update-SoftwareDataGrid -Window $Window
+    Update-SoftwareStats -Window $Window
+
+    $statusText = $Window.FindName('TxtSoftwareStatus')
+    if ($statusText) { $statusText.Text = "Baseline: $($baselineData.Count) items from $($csv.FileName)" }
+
+    $lastScan = $Window.FindName('TxtSoftwareLastScan')
+    if ($lastScan) { $lastScan.Text = "CSV: $($csv.FileName)" }
+
+    Show-Toast -Message "Loaded $($baselineData.Count) items as baseline from $($csv.FileName)" -Type 'Success'
+    Write-AppLockerLog -Message "Imported software CSV as baseline: $($csv.FullPath) ($($baselineData.Count) items)" -Level 'INFO'
+}
+
+function global:Invoke-ImportComparisonCsv {
+    <#
+    .SYNOPSIS
+        Imports a CSV into the comparison slot (right side of comparison).
+        Requires a baseline (scan data or prior baseline import) to exist.
+    #>
+    param([System.Windows.Window]$Window)
+
+    # Check baseline exists
+    $hasBaseline = @($script:SoftwareInventory | Where-Object { $_.Source -ne 'Imported' -and $_.Source -ne 'Compare' }).Count -gt 0
+    if (-not $hasBaseline) {
+        Show-Toast -Message 'No baseline data. Run a scan or import a baseline CSV first.' -Type 'Warning'
+        return
+    }
+
+    $csv = Import-SoftwareCsvFile -Window $Window -Title 'Import Comparison CSV'
+    if (-not $csv) { return }
+
+    $script:SoftwareImportedData = $csv.Data
+    $script:SoftwareImportedFile = $csv.FileName
+
+    $importedFileText = $Window.FindName('TxtSoftwareImportedFile')
+    if ($importedFileText) { $importedFileText.Text = "$($csv.FileName) ($($csv.Data.Count) items)" }
+
+    $statusText = $Window.FindName('TxtSoftwareStatus')
+    if ($statusText) { $statusText.Text = "Comparison ready: $($csv.Data.Count) items from $($csv.FileName). Click Compare Inventories." }
+
+    Show-Toast -Message "Loaded $($csv.Data.Count) items for comparison from $($csv.FileName)" -Type 'Success'
+    Write-AppLockerLog -Message "Imported software CSV for comparison: $($csv.FullPath) ($($csv.Data.Count) items)" -Level 'INFO'
+}
+
+function global:Invoke-ImportSoftwareCsv {
+    <#
+    .SYNOPSIS
+        Legacy single-button import. Auto-detects baseline vs comparison slot.
+        Kept for backward compatibility (drag-drop, etc.).
+    #>
+    param([System.Windows.Window]$Window)
+
+    $hasBaseline = @($script:SoftwareInventory | Where-Object { $_.Source -ne 'Imported' -and $_.Source -ne 'Compare' }).Count -gt 0
+    $hasBaselineFromImport = $script:SoftwareInventory.Count -gt 0 -and $script:SoftwareImportedData.Count -eq 0
+
+    if (-not $hasBaseline -and -not $hasBaselineFromImport) {
+        Invoke-ImportBaselineCsv -Window $Window
+    }
+    else {
+        Invoke-ImportComparisonCsv -Window $Window
     }
 }
 

@@ -192,7 +192,33 @@ function global:Invoke-ToggleWinRMGPO {
         }
 
         if ($result.Success) {
-            [System.Windows.MessageBox]::Show("$GPOName link $action.", 'Success', 'OK', 'Information')
+            $message = "$GPOName link $action."
+
+            # Mutual exclusivity: when ENABLING one GPO, auto-disable the opposite
+            if ($action -eq 'enabled') {
+                $oppositeGPO = $null
+                $oppositeProperty = $null
+                if ($GPOName -eq 'AppLocker-EnableWinRM') {
+                    $oppositeGPO = 'AppLocker-DisableWinRM'
+                    $oppositeProperty = 'DisableWinRM'
+                }
+                elseif ($GPOName -eq 'AppLocker-DisableWinRM') {
+                    $oppositeGPO = 'AppLocker-EnableWinRM'
+                    $oppositeProperty = 'WinRM'
+                }
+
+                if ($oppositeGPO) {
+                    $oppositeStatus = $status.Data.$oppositeProperty
+                    if ($oppositeStatus -and $oppositeStatus.Exists -and $oppositeStatus.Status -eq 'Enabled') {
+                        $disableOpposite = Disable-WinRMGPO -GPOName $oppositeGPO
+                        if ($disableOpposite.Success) {
+                            $message += "`n$oppositeGPO link auto-disabled (mutually exclusive)."
+                        }
+                    }
+                }
+            }
+
+            [System.Windows.MessageBox]::Show($message, 'Success', 'OK', 'Information')
             Update-SetupStatus -Window $Window
         }
         else {
