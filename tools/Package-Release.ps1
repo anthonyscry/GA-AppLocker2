@@ -2,8 +2,9 @@
 # Creates a minimal zip containing only what's needed to run the application.
 $ErrorActionPreference = 'Stop'
 
-$version = 'v1.2.39'
 $projectRoot = Split-Path $PSScriptRoot -Parent
+$manifest = Import-PowerShellDataFile (Join-Path $projectRoot 'GA-AppLocker\GA-AppLocker.psd1')
+$version = "v$($manifest.ModuleVersion)"
 $releaseDir = Join-Path $projectRoot "Release_$version"
 $zipPath = Join-Path $projectRoot "GA-AppLocker-$version.zip"
 
