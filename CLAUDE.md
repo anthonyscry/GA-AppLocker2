@@ -4,7 +4,7 @@
 
 GA-AppLocker is a PowerShell 5.1 WPF application for enterprise AppLocker policy management in air-gapped, classified, or highly secure environments. Complete workflow: AD Discovery → Artifact Scanning → Rule Generation → Policy Building → GPO Deployment.
 
-**Version:** 1.2.37 | **Tests:** 1545/1545 passing (100%) | **Exported Commands:** ~192
+**Version:** 1.2.38 | **Tests:** 1545/1545 passing (100%) | **Exported Commands:** ~192
 
 ## Quick Start
 
@@ -406,6 +406,7 @@ If a function is in `.psd1 FunctionsToExport` but NOT dot-sourced in `.psm1` (or
 
 | Version | Date | Key Changes |
 |---------|------|-------------|
+| 1.2.38 | Feb 1, 2026 | Anti-pattern sweep & startup fix: suppress 51 .Add() pipeline leaks across 21 files (modules + GUI), ReportingExport.ps1 $html+=@"..."@ (11 locations) converted to [StringBuilder], RuleRepository.ps1 12 empty catch blocks replaced with context-specific DEBUG logging, fix duplicate x:Name BtnDeployPolicy in XAML that prevented app startup (introduced in v1.2.34, renamed Deploy panel button to BtnStartDeployment) |
 | 1.2.37 | Feb 1, 2026 | Performance & integration fixes: O(n²) array concat→List in Start-ArtifactScan/RuleStorage/Set-BulkRuleStatus/ConvertFrom-Artifact/Export-RulesToXml (StringBuilder), keyboard shortcut scope fix (script:→global: for panel vars, 6 wrong XAML element names), UI pump in ChangeAction/ChangeGroup (every 100 rules), targeted index updates replace Rebuild-RulesIndex (Update-RuleStatusInIndex extended with -Action/-UserOrGroupSid), dead dispatchers removed, Write-RuleLog scope fix, DEBUG logging in 6 more empty catches, Get-Date hoisted outside 5 loops, PS 5.1 List.AddRange fix (foreach .Add instead of .AddRange cast) |
 | 1.2.36 | Jan 31, 2026 | Performance & polish: Rules text filter 300ms debounce, Show-AppLockerMessageBox testable wrapper (replaces all 150+ [System.Windows.MessageBox]::Show calls across 12 GUI files with global:Show-AppLockerMessageBox that auto-returns in $global:GA_TestMode), DEBUG logging in 5 more empty catches, 2 more @() wraps for PS 5.1 .Count safety |
 | 1.2.35 | Jan 31, 2026 | Code efficiency sweep: fix 56 unsuppressed .Add() pipeline leaks across 18 files, @() wrapping for PS 5.1 .Count safety on Where-Object (6 locations), DEBUG logging in 10 data-path empty catch blocks, dead code cleanup (~600 lines: EmailNotifications, ReportingExport, Invoke-WithRetry removed from exports, AsyncHelpers 3 unused functions marked), new Scanning.Tests.ps1 (106 tests covering artifact type mapping, collection types, SHA256 hashing, local scan behavior, script type filtering, parameter validation, artifact object structure) |

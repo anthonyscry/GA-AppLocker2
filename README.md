@@ -1,4 +1,4 @@
-# GA-AppLocker v1.2.30
+# GA-AppLocker v1.2.38
 
 Enterprise AppLocker policy management for air-gapped, classified, and highly secure Windows environments. Complete workflow from AD discovery through GPO deployment — no internet required.
 
@@ -96,7 +96,7 @@ GA-AppLocker/
     └── GA-AppLocker.Validation/   # 5-stage policy XML validation pipeline
 ```
 
-**10 sub-modules**, ~198 exported functions. All functions return standardized result objects:
+**10 sub-modules**, ~192 exported functions. All functions return standardized result objects:
 
 ```powershell
 @{ Success = $true; Data = <result>; Error = $null }
@@ -132,7 +132,7 @@ All data stored locally in `%LOCALAPPDATA%\GA-AppLocker\`:
 ## Testing
 
 ```powershell
-# Pester unit tests (550/550 passing — 100%)
+# Pester unit tests (1545/1545 passing — 100%)
 Invoke-Pester -Path Tests\Unit\ -Output Detailed
 
 # UI automation (requires interactive PowerShell session)

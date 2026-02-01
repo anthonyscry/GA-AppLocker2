@@ -2,6 +2,28 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.38] - 2026-02-01
+
+### Bug Fixes
+
+- **XAML duplicate name prevented app startup** -- `BtnDeployPolicy` was defined twice in MainWindow.xaml (Policy panel line 2046, Deploy panel line 2146). `XamlReader.Load()` threw "Cannot register duplicate name" and the window never appeared. Introduced in v1.2.34 when Deploy panel button was added. Renamed Deploy panel button to `BtnStartDeployment`. Neither panel references this button by `x:Name` (both use Tag-based dispatch), so renaming is safe.
+
+### Code Quality
+
+- **Suppress 51 `.Add()` pipeline leaks across 21 files** -- Every unsuppressed `.Add()` call on `List<T>`, `ObservableCollection`, WPF `Children`, `Items`, or `ColumnDefinitions` returns an integer that leaks into the PowerShell pipeline, corrupting function return values. Added `[void]` prefix to all 51 remaining instances across modules (Core, Scanning, Rules, Storage) and GUI (Panels, Dialogs, Wizards, Helpers, ToastHelpers).
+
+- **ReportingExport.ps1 StringBuilder conversion** -- Converted 11 `$html += @"..."@` string concatenation instances in `Export-AppLockerReport` to `[System.Text.StringBuilder]` pattern. Eliminates O(n^2) string copying during HTML report generation.
+
+- **RuleRepository.ps1 DEBUG logging in 12 catch blocks** -- Replaced 12 empty `catch { }` blocks with context-specific `Write-AppLockerLog -Level 'DEBUG'` messages covering cache lookup/store failures, event publish failures, cache invalidation failures, and bulk operation failures. Errors were previously swallowed silently.
+
+### Stats
+
+- **Version:** 1.2.38
+- **Tests:** 1545/1545 passing (100%)
+- **Exported Commands:** ~192
+
+---
+
 ## [1.2.30] - 2026-01-31
 
 ### New Features
