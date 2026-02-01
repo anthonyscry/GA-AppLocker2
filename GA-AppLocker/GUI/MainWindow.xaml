@@ -2143,7 +2143,7 @@ Width="1450"
                                                 <ComboBoxItem Content="Daily at 3 AM"/>
                                             </ComboBox>
 
-                                            <Button x:Name="BtnDeployPolicy" 
+                                            <Button x:Name="BtnStartDeployment" 
                                                     Content="Deploy Policy"
                                                     Style="{StaticResource PrimaryButtonStyle}"
                                                     Tag="DeployPolicy"/>
