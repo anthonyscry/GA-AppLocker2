@@ -100,15 +100,17 @@ function Initialize-GlobalSearch {
     $searchBox.Add_LostFocus({
         param($sender, $e)
         $win = $global:GA_MainWindow
-        $popup = $win.FindName('GlobalSearchPopup')
-        # Use dispatcher to delay hiding, allowing click events to process
-        $win.Dispatcher.BeginInvoke([Action]{
-            Start-Sleep -Milliseconds 200
+        # Use a DispatcherTimer to delay hiding (Start-Sleep blocks the dispatcher thread)
+        $hideTimer = [System.Windows.Threading.DispatcherTimer]::new()
+        $hideTimer.Interval = [TimeSpan]::FromMilliseconds(200)
+        $hideTimer.Add_Tick({
+            $hideTimer.Stop()
             $popup = $global:GA_MainWindow.FindName('GlobalSearchPopup')
             if ($popup -and -not $popup.IsMouseOver) {
                 $popup.IsOpen = $false
             }
-        }, [System.Windows.Threading.DispatcherPriority]::Background)
+        }.GetNewClosure())
+        $hideTimer.Start()
     })
     
     # Clear button click

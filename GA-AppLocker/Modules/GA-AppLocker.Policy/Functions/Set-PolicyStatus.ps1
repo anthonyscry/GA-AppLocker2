@@ -43,7 +43,8 @@ function Set-PolicyStatus {
         $oldStatus = $policy.Status
         $policy.Status = $Status
         $policy.ModifiedAt = (Get-Date).ToString('o')
-        $policy.Version = $policy.Version + 1
+        $currentVersion = if ($policy.Version) { [int]$policy.Version } else { 0 }
+        $policy.Version = $currentVersion + 1
 
         $policy | ConvertTo-Json -Depth 5 | Set-Content -Path $policyFile -Encoding UTF8
         

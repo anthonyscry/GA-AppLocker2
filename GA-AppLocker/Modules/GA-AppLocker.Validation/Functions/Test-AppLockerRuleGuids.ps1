@@ -89,7 +89,7 @@ function Test-AppLockerRuleGuids {
             [void]$result.Errors.Add("Duplicate GUID found: $($group.Name)")
         }
 
-        $result.UniqueGuids = ($allGuids | Select-Object -Unique Guid).Count
+        $result.UniqueGuids = ($allGuids.Guid | Sort-Object -Unique).Count
         $result.Success = ($result.Errors.Count -eq 0)
     }
     catch {

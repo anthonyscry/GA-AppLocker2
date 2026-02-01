@@ -295,4 +295,4 @@ function Import-RulesFromXml {
     }
 }
 
-Export-ModuleMember -Function Import-RulesFromXml
+# NOTE: Export-ModuleMember is handled by the parent .psm1 file, not here

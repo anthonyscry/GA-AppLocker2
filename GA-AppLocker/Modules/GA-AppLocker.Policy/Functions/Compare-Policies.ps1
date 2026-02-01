@@ -187,11 +187,11 @@ function Compare-Policies {
 
         $result.Data = [PSCustomObject]@{
             SourcePolicy     = [PSCustomObject]@{
-                Id   = $source.Id
+                Id   = $source.PolicyId
                 Name = $source.Name
             }
             TargetPolicy     = [PSCustomObject]@{
-                Id   = $target.Id
+                Id   = $target.PolicyId
                 Name = $target.Name
             }
             Summary          = [PSCustomObject]@{

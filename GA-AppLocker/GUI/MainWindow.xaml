@@ -1640,7 +1640,7 @@ Width="1450"
                                                                         <Setter Property="Foreground" Value="#4CAF50"/>
                                                                     </DataTrigger>
                                                                     <DataTrigger Binding="{Binding Action}" Value="Deny">
-                                                                        <Setter Property="Foreground" Value="#EF5350"/>
+                                                                         <Setter Property="Foreground" Value="#D13438"/>
                                                                     </DataTrigger>
                                                                 </Style.Triggers>
                                                             </Style>

@@ -235,12 +235,9 @@ function script:Schedule-IndexRebuild {
         $script:RebuildTimer.Start()
     }
     else {
-        # No timer available, rebuild immediately (but still debounced via flag)
+        # No timer available — call rebuild directly (Start-Job can't access script-scoped functions)
         if (-not $script:RebuildInProgress) {
-            Start-Job -ScriptBlock {
-                Start-Sleep -Milliseconds 2000
-                Invoke-DebouncedRebuild
-            } -Name 'IndexRebuild' | Out-Null
+            Invoke-DebouncedRebuild
         }
     }
 }
