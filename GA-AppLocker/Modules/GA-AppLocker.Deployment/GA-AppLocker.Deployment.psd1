@@ -9,7 +9,7 @@
 @{
     RootModule        = 'GA-AppLocker.Deployment.psm1'
     ModuleVersion     = '1.0.0'
-    GUID              = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+    GUID              = 'b2c3d4e5-f6a7-8901-bcde-f12345678901'
     Author            = 'GA-AppLocker Team'
     CompanyName       = 'GA-AppLocker'
     Copyright         = '(c) 2026 GA-AppLocker. All rights reserved.'

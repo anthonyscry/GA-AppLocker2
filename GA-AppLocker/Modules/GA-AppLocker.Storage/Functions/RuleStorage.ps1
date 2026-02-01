@@ -310,6 +310,8 @@ function Get-ExistingRuleIndex {
         Publishers = $pubSet
         PublishersOnly = $pubOnlySet
         TotalRules = if ($script:JsonIndex -and $script:JsonIndex.Rules) { $script:JsonIndex.Rules.Count } else { 0 }
+        HashCount = $hashSet.Count
+        PublisherCount = $pubSet.Count
     }
 }
 #endregion
@@ -879,71 +881,6 @@ function Update-RuleStatusInIndex {
     return $result
 }
 
-function Remove-RulesFromIndex {
-    <#
-    .SYNOPSIS
-        Removes rules from the JSON index by ID.
-
-    .DESCRIPTION
-        Removes rules from the JSON index by ID. Permanently removes the item from storage.
-    #>
-    [CmdletBinding()]
-    [OutputType([PSCustomObject])]
-    param(
-        [Parameter(Mandatory)]
-        [string[]]$RuleIds
-    )
-
-    $result = [PSCustomObject]@{
-        Success = $false
-        RemovedCount = 0
-        Error = $null
-    }
-
-    try {
-        Initialize-JsonIndex
-
-        $idsToRemove = [System.Collections.Generic.HashSet[string]]::new($RuleIds, [System.StringComparer]::OrdinalIgnoreCase)
-        $originalCount = $script:JsonIndex.Rules.Count
-        
-        $script:JsonIndex.Rules = @($script:JsonIndex.Rules | Where-Object { -not $idsToRemove.Contains($_.Id) })
-        
-        $removedCount = $originalCount - $script:JsonIndex.Rules.Count
-        
-        foreach ($id in $RuleIds) {
-            if ($script:RuleById.ContainsKey($id)) {
-                $rule = $script:RuleById[$id]
-                $script:RuleById.Remove($id)
-                
-                if ($rule.Hash) {
-                    $script:HashIndex.Remove($rule.Hash.ToUpper())
-                }
-                if ($rule.PublisherName) {
-                    $key = "$($rule.PublisherName)|$($rule.ProductName)".ToLower()
-                    $script:PublisherIndex.Remove($key)
-                    $pubOnlyKey = $rule.PublisherName.ToLower()
-                    if ($script:PublisherOnlyIndex.ContainsKey($pubOnlyKey)) {
-                        $script:PublisherOnlyIndex.Remove($pubOnlyKey)
-                    }
-                }
-            }
-        }
-
-        if ($removedCount -gt 0) {
-            Save-JsonIndex
-            Write-StorageLog -Message "Removed $removedCount rule(s) from JSON index"
-        }
-
-        $result.Success = $true
-        $result.RemovedCount = $removedCount
-    }
-    catch {
-        $result.Error = "Failed to remove rules from index: $($_.Exception.Message)"
-        Write-StorageLog -Message $result.Error -Level 'ERROR'
-    }
-
-    return $result
-}
 #endregion
 
 #region ===== BACKWARD COMPATIBILITY ALIASES =====

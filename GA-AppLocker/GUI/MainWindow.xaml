@@ -1552,7 +1552,6 @@ Width="1450"
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
                                     <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
@@ -1582,7 +1581,7 @@ Width="1450"
                                 </StackPanel>
 
                                 <!-- Rules DataGrid -->
-                                <DataGrid x:Name="RulesDataGrid" Grid.Row="2"
+                                <DataGrid x:Name="RulesDataGrid" Grid.Row="1"
                                           Style="{StaticResource DataGridStyle}"
                                           AutoGenerateColumns="False"
                                           SelectionMode="Extended"
@@ -1673,7 +1672,7 @@ Width="1450"
                                 </DataGrid>
 
                                 <!-- Action Buttons - Two Row Layout -->
-                                <StackPanel Grid.Row="3" Margin="0,10,0,0">
+                                <StackPanel Grid.Row="2" Margin="0,10,0,0">
                                     <!-- Row 1: Selection + Status Actions -->
                                     <Grid Margin="0,0,0,8">
                                         <Grid.ColumnDefinitions>
@@ -1951,7 +1950,6 @@ Width="1450"
                                 <Grid>
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="*"/>
                                         <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
@@ -1978,7 +1976,7 @@ Width="1450"
                                     </StackPanel>
 
                                     <!-- Policies DataGrid -->
-                                    <DataGrid x:Name="PoliciesDataGrid" Grid.Row="2"
+                                    <DataGrid x:Name="PoliciesDataGrid" Grid.Row="1"
                                               Style="{StaticResource DataGridStyle}"
                                               AutoGenerateColumns="False"
                                               SelectionMode="Single"
@@ -2037,7 +2035,7 @@ Width="1450"
                                     </DataGrid>
 
                                     <!-- Action Buttons -->
-                                    <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,10,0,0">
+                                    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10,0,0">
                                         <Button x:Name="BtnActivatePolicy" Content="Activate" 
                                                 Style="{StaticResource ButtonStyle}" MinWidth="70" Margin="0,0,5,0"
                                                 Background="{StaticResource ActiveBrush}" Tag="ActivatePolicy"/>
@@ -2321,7 +2319,6 @@ Width="1450"
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
                                     <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
@@ -2348,7 +2345,7 @@ Width="1450"
                                 </StackPanel>
 
                                 <!-- Jobs DataGrid -->
-                                <DataGrid x:Name="DeploymentJobsDataGrid" Grid.Row="2"
+                                <DataGrid x:Name="DeploymentJobsDataGrid" Grid.Row="1"
                                           Style="{StaticResource DataGridStyle}"
                                           AutoGenerateColumns="False"
                                           SelectionMode="Single"
@@ -2392,7 +2389,7 @@ Width="1450"
                                 </DataGrid>
 
                                 <!-- Progress/Message Area -->
-                                <Border Grid.Row="3" Background="#252526" CornerRadius="4" Padding="10" Margin="0,10,0,0" MaxHeight="80">
+                                <Border Grid.Row="2" Background="#252526" CornerRadius="4" Padding="10" Margin="0,10,0,0" MaxHeight="80">
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="*"/>

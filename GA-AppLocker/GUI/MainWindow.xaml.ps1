@@ -180,7 +180,6 @@ function global:Invoke-ButtonAction {
         'ChangeRuleGroup' { Invoke-ChangeSelectedRulesGroup -Window $win }
         # Dashboard Quick Actions
         'AddAdminAllowRules' { Invoke-AddAdminAllowRules -Window $win }
-        'AddRuleToPolicy' { Invoke-AddSelectedRulesToPolicy -Window $win }
         'RemoveDuplicateRules' { Invoke-RemoveDuplicateRules -Window $win }
         # Settings panel
         'ToggleTheme' { Toggle-Theme -Window $win }

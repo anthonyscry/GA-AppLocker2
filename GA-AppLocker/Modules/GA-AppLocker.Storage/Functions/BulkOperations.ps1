@@ -228,50 +228,6 @@ function Add-RulesToIndex {
     return $result
 }
 
-function Get-ExistingRuleIndex {
-    <#
-    .SYNOPSIS
-        Returns HashSets for O(1) rule existence checks.
-
-    .DESCRIPTION
-        Used by batch generation to quickly check if rules already exist.
-        Returns Hashes and Publishers as HashSets for Contains() checks.
-
-    .OUTPUTS
-        PSCustomObject with Hashes (HashSet) and Publishers (HashSet) properties.
-    #>
-    [CmdletBinding()]
-    [OutputType([PSCustomObject])]
-    param()
-
-    # Ensure index is loaded
-    Initialize-JsonIndex
-
-    # Convert hashtables to HashSets for consistent interface with Rules module
-    $hashes = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-    $publishers = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-
-    foreach ($key in $script:HashIndex.Keys) {
-        [void]$hashes.Add($key)
-    }
-    foreach ($key in $script:PublisherIndex.Keys) {
-        [void]$publishers.Add($key)
-    }
-
-    $publishersOnly = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-    foreach ($key in $script:PublisherOnlyIndex.Keys) {
-        [void]$publishersOnly.Add($key)
-    }
-
-    return [PSCustomObject]@{
-        Hashes = $hashes
-        Publishers = $publishers
-        PublishersOnly = $publishersOnly
-        HashCount = $hashes.Count
-        PublisherCount = $publishers.Count
-    }
-}
-
 function Remove-RulesBulk {
     <#
     .SYNOPSIS
