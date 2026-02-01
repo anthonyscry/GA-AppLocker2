@@ -131,6 +131,10 @@ function global:Invoke-ScanLocalSoftware {
         $lastScan = $Window.FindName('TxtSoftwareLastScan')
         if ($lastScan) { $lastScan.Text = "$env:COMPUTERNAME - $(Get-Date -Format 'MM/dd HH:mm')" }
 
+        # Update baseline info on Compare tab
+        $baselineFile = $Window.FindName('TxtSoftwareBaselineFile')
+        if ($baselineFile) { $baselineFile.Text = "Scan: $env:COMPUTERNAME ($($results.Count) items)" }
+
         # Auto-save local scan CSV: hostname_softwarelist_ddMMMYY.csv
         try {
             $appDataPath = Get-AppLockerDataPath
@@ -382,6 +386,10 @@ function global:Invoke-ScanRemoteSoftware {
             $lastScan = $win.FindName('TxtSoftwareLastScan')
             if ($lastScan) { $lastScan.Text = "$($r.HostCount) machines - $(Get-Date -Format 'MM/dd HH:mm')" }
 
+            # Update baseline info on Compare tab
+            $baselineFile = $win.FindName('TxtSoftwareBaselineFile')
+            if ($baselineFile) { $baselineFile.Text = "Scan: $($r.HostCount) machine(s) ($($r.AllResults.Count) items)" }
+
             if ($r.FailedHosts.Count -gt 0) {
                 $failDetails = $r.FailedHosts -join "`n"
                 Show-AppLockerMessageBox "Scan completed but $($r.FailedHosts.Count) machine(s) failed:`n`n$failDetails" 'Partial Scan Results' 'OK' 'Warning'
@@ -585,6 +593,10 @@ function global:Invoke-ImportBaselineCsv {
 
     $lastScan = $Window.FindName('TxtSoftwareLastScan')
     if ($lastScan) { $lastScan.Text = "CSV: $($csv.FileName)" }
+
+    # Update baseline info on Compare tab
+    $baselineFile = $Window.FindName('TxtSoftwareBaselineFile')
+    if ($baselineFile) { $baselineFile.Text = "$($csv.FileName) ($($baselineData.Count) items)" }
 
     Show-Toast -Message "Loaded $($baselineData.Count) items as baseline from $($csv.FileName)" -Type 'Success'
     Write-AppLockerLog -Message "Imported software CSV as baseline: $($csv.FullPath) ($($baselineData.Count) items)" -Level 'INFO'
@@ -798,6 +810,9 @@ function global:Invoke-ClearSoftwareComparison {
     if ($Window) {
         $importedFileText = $Window.FindName('TxtSoftwareImportedFile')
         if ($importedFileText) { $importedFileText.Text = 'None' }
+
+        $baselineFile = $Window.FindName('TxtSoftwareBaselineFile')
+        if ($baselineFile) { $baselineFile.Text = 'None (scan or import a CSV on Scan tab)' }
 
         $lastScan = $Window.FindName('TxtSoftwareLastScan')
         if ($lastScan) { $lastScan.Text = 'None' }

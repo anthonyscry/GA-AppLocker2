@@ -2968,76 +2968,119 @@ Width="1450"
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
-                        <!-- Left Sidebar: Actions -->
+                        <!-- Left Sidebar: Tabbed Actions -->
                         <Border Grid.Column="0" Background="{StaticResource SidebarBrush}" CornerRadius="8" Margin="0,0,10,0" VerticalAlignment="Stretch">
-                            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                <StackPanel Margin="15">
-                                    <!-- Scan Section -->
-                                    <TextBlock Text="SCAN" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
-                                    <Button x:Name="BtnScanLocalSoftware" Content="Scan Local Machine"
-                                            Style="{StaticResource PrimaryButtonStyle}" Margin="0,0,0,5"
-                                            Tag="ScanLocalSoftware"/>
-                                    <Button x:Name="BtnScanRemoteSoftware" Content="Scan Remote Machines"
-                                            Style="{StaticResource ButtonStyle}" Margin="0,0,0,5"
-                                            Tag="ScanRemoteSoftware"/>
+                            <TabControl Background="Transparent" BorderThickness="0" Padding="0" VerticalAlignment="Stretch">
+                                <TabControl.Resources>
+                                    <Style TargetType="TabItem">
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
+                                        <Setter Property="Padding" Value="12,8"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="TabItem">
+                                                    <Border x:Name="border" Background="Transparent" Padding="{TemplateBinding Padding}" BorderThickness="0,0,0,2" BorderBrush="Transparent">
+                                                        <ContentPresenter ContentSource="Header"/>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsSelected" Value="True">
+                                                            <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                                                            <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}"/>
+                                                        </Trigger>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}"/>
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </TabControl.Resources>
 
-                                    <!-- Remote Machine Input -->
-                                    <TextBlock Text="REMOTE MACHINES" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,10,0,5"/>
-                                    <TextBlock Text="Enter hostnames (one per line or comma-separated). Leave empty to use Scanner machine list."
-                                               Foreground="{StaticResource MutedBrush}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,5"/>
-                                    <TextBox x:Name="TxtSoftwareRemoteMachines" Height="80"
-                                             Background="#1E1E1E" Foreground="{StaticResource ForegroundBrush}"
-                                             BorderBrush="#3E3E42" Padding="6,4" FontSize="11"
-                                             AcceptsReturn="True" TextWrapping="Wrap"
-                                             VerticalScrollBarVisibility="Auto"/>
-                                    <TextBlock x:Name="TxtSoftwareMachineHint" Text="0 machines"
-                                               Foreground="{StaticResource MutedBrush}" FontSize="10" Margin="0,3,0,0"/>
+                                <!-- Tab 1: Scan -->
+                                <TabItem Header="Scan">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <StackPanel Margin="15">
+                                            <Button x:Name="BtnScanLocalSoftware" Content="Scan Local Machine"
+                                                    Style="{StaticResource PrimaryButtonStyle}" Margin="0,0,0,5"
+                                                    Tag="ScanLocalSoftware"/>
+                                            <Button x:Name="BtnScanRemoteSoftware" Content="Scan Remote Machines"
+                                                    Style="{StaticResource ButtonStyle}" Margin="0,0,0,10"
+                                                    Tag="ScanRemoteSoftware"/>
 
-                                    <!-- Machine Info -->
-                                    <Border Background="#252526" CornerRadius="4" Padding="10" Margin="0,5,0,15">
-                                        <StackPanel>
-                                            <TextBlock Text="Last Scan:" Foreground="{StaticResource MutedBrush}" FontSize="10"/>
-                                            <TextBlock x:Name="TxtSoftwareLastScan" Text="None" Foreground="{StaticResource ForegroundBrush}" FontSize="11" Margin="0,2,0,5"/>
-                                            <TextBlock Text="Total Software:" Foreground="{StaticResource MutedBrush}" FontSize="10"/>
-                                            <TextBlock x:Name="TxtSoftwareTotalCount" Text="0" Foreground="{StaticResource ForegroundBrush}" FontSize="11" FontWeight="SemiBold"/>
+                                            <!-- Remote Machine Input -->
+                                            <TextBlock Text="REMOTE MACHINES" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,5"/>
+                                            <TextBlock Text="Enter hostnames (one per line or comma-separated). Leave empty to use Scanner machine list."
+                                                       Foreground="{StaticResource MutedBrush}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,5"/>
+                                            <TextBox x:Name="TxtSoftwareRemoteMachines" Height="80"
+                                                     Background="#1E1E1E" Foreground="{StaticResource ForegroundBrush}"
+                                                     BorderBrush="#3E3E42" Padding="6,4" FontSize="11"
+                                                     AcceptsReturn="True" TextWrapping="Wrap"
+                                                     VerticalScrollBarVisibility="Auto"/>
+                                            <TextBlock x:Name="TxtSoftwareMachineHint" Text="0 machines"
+                                                       Foreground="{StaticResource MutedBrush}" FontSize="10" Margin="0,3,0,0"/>
+
+                                            <!-- Scan Info -->
+                                            <Border Background="#252526" CornerRadius="4" Padding="10" Margin="0,10,0,15">
+                                                <StackPanel>
+                                                    <TextBlock Text="Last Scan:" Foreground="{StaticResource MutedBrush}" FontSize="10"/>
+                                                    <TextBlock x:Name="TxtSoftwareLastScan" Text="None" Foreground="{StaticResource ForegroundBrush}" FontSize="11" Margin="0,2,0,5"/>
+                                                    <TextBlock Text="Total Software:" Foreground="{StaticResource MutedBrush}" FontSize="10"/>
+                                                    <TextBlock x:Name="TxtSoftwareTotalCount" Text="0" Foreground="{StaticResource ForegroundBrush}" FontSize="11" FontWeight="SemiBold"/>
+                                                </StackPanel>
+                                            </Border>
+
+                                            <!-- Export -->
+                                            <TextBlock Text="EXPORT" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
+                                            <Button x:Name="BtnExportSoftwareCsv" Content="Export to CSV"
+                                                    Style="{StaticResource ButtonStyle}" Margin="0,0,0,5"
+                                                    Tag="ExportSoftwareCsv"/>
                                         </StackPanel>
-                                    </Border>
+                                    </ScrollViewer>
+                                </TabItem>
 
-                                    <!-- Export -->
-                                    <TextBlock Text="EXPORT" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
-                                    <Button x:Name="BtnExportSoftwareCsv" Content="Export to CSV"
-                                            Style="{StaticResource ButtonStyle}" Margin="0,0,0,15"
-                                            Tag="ExportSoftwareCsv"/>
+                                <!-- Tab 2: Compare -->
+                                <TabItem Header="Compare">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <StackPanel Margin="15">
+                                            <TextBlock Text="Compare software inventories across systems by importing two CSVs."
+                                                       Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,15"/>
 
-                                    <!-- Compare -->
-                                    <TextBlock Text="COMPARE" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
-                                    <TextBlock Text="Import two CSVs and compare software across systems."
-                                               Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,10"/>
-                                    <Button x:Name="BtnImportBaseline" Content="Import Baseline CSV"
-                                            Style="{StaticResource ButtonStyle}" Margin="0,0,0,5"
-                                            Tag="ImportBaselineCsv"
-                                            ToolTip="Load a CSV as the baseline (left side of comparison)"/>
-                                    <Button x:Name="BtnImportComparison" Content="Import Comparison CSV"
-                                            Style="{StaticResource ButtonStyle}" Margin="0,0,0,5"
-                                            Tag="ImportComparisonCsv"
-                                            ToolTip="Load a second CSV to compare against the baseline"/>
-                                    <Button x:Name="BtnCompareSoftware" Content="Compare Inventories"
-                                            Style="{StaticResource ButtonStyle}" Margin="0,0,0,5"
-                                            Background="#1565C0"
-                                            Tag="CompareSoftware"/>
-                                    <Button x:Name="BtnClearComparison" Content="Clear Comparison"
-                                            Style="{StaticResource ButtonStyle}" Margin="0,0,0,5"
-                                            Tag="ClearSoftwareComparison"/>
+                                            <TextBlock Text="STEP 1: BASELINE" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,8"/>
+                                            <Button x:Name="BtnImportBaseline" Content="Import Baseline CSV"
+                                                    Style="{StaticResource ButtonStyle}" Margin="0,0,0,10"
+                                                    Tag="ImportBaselineCsv"
+                                                    ToolTip="Load a CSV as the baseline (left side of comparison)"/>
 
-                                    <!-- Imported File Info -->
-                                    <Border Background="#252526" CornerRadius="4" Padding="10" Margin="0,10,0,0">
-                                        <StackPanel>
-                                            <TextBlock Text="Imported File:" Foreground="{StaticResource MutedBrush}" FontSize="10"/>
-                                            <TextBlock x:Name="TxtSoftwareImportedFile" Text="None" Foreground="{StaticResource ForegroundBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                            <TextBlock Text="STEP 2: COMPARISON" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,8"/>
+                                            <Button x:Name="BtnImportComparison" Content="Import Comparison CSV"
+                                                    Style="{StaticResource ButtonStyle}" Margin="0,0,0,10"
+                                                    Tag="ImportComparisonCsv"
+                                                    ToolTip="Load a second CSV to compare against the baseline"/>
+
+                                            <TextBlock Text="STEP 3: COMPARE" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,8"/>
+                                            <Button x:Name="BtnCompareSoftware" Content="Compare Inventories"
+                                                    Style="{StaticResource ButtonStyle}" Margin="0,0,0,15"
+                                                    Background="#1565C0"
+                                                    Tag="CompareSoftware"/>
+
+                                            <!-- Imported File Info -->
+                                            <Border Background="#252526" CornerRadius="4" Padding="10" Margin="0,0,0,15">
+                                                <StackPanel>
+                                                    <TextBlock Text="Baseline:" Foreground="{StaticResource MutedBrush}" FontSize="10"/>
+                                                    <TextBlock x:Name="TxtSoftwareBaselineFile" Text="None (scan or import a CSV on Scan tab)" Foreground="{StaticResource ForegroundBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,8"/>
+                                                    <TextBlock Text="Comparison:" Foreground="{StaticResource MutedBrush}" FontSize="10"/>
+                                                    <TextBlock x:Name="TxtSoftwareImportedFile" Text="None" Foreground="{StaticResource ForegroundBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                                </StackPanel>
+                                            </Border>
+
+                                            <Button x:Name="BtnClearComparison" Content="Clear All Data"
+                                                    Style="{StaticResource ButtonStyle}" Margin="0,0,0,5"
+                                                    Tag="ClearSoftwareComparison"/>
                                         </StackPanel>
-                                    </Border>
-                                </StackPanel>
-                            </ScrollViewer>
+                                    </ScrollViewer>
+                                </TabItem>
+                            </TabControl>
                         </Border>
 
                         <!-- Right: DataGrid -->
