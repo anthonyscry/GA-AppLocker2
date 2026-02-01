@@ -158,7 +158,7 @@ function Get-AllDeploymentJobs {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $false)]
-        [ValidateSet('Pending', 'Running', 'Completed', 'Failed', 'Cancelled', '')]
+        [ValidateSet('Pending', 'Running', 'Completed', 'Failed', 'Cancelled', 'ManualRequired', '')]
         [string]$Status = ''
     )
 

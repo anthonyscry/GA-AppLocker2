@@ -638,15 +638,12 @@ function global:Invoke-CreateManualRule {
     try {
         $result = switch ($ruleType) {
             'Path' {
-                if (-not (Get-Command -Name 'New-PathRule' -ErrorAction SilentlyContinue)) { throw 'New-PathRule not available' }
                 New-PathRule -Path $value -Action $action -Description $desc -CollectionType 'Exe' -UserOrGroupSid $targetGroupSid -Save
             }
             'Hash' {
-                if (-not (Get-Command -Name 'New-HashRule' -ErrorAction SilentlyContinue)) { throw 'New-HashRule not available' }
                 New-HashRule -Hash $value -SourceFileName 'Manual' -Action $action -Description $desc -CollectionType 'Exe' -UserOrGroupSid $targetGroupSid -Save
             }
             'Publisher' {
-                if (-not (Get-Command -Name 'New-PublisherRule' -ErrorAction SilentlyContinue)) { throw 'New-PublisherRule not available' }
                 $parts = $value -split ','
                 $pubName = $parts[0].Trim()
                 $prodName = if ($parts.Count -gt 1) { $parts[1].Trim() } else { '*' }
@@ -742,7 +739,7 @@ function global:Set-SelectedRuleStatus {
         # Batch update the index once (much faster than individual calls)
         # Use try-catch - Get-Command fails in WPF context
         if ($updatedIds.Count -gt 0) {
-            try { Update-RuleStatusInIndex -RuleIds $updatedIds.ToArray() -Status $Status | Out-Null } catch { }
+            try { Update-RuleStatusInIndex -RuleIds $updatedIds.ToArray() -Status $Status | Out-Null } catch { Write-Log -Level Warning -Message "Index update failed: $($_.Exception.Message)" }
         }
         
         if ($errors.Count -gt 0) {
@@ -832,7 +829,7 @@ function global:Invoke-DeleteSelectedRules {
                         Clear-AppLockerCache -Pattern 'GlobalSearch_*' | Out-Null
                         Clear-AppLockerCache -Pattern 'RuleCounts*' | Out-Null
                         Clear-AppLockerCache -Pattern 'RuleQuery*' | Out-Null
-                    } catch { }
+                    } catch { Write-Log -Level Warning -Message "Cache clear failed: $($_.Exception.Message)" }
                 }
                 else {
                     Show-Toast -Message "Delete failed: $($deleteResult.Error)" -Type 'Error'
@@ -861,11 +858,6 @@ function global:Invoke-DeleteSelectedRules {
 
 function global:Invoke-ApproveTrustedVendors {
     param([System.Windows.Window]$Window)
-
-    if (-not (Get-Command -Name 'Approve-TrustedVendorRules' -ErrorAction SilentlyContinue)) {
-        Show-Toast -Message 'Approve-TrustedVendorRules function not available. Please update GA-AppLocker.Rules module.' -Type 'Error'
-        return
-    }
 
     # Confirm action
     $confirm = [System.Windows.MessageBox]::Show(
@@ -901,11 +893,6 @@ function global:Invoke-ApproveTrustedVendors {
 
 function global:Invoke-RemoveDuplicateRules {
     param([System.Windows.Window]$Window)
-
-    if (-not (Get-Command -Name 'Remove-DuplicateRules' -ErrorAction SilentlyContinue)) {
-        Show-Toast -Message 'Remove-DuplicateRules function not available. Please update GA-AppLocker.Rules module.' -Type 'Error'
-        return
-    }
 
     # Synchronous - duplicate detection is now O(n) and takes <1 second
     try {

@@ -84,11 +84,6 @@ function global:Update-PoliciesDataGrid {
     $dataGrid = $Window.FindName('PoliciesDataGrid')
     if (-not $dataGrid) { return }
 
-    if (-not (Get-Command -Name 'Get-AllPolicies' -ErrorAction SilentlyContinue)) {
-        $dataGrid.ItemsSource = $null
-        return
-    }
-
     # Capture filter state for use in callback
     $statusFilter = $script:CurrentPoliciesFilter
     $filterBox = $Window.FindName('TxtPolicyFilter')
@@ -166,7 +161,7 @@ function global:Update-PoliciesDataGrid {
     }
 
     # Use async for initial/refresh loads
-    if ($Async -and (Get-Command -Name 'Invoke-AsyncOperation' -ErrorAction SilentlyContinue)) {
+    if ($Async) {
         Invoke-AsyncOperation -ScriptBlock { Get-AllPolicies } -LoadingMessage 'Loading policies...' -OnComplete {
             param($Result)
             & $processPoliciesData $Result $statusFilter $textFilter $dataGrid $Window
@@ -198,10 +193,10 @@ function global:Update-PolicyCounters {
     $active = if ($Policies) { ($Policies | Where-Object { $_.Status -eq 'Active' }).Count } else { 0 }
     $deployed = if ($Policies) { ($Policies | Where-Object { $_.Status -eq 'Deployed' }).Count } else { 0 }
 
-    $Window.FindName('TxtPolicyTotalCount').Text = "$total"
-    $Window.FindName('TxtPolicyDraftCount').Text = "$draft"
-    $Window.FindName('TxtPolicyActiveCount').Text = "$active"
-    $Window.FindName('TxtPolicyDeployedCount').Text = "$deployed"
+    $ctrl = $Window.FindName('TxtPolicyTotalCount');    if ($ctrl) { $ctrl.Text = "$total" }
+    $ctrl = $Window.FindName('TxtPolicyDraftCount');    if ($ctrl) { $ctrl.Text = "$draft" }
+    $ctrl = $Window.FindName('TxtPolicyActiveCount');   if ($ctrl) { $ctrl.Text = "$active" }
+    $ctrl = $Window.FindName('TxtPolicyDeployedCount'); if ($ctrl) { $ctrl.Text = "$deployed" }
 }
 
 function global:Update-PoliciesFilter {

@@ -1092,8 +1092,9 @@ function Remove-OrphanedRuleFiles {
         # Confirm deletion unless -Force or -WhatIf
         if (-not $Force -and -not $WhatIfPreference) {
             $sizeMB = [math]::Round($totalBytes / 1MB, 2)
-            $confirm = Read-Host "Delete $($orphanedFiles.Count) orphaned rule files ($sizeMB MB)? [y/N]"
-            if ($confirm -notmatch '^[Yy]') {
+            if (-not $PSCmdlet.ShouldContinue(
+                "Delete $($orphanedFiles.Count) orphaned rule files ($sizeMB MB)?",
+                'Confirm Orphaned Rule File Cleanup')) {
                 $result.Success = $true
                 $result.Error = "Cancelled by user"
                 return $result

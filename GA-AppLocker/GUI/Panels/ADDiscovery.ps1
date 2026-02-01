@@ -487,37 +487,6 @@ function global:Add-ChildOUsToTreeItem {
     }
 }
 
-function global:New-TreeViewItem {
-    <#
-    .SYNOPSIS
-        Creates a TreeViewItem for an OU (legacy function kept for compatibility).
-    #>
-    param($OU, $AllOUs)
-
-    # Use BMP-safe chars (PS 5.1 [char] is 16-bit, cannot represent emoji > 0xFFFF)
-    $icon = switch ($OU.MachineType) {
-        'DomainController' { [char]0x2302 }  # ⌂
-        'Server'           { [char]0x25A3 }  # ▣
-        'Workstation'      { [char]0x25A1 }  # □
-        default            { [char]0x25C7 }  # ◇
-    }
-
-    $header = "$icon $($OU.Name)"
-    if ($OU.ComputerCount -gt 0) {
-        $header += " ($($OU.ComputerCount))"
-    }
-
-    $item = [System.Windows.Controls.TreeViewItem]::new()
-    $item.Header = $header
-    $item.Tag = $OU.DistinguishedName
-    $item.Foreground = [System.Windows.Media.Brushes]::White
-
-    # Add child OUs using the helper function
-    Add-ChildOUsToTreeItem -ParentItem $item -ParentOU $OU -AllOUs $AllOUs
-
-    return $item
-}
-
 function global:Update-MachineDataGrid {
     param(
         [System.Windows.Window]$Window,

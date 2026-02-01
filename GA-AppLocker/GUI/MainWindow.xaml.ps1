@@ -185,9 +185,7 @@ function global:Invoke-ButtonAction {
         'ToggleTheme' { Toggle-Theme -Window $win }
         # Default case for unknown actions
         default {
-            if (Get-Command -Name 'Write-AppLockerLog' -ErrorAction SilentlyContinue) {
-                Write-AppLockerLog -Message "Unknown button action: $Action" -Level 'WARNING'
-            }
+            Write-Log -Level Warning -Message "Unknown button action: $Action"
         }
     }
 }
@@ -376,22 +374,16 @@ function script:Save-CurrentSessionState {
     }
     
     # Save asynchronously to not block UI
-    if (Get-Command -Name 'Save-SessionState' -ErrorAction SilentlyContinue) {
-        try {
-            Save-SessionState -State $state | Out-Null
-        }
-        catch {
-            Write-Log -Level Warning -Message "Failed to save session: $($_.Exception.Message)"
-        }
+    try {
+        Save-SessionState -State $state | Out-Null
+    }
+    catch {
+        Write-Log -Level Warning -Message "Failed to save session: $($_.Exception.Message)"
     }
 }
 
 function script:Restore-PreviousSessionState {
     param([System.Windows.Window]$Window)
-    
-    if (-not (Get-Command -Name 'Restore-SessionState' -ErrorAction SilentlyContinue)) {
-        return $false
-    }
     
     try {
         $result = Restore-SessionState
@@ -893,10 +885,8 @@ public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int va
 
     # Register keyboard shortcuts
     try {
-        if (Get-Command -Name 'Register-KeyboardShortcuts' -ErrorAction SilentlyContinue) {
-            Register-KeyboardShortcuts -Window $Window
-            Write-Log -Message 'Keyboard shortcuts registered'
-        }
+        Register-KeyboardShortcuts -Window $Window
+        Write-Log -Message 'Keyboard shortcuts registered'
     }
     catch {
         Write-Log -Level Warning -Message "Keyboard shortcuts init failed: $($_.Exception.Message)"
@@ -904,10 +894,8 @@ public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int va
 
     # Register drag-drop handlers
     try {
-        if (Get-Command -Name 'Register-DragDropHandlers' -ErrorAction SilentlyContinue) {
-            Register-DragDropHandlers -Window $Window
-            Write-Log -Message 'Drag-drop handlers registered'
-        }
+        Register-DragDropHandlers -Window $Window
+        Write-Log -Message 'Drag-drop handlers registered'
     }
     catch {
         Write-Log -Level Warning -Message "Drag-drop handlers init failed: $($_.Exception.Message)"

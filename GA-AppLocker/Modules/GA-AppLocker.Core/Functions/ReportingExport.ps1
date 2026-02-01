@@ -52,7 +52,7 @@ function Export-AppLockerReport {
 
     try {
         $reportDate = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-        $domain = try { (Get-CimInstance Win32_ComputerSystem).Domain } catch { 'Unknown' }
+        $domain = try { [System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().DomainName } catch { 'Unknown' }
         
         # Gather data
         $ruleStats = @{ Total = 0; Approved = 0; Pending = 0; Rejected = 0; Review = 0 }
@@ -425,7 +425,7 @@ function Export-ForPowerBI {
         
         # Create summary/stats file for dashboards
         $statsPath = Join-Path $OutputDirectory "summary_$timestamp.$($Format.ToLower())"
-        $domainName = try { (Get-CimInstance Win32_ComputerSystem).Domain } catch { 'Unknown' }
+        $domainName = try { [System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().DomainName } catch { 'Unknown' }
         $rulesTotal = if ($rulesResult.Success -and $rulesResult.Data) { $rulesResult.Data.Count } else { 0 }
         $rulesApproved = if ($rulesResult.Success -and $rulesResult.Data) { @($rulesResult.Data | Where-Object Status -eq 'Approved').Count } else { 0 }
         $rulesPending = if ($rulesResult.Success -and $rulesResult.Data) { @($rulesResult.Data | Where-Object Status -eq 'Pending').Count } else { 0 }

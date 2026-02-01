@@ -13,16 +13,18 @@ function Initialize-ScannerPanel {
                 $paths = $config.DefaultScanPaths
             }
         }
-        catch { }
+        catch { Write-Log -Level Warning -Message "Failed to load scan config: $($_.Exception.Message)" }
         
-        # Use clean default paths (ProgramData included)
-        $paths = @(
-            'C:\Program Files',
-            'C:\Program Files (x86)',
-            'C:\ProgramData',
-            'C:\Windows\System32',
-            'C:\Windows\SysWOW64'
-        )
+        # Fall back to clean defaults if config didn't provide paths
+        if (-not $paths -or $paths.Count -eq 0) {
+            $paths = @(
+                'C:\Program Files',
+                'C:\Program Files (x86)',
+                'C:\ProgramData',
+                'C:\Windows\System32',
+                'C:\Windows\SysWOW64'
+            )
+        }
         $txtPaths.Text = $paths -join "`n"
     }
 
@@ -231,18 +233,18 @@ function global:Invoke-StartArtifactScan {
         return
     }
 
-    # Get scan configuration
-    $scanLocal = $Window.FindName('ChkScanLocal').IsChecked
-    $scanRemote = $Window.FindName('ChkScanRemote').IsChecked
-    $includeEvents = $Window.FindName('ChkIncludeEventLogs').IsChecked
-    $includeHighRisk = $Window.FindName('ChkIncludeHighRisk').IsChecked
-    $skipDllScanning = $Window.FindName('ChkSkipDllScanning').IsChecked
-    $skipWshScanning = $Window.FindName('ChkSkipWshScanning').IsChecked
-    $skipShellScanning = $Window.FindName('ChkSkipShellScanning').IsChecked
-    $includeAppx = $Window.FindName('ChkIncludeAppx').IsChecked
-    $saveResults = $Window.FindName('ChkSaveResults').IsChecked
-    $scanName = $Window.FindName('TxtScanName').Text
-    $pathsText = $Window.FindName('TxtScanPaths').Text
+    # Get scan configuration (null-safe FindName access)
+    $chk = $Window.FindName('ChkScanLocal');        $scanLocal = if ($chk) { $chk.IsChecked } else { $false }
+    $chk = $Window.FindName('ChkScanRemote');       $scanRemote = if ($chk) { $chk.IsChecked } else { $false }
+    $chk = $Window.FindName('ChkIncludeEventLogs'); $includeEvents = if ($chk) { $chk.IsChecked } else { $false }
+    $chk = $Window.FindName('ChkIncludeHighRisk');  $includeHighRisk = if ($chk) { $chk.IsChecked } else { $false }
+    $chk = $Window.FindName('ChkSkipDllScanning');  $skipDllScanning = if ($chk) { $chk.IsChecked } else { $false }
+    $chk = $Window.FindName('ChkSkipWshScanning');  $skipWshScanning = if ($chk) { $chk.IsChecked } else { $false }
+    $chk = $Window.FindName('ChkSkipShellScanning');$skipShellScanning = if ($chk) { $chk.IsChecked } else { $false }
+    $chk = $Window.FindName('ChkIncludeAppx');      $includeAppx = if ($chk) { $chk.IsChecked } else { $true }
+    $chk = $Window.FindName('ChkSaveResults');      $saveResults = if ($chk) { $chk.IsChecked } else { $true }
+    $txt = $Window.FindName('TxtScanName');          $scanName = if ($txt) { $txt.Text } else { '' }
+    $txt = $Window.FindName('TxtScanPaths');         $pathsText = if ($txt) { $txt.Text } else { '' }
 
     # Validate
     if (-not $scanLocal -and -not $scanRemote) {
@@ -599,9 +601,7 @@ function global:Update-ArtifactDataGrid {
         Update-ArtifactSelectionCount -Window $Window
     }
     catch {
-        if (Get-Command -Name 'Write-AppLockerLog' -ErrorAction SilentlyContinue) {
-            Write-AppLockerLog -Message "Error updating artifact grid: $($_.Exception.Message)" -Level 'ERROR'
-        }
+        Write-Log -Level Error -Message "Error updating artifact grid: $($_.Exception.Message)"
     }
 }
 
@@ -1262,10 +1262,6 @@ function global:Initialize-ScheduledScansList {
     $listBox = $Window.FindName('ScheduledScansList')
     if (-not $listBox) { return }
     
-    if (-not (Get-Command -Name 'Get-ScheduledScans' -ErrorAction SilentlyContinue)) {
-        return
-    }
-    
     try {
         $result = Get-ScheduledScans
         if ($result.Success -and $result.Data -and $result.Data.Count -gt 0) {
@@ -1299,11 +1295,6 @@ function global:Invoke-CreateScheduledScan {
         Creates a new scheduled scan from UI values.
     #>
     param([System.Windows.Window]$Window)
-    
-    if (-not (Get-Command -Name 'New-ScheduledScan' -ErrorAction SilentlyContinue)) {
-        Show-Toast -Message 'Scheduled scan functions not available.' -Type 'Error'
-        return
-    }
     
     # Get UI values
     $txtName = $Window.FindName('TxtScheduleName')
@@ -1419,11 +1410,6 @@ function global:Invoke-RunScheduledScanNow {
         return
     }
     
-    if (-not (Get-Command -Name 'Invoke-ScheduledScan' -ErrorAction SilentlyContinue)) {
-        Show-Toast -Message 'Scheduled scan functions not available.' -Type 'Error'
-        return
-    }
-    
     $selectedSchedule = $listBox.SelectedItem
     $scheduleId = $selectedSchedule.ScheduleId
     $scheduleName = $selectedSchedule.Name
@@ -1474,11 +1460,6 @@ function global:Invoke-DeleteScheduledScan {
         return
     }
     
-    if (-not (Get-Command -Name 'Remove-ScheduledScan' -ErrorAction SilentlyContinue)) {
-        Show-Toast -Message 'Scheduled scan functions not available.' -Type 'Error'
-        return
-    }
-    
     $selectedSchedule = $listBox.SelectedItem
     $scheduleId = $selectedSchedule.ScheduleId
     $scheduleName = $selectedSchedule.Name
@@ -1519,11 +1500,6 @@ function global:Invoke-ToggleScheduledScan {
     $listBox = $Window.FindName('ScheduledScansList')
     if (-not $listBox -or -not $listBox.SelectedItem) {
         Show-Toast -Message 'Please select a scheduled scan to toggle.' -Type 'Warning'
-        return
-    }
-    
-    if (-not (Get-Command -Name 'Set-ScheduledScanEnabled' -ErrorAction SilentlyContinue)) {
-        Show-Toast -Message 'Scheduled scan functions not available.' -Type 'Error'
         return
     }
     

@@ -164,11 +164,6 @@ function global:Refresh-DeployPolicyCombo {
         return
     }
 
-    if (-not (Get-Command -Name 'Get-AllPolicies' -ErrorAction SilentlyContinue)) {
-        Write-Log -Message 'Refresh-DeployPolicyCombo: Get-AllPolicies command not available (Policy module not loaded?)' -Level 'Warning'
-        return
-    }
-
     try {
         if ($policyCombo) { $policyCombo.Items.Clear() }
         if ($editPolicyCombo) { $editPolicyCombo.Items.Clear() }
@@ -222,11 +217,6 @@ function global:Update-DeploymentJobsDataGrid {
     $dataGrid = $Window.FindName('DeploymentJobsDataGrid')
     if (-not $dataGrid) { return }
 
-    if (-not (Get-Command -Name 'Get-AllDeploymentJobs' -ErrorAction SilentlyContinue)) {
-        $dataGrid.ItemsSource = $null
-        return
-    }
-
     # Capture filter state
     $deployFilter = $script:CurrentDeploymentFilter
 
@@ -279,7 +269,7 @@ function global:Update-DeploymentJobsDataGrid {
     }
 
     # Use async for initial/refresh loads
-    if ($Async -and (Get-Command -Name 'Invoke-AsyncOperation' -ErrorAction SilentlyContinue)) {
+    if ($Async) {
         Invoke-AsyncOperation -ScriptBlock { Get-AllDeploymentJobs } -LoadingMessage 'Loading deployment jobs...' -OnComplete {
             param($Result)
             & $processJobsData $Result $deployFilter $dataGrid
@@ -312,10 +302,10 @@ function Update-JobCounters {
     $running = if ($Jobs) { ($Jobs | Where-Object { $_.Status -eq 'Running' }).Count } else { 0 }
     $completed = if ($Jobs) { ($Jobs | Where-Object { $_.Status -eq 'Completed' }).Count } else { 0 }
 
-    $Window.FindName('TxtJobTotalCount').Text = "$total"
-    $Window.FindName('TxtJobPendingCount').Text = "$pending"
-    $Window.FindName('TxtJobRunningCount').Text = "$running"
-    $Window.FindName('TxtJobCompletedCount').Text = "$completed"
+    $ctrl = $Window.FindName('TxtJobTotalCount');     if ($ctrl) { $ctrl.Text = "$total" }
+    $ctrl = $Window.FindName('TxtJobPendingCount');   if ($ctrl) { $ctrl.Text = "$pending" }
+    $ctrl = $Window.FindName('TxtJobRunningCount');   if ($ctrl) { $ctrl.Text = "$running" }
+    $ctrl = $Window.FindName('TxtJobCompletedCount'); if ($ctrl) { $ctrl.Text = "$completed" }
 }
 
 function global:Update-DeploymentFilter {
@@ -373,19 +363,20 @@ function global:Update-SelectedJobInfo {
     param([System.Windows.Window]$Window)
 
     $dataGrid = $Window.FindName('DeploymentJobsDataGrid')
+    if (-not $dataGrid) { return }
     $selectedItem = $dataGrid.SelectedItem
     $messageBox = $Window.FindName('TxtDeploymentMessage')
     $progressBar = $Window.FindName('DeploymentProgressBar')
 
     if ($selectedItem) {
         $script:SelectedDeploymentJobId = $selectedItem.JobId
-        $messageBox.Text = $selectedItem.Message
-        $progressBar.Value = $selectedItem.Progress
+        if ($messageBox)  { $messageBox.Text = $selectedItem.Message }
+        if ($progressBar) { $progressBar.Value = $selectedItem.Progress }
     }
     else {
         $script:SelectedDeploymentJobId = $null
-        $messageBox.Text = 'Select a deployment job to view details'
-        $progressBar.Value = 0
+        if ($messageBox)  { $messageBox.Text = 'Select a deployment job to view details' }
+        if ($progressBar) { $progressBar.Value = 0 }
     }
 }
 
@@ -781,7 +772,9 @@ function global:Invoke-BackupGpoPolicy {
                 $policy = Get-AppLockerPolicy -Id $gpo.Id -Domain $gpo.DomainName -Xml
                 $source = "GPO: $gpoName"
             }
-        } catch { }
+        } catch {
+            Write-Log -Level Warning -Message "GPO policy backup failed, falling back to effective: $($_.Exception.Message)"
+        }
 
         if (-not $policy) {
             # Fallback: get effective local policy

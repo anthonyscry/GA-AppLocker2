@@ -26,7 +26,7 @@ $script:ValidRuleActions = @('Allow', 'Deny')
 $script:ValidRuleStatuses = @('Pending', 'Approved', 'Rejected', 'Review')
 
 # Valid policy statuses
-$script:ValidPolicyStatuses = @('Draft', 'Active', 'Archived')
+$script:ValidPolicyStatuses = @('Draft', 'Active', 'Deployed', 'Archived')
 
 # Valid enforcement modes
 $script:ValidEnforcementModes = @('NotConfigured', 'AuditOnly', 'Enabled')

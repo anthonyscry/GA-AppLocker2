@@ -132,7 +132,7 @@ function global:Invoke-InitializeWinRM {
         try {
             Enable-WinRMGPO -GPOName 'AppLocker-EnableWinRM' -ErrorAction SilentlyContinue
             Disable-WinRMGPO -GPOName 'AppLocker-DisableWinRM' -ErrorAction SilentlyContinue
-        } catch { }
+        } catch { Write-Log -Level Warning -Message "WinRM GPO link state update failed: $($_.Exception.Message)" }
 
         Hide-LoadingOverlay
 

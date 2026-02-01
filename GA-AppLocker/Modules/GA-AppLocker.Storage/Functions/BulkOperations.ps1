@@ -165,6 +165,9 @@ function Add-RulesToIndex {
         $rulesPath = Join-Path $dataPath 'Rules'
 
         $skipped = 0
+        # Collect new entries in a List to avoid O(n^2) array += growth
+        $newEntries = [System.Collections.Generic.List[PSCustomObject]]::new()
+
         foreach ($rule in $Rules) {
             # Skip if rule already exists in index (prevents duplicates when index was rebuilt from files)
             if ($script:RuleById.ContainsKey($rule.Id)) {
@@ -190,8 +193,8 @@ function Add-RulesToIndex {
                 FilePath       = Join-Path $rulesPath "$($rule.Id).json"
             }
 
-            # Add to index array
-            $script:JsonIndex.Rules += $indexEntry
+            # Collect for batch append
+            $newEntries.Add($indexEntry)
 
             # Update hashtables for O(1) lookup
             $script:RuleById[$rule.Id] = $indexEntry
@@ -208,6 +211,11 @@ function Add-RulesToIndex {
             }
 
             $result.AddedCount++
+        }
+
+        # Batch append to index array (single allocation instead of per-rule +=)
+        if ($newEntries.Count -gt 0) {
+            $script:JsonIndex.Rules = @($script:JsonIndex.Rules) + $newEntries.ToArray()
         }
         
         if ($skipped -gt 0) {
