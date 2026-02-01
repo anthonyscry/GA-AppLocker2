@@ -1,7 +1,7 @@
 #region Scanner Panel Functions
 # Scanner.ps1 - Scanner panel handlers
 function Initialize-ScannerPanel {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     # Initialize scan paths from config or defaults
     $txtPaths = $Window.FindName('TxtScanPaths')
@@ -226,7 +226,7 @@ function Initialize-ScannerPanel {
 }
 
 function global:Invoke-StartArtifactScan {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     if ($script:ScanInProgress) {
         [System.Windows.MessageBox]::Show('A scan is already in progress.', 'Scan Active', 'OK', 'Warning')
@@ -261,7 +261,8 @@ function global:Invoke-StartArtifactScan {
 
     if ([string]::IsNullOrWhiteSpace($scanName)) {
         $scanName = "Scan_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
-        $Window.FindName('TxtScanName').Text = $scanName
+        $txtName = $Window.FindName('TxtScanName')
+        if ($txtName) { $txtName.Text = $scanName }
     }
 
     # Parse paths
@@ -407,8 +408,12 @@ function global:Invoke-StartArtifactScan {
                 $script:ScanInProgress = $false
                 Update-ScanUIState -Window $win -Scanning $false
                 Update-ScanProgress -Window $win -Text "Scan cancelled" -Percent 0
-                $win.FindName('ScanStatusLabel').Text = "Cancelled"
-                $win.FindName('ScanStatusLabel').Foreground = [System.Windows.Media.Brushes]::Orange
+                
+                $statusLabel = $win.FindName('ScanStatusLabel')
+                if ($statusLabel) {
+                    $statusLabel.Text = "Cancelled"
+                    $statusLabel.Foreground = [System.Windows.Media.Brushes]::Orange
+                }
                 return
             }
         
@@ -434,8 +439,11 @@ function global:Invoke-StartArtifactScan {
             
                 if ($syncHash.Error) {
                     Update-ScanProgress -Window $win -Text "Error: $($syncHash.Error)" -Percent 0
-                    $win.FindName('ScanStatusLabel').Text = "Error"
-                    $win.FindName('ScanStatusLabel').Foreground = [System.Windows.Media.Brushes]::OrangeRed
+                    $statusLabel = $win.FindName('ScanStatusLabel')
+                    if ($statusLabel) {
+                        $statusLabel.Text = "Error"
+                        $statusLabel.Foreground = [System.Windows.Media.Brushes]::OrangeRed
+                    }
                     [System.Windows.MessageBox]::Show("Scan error: $($syncHash.Error)", 'Error', 'OK', 'Error')
                 }
                 elseif ($syncHash.Result -and $syncHash.Result.Success) {
@@ -445,13 +453,23 @@ function global:Invoke-StartArtifactScan {
                     Update-ScanProgress -Window $win -Text "Scan complete: $($result.Summary.TotalArtifacts) artifacts" -Percent 100
 
                     # Update counters
-                    $win.FindName('ScanArtifactCount').Text = "$($result.Summary.TotalArtifacts) artifacts"
+                    $countLabel = $win.FindName('ScanArtifactCount')
+                    if ($countLabel) { $countLabel.Text = "$($result.Summary.TotalArtifacts) artifacts" }
+                    
                     $preGen = $win.FindName('TxtArtifactCountPreGen')
                     if ($preGen) { $preGen.Text = "$($result.Summary.TotalArtifacts)" }
-                    $win.FindName('ScanSignedCount').Text = "$($result.Summary.SignedArtifacts)"
-                    $win.FindName('ScanUnsignedCount').Text = "$($result.Summary.UnsignedArtifacts)"
-                    $win.FindName('ScanStatusLabel').Text = "Complete"
-                    $win.FindName('ScanStatusLabel').Foreground = [System.Windows.Media.Brushes]::LightGreen
+                    
+                    $signedLabel = $win.FindName('ScanSignedCount')
+                    if ($signedLabel) { $signedLabel.Text = "$($result.Summary.SignedArtifacts)" }
+                    
+                    $unsignedLabel = $win.FindName('ScanUnsignedCount')
+                    if ($unsignedLabel) { $unsignedLabel.Text = "$($result.Summary.UnsignedArtifacts)" }
+                    
+                    $statusLabel = $win.FindName('ScanStatusLabel')
+                    if ($statusLabel) {
+                        $statusLabel.Text = "Complete"
+                        $statusLabel.Foreground = [System.Windows.Media.Brushes]::LightGreen
+                    }
 
                     # Refresh saved scans list
                     Update-SavedScansList -Window $win
@@ -502,7 +520,7 @@ function global:Invoke-StartArtifactScan {
 }
 
 function global:Invoke-StopArtifactScan {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     # Signal cancellation - the timer tick handler will clean up
     $script:ScanCancelled = $true
@@ -510,7 +528,7 @@ function global:Invoke-StopArtifactScan {
 
 function global:Update-ScanUIState {
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [bool]$Scanning
     )
 
@@ -523,7 +541,7 @@ function global:Update-ScanUIState {
 
 function global:Update-ScanProgress {
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [string]$Text,
         [int]$Percent
     )
@@ -541,7 +559,7 @@ function global:Update-ScanProgress {
 }
 
 function global:Update-ArtifactDataGrid {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     try {
         $dataGrid = $Window.FindName('ArtifactDataGrid')
@@ -607,7 +625,7 @@ function global:Update-ArtifactDataGrid {
 
 function global:Update-ArtifactFilter {
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [string]$Filter
     )
 
@@ -648,7 +666,7 @@ function global:Invoke-SelectAllArtifacts {
         Selects or deselects all artifacts in the ArtifactDataGrid.
     #>
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [bool]$SelectAll = $true
     )
     
@@ -670,7 +688,7 @@ function global:Update-ArtifactSelectionCount {
     .SYNOPSIS
         Updates the selected artifact count display.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     $dataGrid = $Window.FindName('ArtifactDataGrid')
     $countText = $Window.FindName('TxtSelectedArtifactCount')
@@ -682,7 +700,7 @@ function global:Update-ArtifactSelectionCount {
 }
 
 function global:Update-SavedScansList {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $listBox = $Window.FindName('SavedScansList')
     if (-not $listBox) { return }
@@ -704,7 +722,7 @@ function global:Update-SavedScansList {
 }
 
 function global:Invoke-LoadSelectedScan {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $listBox = $Window.FindName('SavedScansList')
     if (-not $listBox.SelectedItem) {
@@ -754,13 +772,24 @@ function global:Invoke-LoadSelectedScan {
         # Update counters
         $signed = ($script:CurrentScanArtifacts | Where-Object { $_.IsSigned }).Count
         $unsigned = $script:CurrentScanArtifacts.Count - $signed
-        $Window.FindName('ScanArtifactCount').Text = "$($script:CurrentScanArtifacts.Count) artifacts"
+        
+        $countLabel = $Window.FindName('ScanArtifactCount')
+        if ($countLabel) { $countLabel.Text = "$($script:CurrentScanArtifacts.Count) artifacts" }
+        
         $preGen = $Window.FindName('TxtArtifactCountPreGen')
         if ($preGen) { $preGen.Text = "$($script:CurrentScanArtifacts.Count)" }
-        $Window.FindName('ScanSignedCount').Text = "$signed"
-        $Window.FindName('ScanUnsignedCount').Text = "$unsigned"
-        $Window.FindName('ScanStatusLabel').Text = $statusText
-        $Window.FindName('ScanStatusLabel').Foreground = [System.Windows.Media.Brushes]::LightBlue
+        
+        $signedLabel = $Window.FindName('ScanSignedCount')
+        if ($signedLabel) { $signedLabel.Text = "$signed" }
+        
+        $unsignedLabel = $Window.FindName('ScanUnsignedCount')
+        if ($unsignedLabel) { $unsignedLabel.Text = "$unsigned" }
+        
+        $statusLabel = $Window.FindName('ScanStatusLabel')
+        if ($statusLabel) {
+            $statusLabel.Text = $statusText
+            $statusLabel.Foreground = [System.Windows.Media.Brushes]::LightBlue
+        }
 
         Update-ScanProgress -Window $Window -Text "$statusText`: $($selectedScan.ScanName)" -Percent 100
     }
@@ -770,7 +799,7 @@ function global:Invoke-LoadSelectedScan {
 }
 
 function global:Invoke-DeleteSelectedScan {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $listBox = $Window.FindName('SavedScansList')
     if (-not $listBox.SelectedItem) {
@@ -800,7 +829,7 @@ function global:Invoke-DeleteSelectedScan {
 }
 
 function global:Invoke-ImportArtifacts {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     Add-Type -AssemblyName System.Windows.Forms
 
@@ -868,13 +897,24 @@ function global:Invoke-ImportArtifacts {
             # Update counters
             $signed = ($script:CurrentScanArtifacts | Where-Object { $_.IsSigned }).Count
             $unsigned = $script:CurrentScanArtifacts.Count - $signed
-            $Window.FindName('ScanArtifactCount').Text = "$($script:CurrentScanArtifacts.Count) artifacts"
+            
+            $countLabel = $Window.FindName('ScanArtifactCount')
+            if ($countLabel) { $countLabel.Text = "$($script:CurrentScanArtifacts.Count) artifacts" }
+            
             $preGen = $Window.FindName('TxtArtifactCountPreGen')
             if ($preGen) { $preGen.Text = "$($script:CurrentScanArtifacts.Count)" }
-            $Window.FindName('ScanSignedCount').Text = "$signed"
-            $Window.FindName('ScanUnsignedCount').Text = "$unsigned"
-            $Window.FindName('ScanStatusLabel').Text = $statusText
-            $Window.FindName('ScanStatusLabel').Foreground = [System.Windows.Media.Brushes]::LightGreen
+            
+            $signedLabel = $Window.FindName('ScanSignedCount')
+            if ($signedLabel) { $signedLabel.Text = "$signed" }
+            
+            $unsignedLabel = $Window.FindName('ScanUnsignedCount')
+            if ($unsignedLabel) { $unsignedLabel.Text = "$unsigned" }
+            
+            $statusLabel = $Window.FindName('ScanStatusLabel')
+            if ($statusLabel) {
+                $statusLabel.Text = $statusText
+                $statusLabel.Foreground = [System.Windows.Media.Brushes]::LightGreen
+            }
 
             [System.Windows.MessageBox]::Show($messageText, 'Import Complete', 'OK', 'Information')
         }
@@ -885,7 +925,7 @@ function global:Invoke-ImportArtifacts {
 }
 
 function global:Invoke-ExportArtifacts {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     # Get artifacts from DataGrid (respects current filters)
     $dataGrid = $Window.FindName('ArtifactDataGrid')
@@ -938,7 +978,7 @@ function global:Invoke-ExportArtifacts {
 }
 
 function Invoke-BrowseScanPath {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     Add-Type -AssemblyName System.Windows.Forms
 
@@ -962,7 +1002,7 @@ function Invoke-BrowseScanPath {
 # Note: Show-MachineSelectionDialog is now in GUI/Dialogs/ScannerDialogs.ps1
 
 function global:Invoke-SelectMachinesForScan {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     if ($script:DiscoveredMachines.Count -eq 0) {
         $confirm = [System.Windows.MessageBox]::Show(
@@ -1016,7 +1056,7 @@ function global:Invoke-RemoveScanMachines {
         Removes selected machines from the Scanner machine list.
         Supports Shift+Click and Ctrl+Click multi-select (SelectionMode=Extended).
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $machineList = $Window.FindName('ScanMachineList')
     if (-not $machineList -or $machineList.SelectedItems.Count -eq 0) {
@@ -1064,7 +1104,7 @@ function global:Invoke-ClearScanMachines {
     .SYNOPSIS
         Clears all machines from the Scanner machine list.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     if ($script:SelectedScanMachines.Count -eq 0) {
         Show-Toast -Message 'Machine list is already empty.' -Type 'Info'
@@ -1087,178 +1127,11 @@ function global:Invoke-ClearScanMachines {
     Show-Toast -Message "Cleared $removedCount machine(s) from scan list." -Type 'Info'
 }
 
-# Deduplicates scan artifacts by selected mode (Smart, Publisher, PublisherProduct, Hash)
-# Programmatic use only - UI moved to Rule Generation Wizard
-# Kept for backward compatibility and scripting scenarios
-function global:Invoke-DedupeArtifacts {
-    param([System.Windows.Window]$Window)
+# Legacy function removed - use Rule Generation Wizard for deduplication
+# Was: Invoke-DedupeArtifacts
 
-    if (-not $script:CurrentScanArtifacts -or $script:CurrentScanArtifacts.Count -eq 0) {
-        Show-Toast -Message 'No artifacts loaded. Run a scan first.' -Type 'Warning'
-        return
-    }
-
-    # Get dedupe mode from dropdown
-    $dedupeMode = 'Hash'
-    $cboMode = $Window.FindName('CboDedupeMode')
-    if ($cboMode -and $cboMode.SelectedItem) {
-        $dedupeMode = $cboMode.SelectedItem.Tag
-    }
-
-    $originalCount = $script:CurrentScanArtifacts.Count
-
-    # Build hash set for O(n) deduplication
-    $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-    $uniqueArtifacts = [System.Collections.Generic.List[object]]::new()
-
-    foreach ($artifact in $script:CurrentScanArtifacts) {
-        $key = switch ($dedupeMode) {
-            'Smart' {
-                # Smart: Publisher+Product for signed, Hash for unsigned (matches Smart rule generation)
-                if ($artifact.IsSigned -and $artifact.Publisher) {
-                    $product = if ($artifact.ProductName) { $artifact.ProductName } else { 'Unknown' }
-                    "PUB|$($artifact.Publisher)|$product"
-                } else {
-                    # Unsigned: use hash
-                    if ($artifact.SHA256Hash) { $artifact.SHA256Hash } 
-                    else { "$($artifact.FilePath)|$($artifact.FileSize)" }
-                }
-            }
-            'Publisher' {
-                # Dedupe by publisher name only (one artifact per vendor)
-                if ($artifact.Publisher) {
-                    "PUB|$($artifact.Publisher)"
-                } else {
-                    # No publisher: fall back to hash
-                    if ($artifact.SHA256Hash) { $artifact.SHA256Hash } 
-                    else { "$($artifact.FilePath)|$($artifact.FileSize)" }
-                }
-            }
-            'PublisherProduct' {
-                # Dedupe by publisher + product (one artifact per product)
-                if ($artifact.Publisher) {
-                    $product = if ($artifact.ProductName) { $artifact.ProductName } else { 'Unknown' }
-                    "PUB|$($artifact.Publisher)|$product"
-                } else {
-                    # No publisher: fall back to hash
-                    if ($artifact.SHA256Hash) { $artifact.SHA256Hash } 
-                    else { "$($artifact.FilePath)|$($artifact.FileSize)" }
-                }
-            }
-            default {
-                # Hash mode: exact file match
-                if ($artifact.SHA256Hash) { $artifact.SHA256Hash } 
-                else { "$($artifact.FilePath)|$($artifact.FileSize)" }
-            }
-        }
-        
-        if ($seen.Add($key)) {
-            $uniqueArtifacts.Add($artifact)
-        }
-    }
-
-    $removed = $originalCount - $uniqueArtifacts.Count
-    $script:CurrentScanArtifacts = $uniqueArtifacts
-
-    # Update displays
-    Update-ArtifactDataGrid -Window $Window
-    
-    $artifactCount = $Window.FindName('ScanArtifactCount')
-    if ($artifactCount) { $artifactCount.Text = "$($uniqueArtifacts.Count) artifacts" }
-    
-    $preGenCount = $Window.FindName('TxtArtifactCountPreGen')
-    if ($preGenCount) { $preGenCount.Text = "$($uniqueArtifacts.Count)" }
-
-    $modeText = switch ($dedupeMode) { 'Smart' { 'smart' }; 'Publisher' { 'publisher' }; 'PublisherProduct' { 'publisher+product' }; default { 'hash' } }
-    if ($removed -gt 0) {
-        Show-Toast -Message "Removed $removed duplicates (by $modeText). $($uniqueArtifacts.Count) unique remaining." -Type 'Success'
-        Write-Log -Message "Deduplicated artifacts by $modeText`: $originalCount -> $($uniqueArtifacts.Count) ($removed removed)"
-    } else {
-        Show-Toast -Message "No duplicates found by $modeText. All $($uniqueArtifacts.Count) artifacts unique." -Type 'Info'
-    }
-}
-
-# Applies exclusion filters to scan artifacts based on checkbox selections
-# Programmatic use only - UI moved to Rule Generation Wizard
-# Kept for backward compatibility and scripting scenarios
-function global:Invoke-ApplyArtifactExclusions {
-    param([System.Windows.Window]$Window)
-
-    if (-not $script:CurrentScanArtifacts -or $script:CurrentScanArtifacts.Count -eq 0) {
-        Show-Toast -Message 'No artifacts loaded. Run a scan first.' -Type 'Warning'
-        return
-    }
-
-    # Get exclusion checkboxes (these were moved to the Rule Generation Wizard)
-    $chkDll = $Window.FindName('ChkExcludeDll')
-    $chkJs = $Window.FindName('ChkExcludeJs')
-    $chkScripts = $Window.FindName('ChkExcludeScripts')
-    $chkUnsigned = $Window.FindName('ChkExcludeUnsigned')
-
-    # If all checkboxes are missing, the UI was moved to the Rule Generation Wizard
-    if (-not $chkDll -and -not $chkJs -and -not $chkScripts -and -not $chkUnsigned) {
-        Show-Toast -Message 'Exclusions are now configured in the Rule Generation Wizard (Step 1).' -Type 'Info'
-        return
-    }
-
-    $excludeDll = if ($chkDll) { $chkDll.IsChecked } else { $false }
-    $excludeJs = if ($chkJs) { $chkJs.IsChecked } else { $false }
-    $excludeScripts = if ($chkScripts) { $chkScripts.IsChecked } else { $false }
-    $excludeUnsigned = if ($chkUnsigned) { $chkUnsigned.IsChecked } else { $false }
-
-    if (-not $excludeDll -and -not $excludeJs -and -not $excludeScripts -and -not $excludeUnsigned) {
-        Show-Toast -Message 'No exclusions selected.' -Type 'Info'
-        return
-    }
-
-    $originalCount = $script:CurrentScanArtifacts.Count
-    $excluded = @()
-
-    # Build list of extensions to exclude
-    $excludeExtensions = @()
-    if ($excludeDll) { $excludeExtensions += '.dll' }
-    if ($excludeJs) { $excludeExtensions += '.js' }
-    if ($excludeScripts) { $excludeExtensions += @('.ps1', '.bat', '.cmd', '.vbs', '.wsf') }
-
-    # Filter artifacts
-    $filtered = $script:CurrentScanArtifacts | Where-Object {
-        $dominated = $false
-        
-        # Check extension exclusions
-        if ($excludeExtensions.Count -gt 0) {
-            $ext = $_.Extension
-            if (-not $ext -and $_.FileName) { $ext = [System.IO.Path]::GetExtension($_.FileName) }
-            if ($ext -and $excludeExtensions -contains $ext.ToLower()) { $dominated = $true }
-        }
-        
-        # Check unsigned exclusion
-        if (-not $dominated -and $excludeUnsigned -and -not $_.IsSigned) { $dominated = $true }
-        
-        -not $dominated
-    }
-
-    $script:CurrentScanArtifacts = @($filtered)
-    $removedCount = $originalCount - $script:CurrentScanArtifacts.Count
-
-    # Update displays
-    Update-ArtifactDataGrid -Window $Window
-    
-    $artifactCount = $Window.FindName('ScanArtifactCount')
-    if ($artifactCount) { $artifactCount.Text = "$($script:CurrentScanArtifacts.Count) artifacts" }
-    
-    $preGenCount = $Window.FindName('TxtArtifactCountPreGen')
-    if ($preGenCount) { $preGenCount.Text = "$($script:CurrentScanArtifacts.Count)" }
-
-    # Build exclusion description
-    $excludeDesc = @()
-    if ($excludeDll) { $excludeDesc += 'DLLs' }
-    if ($excludeJs) { $excludeDesc += 'JS' }
-    if ($excludeScripts) { $excludeDesc += 'Scripts' }
-    if ($excludeUnsigned) { $excludeDesc += 'Unsigned' }
-
-    Show-Toast -Message "Excluded $removedCount artifacts ($($excludeDesc -join ', ')). $($script:CurrentScanArtifacts.Count) remaining." -Type 'Success'
-    Write-Log -Message "Applied exclusions ($($excludeDesc -join ', ')): $originalCount -> $($script:CurrentScanArtifacts.Count) ($removedCount removed)"
-}
+# Legacy function removed - use Rule Generation Wizard for exclusions
+# Was: Invoke-ApplyArtifactExclusions
 
 #endregion
 
@@ -1268,7 +1141,7 @@ function global:Initialize-ScheduledScansList {
     .SYNOPSIS
         Loads scheduled scans into the ScheduledScansList ListBox.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     $listBox = $Window.FindName('ScheduledScansList')
     if (-not $listBox) { return }
@@ -1305,7 +1178,7 @@ function global:Invoke-CreateScheduledScan {
     .SYNOPSIS
         Creates a new scheduled scan from UI values.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     # Get UI values
     $txtName = $Window.FindName('TxtScheduleName')
@@ -1413,7 +1286,7 @@ function global:Invoke-RunScheduledScanNow {
     .SYNOPSIS
         Runs the selected scheduled scan immediately.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     $listBox = $Window.FindName('ScheduledScansList')
     if (-not $listBox -or -not $listBox.SelectedItem) {
@@ -1463,7 +1336,7 @@ function global:Invoke-DeleteScheduledScan {
     .SYNOPSIS
         Deletes the selected scheduled scan.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     $listBox = $Window.FindName('ScheduledScansList')
     if (-not $listBox -or -not $listBox.SelectedItem) {
@@ -1506,7 +1379,7 @@ function global:Invoke-ToggleScheduledScan {
     .SYNOPSIS
         Toggles the enabled state of the selected scheduled scan.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     $listBox = $Window.FindName('ScheduledScansList')
     if (-not $listBox -or -not $listBox.SelectedItem) {
@@ -1545,7 +1418,7 @@ function global:Invoke-LaunchRuleWizard {
         Launches the Rule Generation Wizard with current scan artifacts.
         The wizard shows a 3-step UI: Configure -> Preview -> Generate
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     if (-not $script:CurrentScanArtifacts -or $script:CurrentScanArtifacts.Count -eq 0) {
         Show-Toast -Message "No artifacts available. Run a scan first." -Type 'Warning'
@@ -1821,7 +1694,7 @@ function global:Invoke-DirectRuleGenerationWithSettings {
         Generates rules using settings from the configuration dialog.
     #>
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [PSCustomObject]$Settings
     )
     
@@ -1882,7 +1755,7 @@ function global:Invoke-DirectRuleGeneration {
     .SYNOPSIS
         Generates rules directly without wizard UI. Called after user confirmation.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     $artifactCount = $script:CurrentScanArtifacts.Count
     Show-Toast -Message "Generating rules from $artifactCount artifacts (Smart mode)..." -Type 'Info'

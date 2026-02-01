@@ -1,7 +1,7 @@
 #region Policy Panel Functions
 # Policy.ps1 - Policy panel handlers
 function Initialize-PolicyPanel {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     # Wire up filter buttons
     $filterButtons = @(
@@ -77,7 +77,7 @@ function Initialize-PolicyPanel {
 
 function global:Update-PoliciesDataGrid {
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [switch]$Async
     )
 
@@ -184,14 +184,14 @@ function global:Update-PoliciesDataGrid {
 
 function global:Update-PolicyCounters {
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [array]$Policies
     )
 
-    $total = if ($Policies) { $Policies.Count } else { 0 }
-    $draft = if ($Policies) { ($Policies | Where-Object { $_.Status -eq 'Draft' }).Count } else { 0 }
-    $active = if ($Policies) { ($Policies | Where-Object { $_.Status -eq 'Active' }).Count } else { 0 }
-    $deployed = if ($Policies) { ($Policies | Where-Object { $_.Status -eq 'Deployed' }).Count } else { 0 }
+    $total = if ($Policies) { @($Policies).Count } else { 0 }
+    $draft = if ($Policies) { @($Policies | Where-Object { $_.Status -eq 'Draft' }).Count } else { 0 }
+    $active = if ($Policies) { @($Policies | Where-Object { $_.Status -eq 'Active' }).Count } else { 0 }
+    $deployed = if ($Policies) { @($Policies | Where-Object { $_.Status -eq 'Deployed' }).Count } else { 0 }
 
     $ctrl = $Window.FindName('TxtPolicyTotalCount');    if ($ctrl) { $ctrl.Text = "$total" }
     $ctrl = $Window.FindName('TxtPolicyDraftCount');    if ($ctrl) { $ctrl.Text = "$draft" }
@@ -201,7 +201,7 @@ function global:Update-PolicyCounters {
 
 function global:Update-PoliciesFilter {
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [string]$Filter
     )
 
@@ -251,7 +251,7 @@ function global:Update-PoliciesFilter {
 }
 
 function global:Update-SelectedPolicyInfo {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $dataGrid = $Window.FindName('PoliciesDataGrid')
     if (-not $dataGrid) { return }
@@ -362,7 +362,7 @@ function global:Update-SelectedPolicyInfo {
 }
 
 function global:Invoke-SavePolicyChanges {
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     if (-not $script:SelectedPolicyId) {
         Show-Toast -Message 'Please select a policy to edit.' -Type 'Warning'
@@ -431,10 +431,13 @@ function global:Invoke-SavePolicyChanges {
 }
 
 function global:Invoke-CreatePolicy {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
-    $name = $Window.FindName('TxtPolicyName').Text
-    $description = $Window.FindName('TxtPolicyDescription').Text
+    $txtName = $Window.FindName('TxtPolicyName')
+    $txtDesc = $Window.FindName('TxtPolicyDescription')
+    
+    $name = if ($txtName) { $txtName.Text } else { '' }
+    $description = if ($txtDesc) { $txtDesc.Text } else { '' }
 
     if ([string]::IsNullOrWhiteSpace($name)) {
         Show-Toast -Message 'Please enter a policy name.' -Type 'Warning'
@@ -442,29 +445,34 @@ function global:Invoke-CreatePolicy {
     }
 
     $enforcementCombo = $Window.FindName('CboPolicyEnforcement')
-    $enforcement = switch ($enforcementCombo.SelectedIndex) {
-        0 { 'AuditOnly' }
-        1 { 'Enabled' }
-        2 { 'NotConfigured' }
-        default { 'AuditOnly' }
+    $enforcement = 'AuditOnly'
+    if ($enforcementCombo) {
+        $enforcement = switch ($enforcementCombo.SelectedIndex) {
+            0 { 'AuditOnly' }
+            1 { 'Enabled' }
+            2 { 'NotConfigured' }
+            default { 'AuditOnly' }
+        }
     }
 
     # Get deployment phase from ComboBox
     $phaseCombo = $Window.FindName('CboPolicyPhase')
-    $selectedPhaseItem = $phaseCombo.SelectedItem
-    $phase = if ($selectedPhaseItem -and $selectedPhaseItem.Tag) {
-        [int]$selectedPhaseItem.Tag
-    } else {
-        1  # Default to Phase 1
+    $phase = 1
+    if ($phaseCombo) {
+        $selectedPhaseItem = $phaseCombo.SelectedItem
+        if ($selectedPhaseItem -and $selectedPhaseItem.Tag) {
+            $phase = [int]$selectedPhaseItem.Tag
+        }
     }
 
     try {
         $result = New-Policy -Name $name -Description $description -EnforcementMode $enforcement -Phase $phase
         
         if ($result.Success) {
-            $Window.FindName('TxtPolicyName').Text = ''
-            $Window.FindName('TxtPolicyDescription').Text = ''
-            $Window.FindName('CboPolicyPhase').SelectedIndex = 0  # Reset to Phase 1
+            if ($txtName) { $txtName.Text = '' }
+            if ($txtDesc) { $txtDesc.Text = '' }
+            if ($phaseCombo) { $phaseCombo.SelectedIndex = 0 } # Reset to Phase 1
+            
             Update-PoliciesDataGrid -Window $Window
             Update-WorkflowBreadcrumb -Window $Window
             Show-Toast -Message "Policy '$name' created successfully (Phase $phase)." -Type 'Success'
@@ -474,13 +482,13 @@ function global:Invoke-CreatePolicy {
         }
     }
     catch {
-        [System.Windows.MessageBox]::Show("Error: $($_.Exception.Message)", 'Error', 'OK', 'Error')
+        Show-Toast -Message "Error: $($_.Exception.Message)" -Type 'Error'
     }
 }
 
 function global:Set-SelectedPolicyStatus {
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [string]$Status
     )
 
@@ -506,7 +514,7 @@ function global:Set-SelectedPolicyStatus {
 }
 
 function global:Invoke-DeleteSelectedPolicy {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     if (-not $script:SelectedPolicyId) {
         [System.Windows.MessageBox]::Show('Please select a policy to delete.', 'No Selection', 'OK', 'Information')
@@ -541,7 +549,7 @@ function global:Invoke-DeleteSelectedPolicy {
 }
 
 function global:Invoke-ExportSelectedPolicy {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     if (-not $script:SelectedPolicyId) {
         [System.Windows.MessageBox]::Show('Please select a policy to export.', 'No Selection', 'OK', 'Information')
@@ -578,7 +586,7 @@ function global:Invoke-ExportSelectedPolicy {
 }
 
 function global:Invoke-DeploySelectedPolicy {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     if (-not $script:SelectedPolicyId) {
         [System.Windows.MessageBox]::Show('Please select a policy to deploy.', 'No Selection', 'OK', 'Information')
@@ -631,7 +639,7 @@ function script:Get-PhaseCollectionTypes {
 }
 
 function global:Invoke-AddRulesToPolicy {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     if (-not $script:SelectedPolicyId) {
         [System.Windows.MessageBox]::Show('Please select a policy first.', 'No Selection', 'OK', 'Information')
@@ -701,7 +709,7 @@ function global:Invoke-AddRulesToPolicy {
 }
 
 function global:Invoke-RemoveRulesFromPolicy {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     if (-not $script:SelectedPolicyId) {
         [System.Windows.MessageBox]::Show('Please select a policy first.', 'No Selection', 'OK', 'Information')
@@ -745,7 +753,7 @@ function global:Invoke-RemoveRulesFromPolicy {
 #region ===== POLICY COMPARISON HANDLERS =====
 
 function Initialize-PolicyCompareDropdowns {
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     $cboSource = $Window.FindName('CboCompareSource')
     $cboTarget = $Window.FindName('CboCompareTarget')
@@ -762,7 +770,7 @@ function Initialize-PolicyCompareDropdowns {
 }
 
 function global:Invoke-ComparePolicies {
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     $cboSource = $Window.FindName('CboCompareSource')
     $cboTarget = $Window.FindName('CboCompareTarget')
@@ -830,7 +838,7 @@ Summary:
 }
 
 function global:Invoke-ExportDiffReport {
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     if (-not $script:LastPolicyComparison) {
         Show-Toast -Message 'No comparison results available. Compare policies first.' -Type 'Warning'

@@ -140,7 +140,7 @@ function Set-EmailSettings {
         # Audit log
         if (Get-Command -Name 'Write-AuditLog' -ErrorAction SilentlyContinue) {
             Write-AuditLog -Action 'EmailSettingsUpdated' -Category 'Config' `
-                -Details "SMTP: $SmtpServer, Enabled: $($settings.Enabled)"
+                -Details "SMTP: $SmtpServer, Enabled: $($settings.Enabled)" | Out-Null
         }
         
         return @{
@@ -348,7 +348,7 @@ Time: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
         # Audit log
         if (Get-Command -Name 'Write-AuditLog' -ErrorAction SilentlyContinue) {
             Write-AuditLog -Action 'EmailSent' -Category 'System' `
-                -Target $Subject -Details "To: $($settings.ToAddresses -join ', '); Type: $EventType"
+                -Target $Subject -Details "To: $($settings.ToAddresses -join ', '); Type: $EventType" | Out-Null
         }
         
         return @{

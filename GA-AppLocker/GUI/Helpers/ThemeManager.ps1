@@ -65,7 +65,7 @@ function Set-Theme {
         Theme name: 'Dark' or 'Light'
     #>
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [ValidateSet('Dark', 'Light')]
         [string]$Theme
     )
@@ -131,7 +131,7 @@ function Toggle-Theme {
     .PARAMETER Window
         The WPF Window object.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     $newTheme = if ($script:CurrentTheme -eq 'Dark') { 'Light' } else { 'Dark' }
     Set-Theme -Window $Window -Theme $newTheme
@@ -145,7 +145,7 @@ function Update-ThemeToggleUI {
         Updates the theme toggle switch visual state.
     #>
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [string]$Theme
     )
     
@@ -244,7 +244,7 @@ function Initialize-Theme {
     .SYNOPSIS
         Initializes the theme on application startup.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     $savedTheme = Get-ThemePreference
     $script:CurrentTheme = $savedTheme

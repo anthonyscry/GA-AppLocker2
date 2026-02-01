@@ -97,108 +97,87 @@ function Set-BulkRuleStatus {
     }
 
     try {
-        $rulePath = Get-RuleStoragePath
-        $ruleFiles = Get-ChildItem -Path $rulePath -Filter '*.json' -ErrorAction SilentlyContinue
-        $totalFiles = $ruleFiles.Count
+        # Use the in-memory JSON index instead of reading all files from disk
+        # Pre-filter with index-supported fields for O(n) in-memory scan instead of O(n) disk reads
+        $indexParams = @{ Take = 100000 }
+        if ($CurrentStatus) { $indexParams['Status'] = $CurrentStatus }
+        if ($RuleType) { $indexParams['RuleType'] = $RuleType }
+        if ($CollectionType) { $indexParams['CollectionType'] = $CollectionType }
 
-        if ($totalFiles -eq 0) {
+        $allRulesResult = Get-AllRules @indexParams
+        if (-not $allRulesResult.Success) {
+            $result.Error = "Failed to load rules from index: $($allRulesResult.Error)"
+            return $result
+        }
+
+        $indexRules = @($allRulesResult.Data)
+        if ($indexRules.Count -eq 0) {
             $result.Error = "No rules found in storage"
             return $result
         }
 
-        Write-RuleLog -Message "Scanning $totalFiles rules for bulk status update..."
+        Write-RuleLog -Message "Filtering $($indexRules.Count) rules from index for bulk status update..."
 
         $matchedRules = @()
-        $processedCount = 0
 
-        foreach ($file in $ruleFiles) {
-            $processedCount++
-            
-            # Progress reporting every 1000 files
-            if ($processedCount % 1000 -eq 0) {
-                $pct = [math]::Round(($processedCount / $totalFiles) * 100)
-                Write-Progress -Activity "Scanning rules" -Status "$processedCount of $totalFiles ($pct%)" -PercentComplete $pct
+        foreach ($rule in $indexRules) {
+            # Already at target status - skip
+            if ($rule.Status -eq $Status) {
+                continue
             }
 
-            try {
-                $rule = Get-Content -Path $file.FullName -Raw | ConvertFrom-Json
+            $matches = $true
 
-                # Apply filters
-                $matches = $true
-
-                # Current status filter
-                if ($CurrentStatus -and $rule.Status -ne $CurrentStatus) {
+            # Vendor exact match
+            if ($matches -and $Vendor) {
+                if ($rule.GroupVendor -ne $Vendor) {
                     $matches = $false
                 }
+            }
 
-                # Already at target status - skip
-                if ($rule.Status -eq $Status) {
+            # Vendor pattern match
+            if ($matches -and $VendorPattern) {
+                if (-not ($rule.GroupVendor -like $VendorPattern)) {
                     $matches = $false
                 }
+            }
 
-                # Vendor exact match
-                if ($matches -and $Vendor) {
-                    if ($rule.GroupVendor -ne $Vendor) {
+            # Publisher pattern match (for publisher rules, match PublisherName)
+            if ($matches -and $PublisherPattern) {
+                if ($rule.RuleType -eq 'Publisher') {
+                    if (-not ($rule.PublisherName -like $PublisherPattern)) {
                         $matches = $false
                     }
                 }
-
-                # Vendor pattern match
-                if ($matches -and $VendorPattern) {
-                    if (-not ($rule.GroupVendor -like $VendorPattern)) {
+                else {
+                    # For non-publisher rules, try matching Name field
+                    if (-not ($rule.Name -like $PublisherPattern)) {
                         $matches = $false
-                    }
-                }
-
-                # Publisher pattern match (for publisher rules, match PublisherName)
-                if ($matches -and $PublisherPattern) {
-                    if ($rule.RuleType -eq 'Publisher') {
-                        if (-not ($rule.PublisherName -like $PublisherPattern)) {
-                            $matches = $false
-                        }
-                    }
-                    else {
-                        # For non-publisher rules, try matching Name field
-                        if (-not ($rule.Name -like $PublisherPattern)) {
-                            $matches = $false
-                        }
-                    }
-                }
-
-                # Group name match
-                if ($matches -and $GroupName) {
-                    if ($rule.GroupName -ne $GroupName) {
-                        $matches = $false
-                    }
-                }
-
-                # Rule type filter
-                if ($matches -and $RuleType) {
-                    if ($rule.RuleType -ne $RuleType) {
-                        $matches = $false
-                    }
-                }
-
-                # Collection type filter
-                if ($matches -and $CollectionType) {
-                    if ($rule.CollectionType -ne $CollectionType) {
-                        $matches = $false
-                    }
-                }
-
-                if ($matches) {
-                    $matchedRules += @{
-                        File = $file
-                        Rule = $rule
                     }
                 }
             }
-            catch {
-                $result.ErrorCount++
+
+            # Group name match - requires reading full file (GroupName not in index)
+            if ($matches -and $GroupName) {
+                if ($rule.FilePath -and (Test-Path $rule.FilePath)) {
+                    try {
+                        $fullRule = Get-Content -Path $rule.FilePath -Raw | ConvertFrom-Json
+                        if ($fullRule.GroupName -ne $GroupName) {
+                            $matches = $false
+                        }
+                    }
+                    catch { $matches = $false }
+                }
+                else { $matches = $false }
+            }
+
+            if ($matches) {
+                $matchedRules += @{
+                    IndexEntry = $rule
+                    Rule = $null  # Loaded on-demand during update
+                }
             }
         }
-
-        Write-Progress -Activity "Scanning rules" -Completed
 
         if ($matchedRules.Count -eq 0) {
             $result.Success = $true
@@ -207,9 +186,9 @@ function Set-BulkRuleStatus {
             return $result
         }
 
-        # Build summary by type
-        $byType = $matchedRules | Group-Object { $_.Rule.RuleType }
-        $byCollection = $matchedRules | Group-Object { $_.Rule.CollectionType }
+        # Build summary by type (use IndexEntry which has RuleType/CollectionType)
+        $byType = $matchedRules | Group-Object { $_.IndexEntry.RuleType }
+        $byCollection = $matchedRules | Group-Object { $_.IndexEntry.CollectionType }
 
         $summaryText = "Found $($matchedRules.Count) rules to update:`n"
         $summaryText += "  By Type: " + (($byType | ForEach-Object { "$($_.Name): $($_.Count)" }) -join ", ") + "`n"
@@ -223,9 +202,10 @@ function Set-BulkRuleStatus {
             return $result
         }
 
-        # Apply updates
+        # Apply updates - only read files that matched (not all 35K)
         Write-RuleLog -Message "Updating $($matchedRules.Count) rules to status '$Status'..."
         $updateCount = 0
+        $rulePath = Get-RuleStoragePath
 
         foreach ($item in $matchedRules) {
             $updateCount++
@@ -236,21 +216,32 @@ function Set-BulkRuleStatus {
             }
 
             try {
-                $oldStatus = $item.Rule.Status
-                $item.Rule.Status = $Status
-                $item.Rule.ModifiedDate = Get-Date -Format 'o'
+                # Load full rule from disk (only for matched rules)
+                $filePath = $item.IndexEntry.FilePath
+                if (-not $filePath) {
+                    $filePath = Join-Path $rulePath "$($item.IndexEntry.Id).json"
+                }
 
-                $item.Rule | ConvertTo-Json -Depth 10 | Set-Content -Path $item.File.FullName -Encoding UTF8
+                if (-not (Test-Path $filePath)) {
+                    $result.ErrorCount++
+                    continue
+                }
+
+                $rule = Get-Content -Path $filePath -Raw | ConvertFrom-Json
+                $rule.Status = $Status
+                $rule.ModifiedDate = Get-Date -Format 'o'
+
+                $rule | ConvertTo-Json -Depth 10 | Set-Content -Path $filePath -Encoding UTF8
 
                 $result.UpdatedCount++
 
                 if ($PassThru) {
-                    $result.Data += $item.Rule
+                    $result.Data += $rule
                 }
             }
             catch {
                 $result.ErrorCount++
-                Write-RuleLog -Level Warning -Message "Failed to update rule $($item.Rule.Id): $($_.Exception.Message)"
+                Write-RuleLog -Level Warning -Message "Failed to update rule $($item.IndexEntry.Id): $($_.Exception.Message)"
             }
         }
 
@@ -258,12 +249,9 @@ function Set-BulkRuleStatus {
 
         # Sync the JSON index with updated statuses
         if ($result.UpdatedCount -gt 0) {
-            $updatedIds = @($matchedRules | ForEach-Object { $_.Rule.Id })
-            if (Get-Command -Name 'Update-RuleStatusInIndex' -ErrorAction SilentlyContinue) {
-                $indexResult = Update-RuleStatusInIndex -RuleIds $updatedIds -Status $Status
-                if (-not $indexResult.Success) {
-                    Write-RuleLog -Level Warning -Message "Index sync warning: $($indexResult.Error)"
-                }
+            $updatedIds = @($matchedRules | ForEach-Object { $_.IndexEntry.Id })
+            try { Update-RuleStatusInIndex -RuleIds $updatedIds -Status $Status | Out-Null } catch {
+                Write-RuleLog -Level Warning -Message "Index sync warning: $($_.Exception.Message)"
             }
         }
 

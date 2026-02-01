@@ -293,7 +293,7 @@ function Export-AppLockerReport {
         # Audit log
         if (Get-Command -Name 'Write-AuditLog' -ErrorAction SilentlyContinue) {
             Write-AuditLog -Action 'ReportGenerated' -Category 'System' -Target $OutputPath `
-                -Details "Rules: $($rules.Count), Policies: $($policies.Count)"
+                -Details "Rules: $($rules.Count), Policies: $($policies.Count)" | Out-Null
         }
         
         return @{
@@ -452,7 +452,7 @@ function Export-ForPowerBI {
         # Audit log
         if (Get-Command -Name 'Write-AuditLog' -ErrorAction SilentlyContinue) {
             Write-AuditLog -Action 'PowerBIExport' -Category 'System' -Target $OutputDirectory `
-                -Details "Exported $($exportedFiles.Count) files in $Format format"
+                -Details "Exported $($exportedFiles.Count) files in $Format format" | Out-Null
         }
         
         return @{

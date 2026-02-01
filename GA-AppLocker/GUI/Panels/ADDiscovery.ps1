@@ -5,7 +5,7 @@
 $script:ADDiscovery_Handlers = @{}
 
 function Initialize-DiscoveryPanel {
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     # Clean up any existing handlers first to prevent accumulation
     Unregister-DiscoveryPanelEvents -Window $Window
@@ -126,6 +126,33 @@ function Initialize-DiscoveryPanel {
         }
     }
 
+    # Wire up Select All / Clear OUs buttons
+    $btnSelectAllOUs = $Window.FindName('BtnSelectAllOUs')
+    if ($btnSelectAllOUs) {
+        $script:ADDiscovery_Handlers['BtnSelectAllOUs'] = {
+            param($sender, $e)
+            Show-Toast -Message "Bulk OU selection is not yet available." -Type 'Info'
+        }
+        $btnSelectAllOUs.Add_Click($script:ADDiscovery_Handlers['BtnSelectAllOUs'])
+    }
+
+    $btnClearOUs = $Window.FindName('BtnClearOUs')
+    if ($btnClearOUs) {
+        $script:ADDiscovery_Handlers['BtnClearOUs'] = {
+            param($sender, $e)
+            # Reset filter to show all machines
+            if ($script:DiscoveredMachines) {
+                Update-MachineDataGrid -Window $Window -Machines $script:DiscoveredMachines
+                
+                $machineCount = $Window.FindName('DiscoveryMachineCount')
+                if ($machineCount) {
+                    $machineCount.Text = "$($script:DiscoveredMachines.Count) machines"
+                }
+            }
+        }
+        $btnClearOUs.Add_Click($script:ADDiscovery_Handlers['BtnClearOUs'])
+    }
+
     # Wire up OUTreeView selection to filter machines (Bug 3: missing feature)
     $treeView = $Window.FindName('OUTreeView')
     if ($treeView) {
@@ -163,7 +190,7 @@ function Unregister-DiscoveryPanelEvents {
         Called when switching away from the panel to prevent handler accumulation
         and memory leaks.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     if (-not $Window) { $Window = $global:GA_MainWindow }
     if (-not $Window) { return }
@@ -216,7 +243,7 @@ function Unregister-DiscoveryPanelEvents {
 
 function global:Invoke-DomainRefresh {
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [switch]$Async
     )
 
@@ -489,7 +516,7 @@ function global:Add-ChildOUsToTreeItem {
 
 function global:Update-MachineDataGrid {
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [array]$Machines
     )
 
@@ -522,7 +549,7 @@ function global:Get-CheckedMachines {
         Filters out non-machine objects (e.g. WPF NewItemPlaceholder).
         Used by Test Connectivity and Scanner to operate on selected machines only.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $dataGrid = $Window.FindName('MachineDataGrid')
     if (-not $dataGrid -or $dataGrid.SelectedItems.Count -eq 0) { return @() }
@@ -537,7 +564,7 @@ function global:Get-CheckedMachines {
 
 function global:Invoke-ConnectivityTest {
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [switch]$Async
     )
 

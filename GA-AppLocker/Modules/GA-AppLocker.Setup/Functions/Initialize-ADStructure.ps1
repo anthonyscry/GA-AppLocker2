@@ -65,7 +65,7 @@ function Initialize-ADStructure {
             $ouPath = $existingOU.DistinguishedName
         }
         else {
-            New-ADOrganizationalUnit -Name $OUName -Path $domainDN -Description "AppLocker management objects" -ErrorAction Stop
+            New-ADOrganizationalUnit -Name $OUName -Path $domainDN -Description "AppLocker management objects" -ErrorAction Stop | Out-Null
             Write-SetupLog -Message "Created OU: $OUName"
             $ouCreated = $true
         }
@@ -89,7 +89,7 @@ function Initialize-ADStructure {
                                 -GroupCategory Security `
                                 -Path $ouPath `
                                 -Description $groupDef.Description `
-                                -ErrorAction Stop
+                                -ErrorAction Stop | Out-Null
                     
                     Write-SetupLog -Message "Created group: $($groupDef.Name)"
                     $groupsCreated += [PSCustomObject]@{

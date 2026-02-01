@@ -15,7 +15,7 @@ function global:Start-RuleGenerationAsync {
         and monitors progress via a DispatcherTimer.
     #>
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [array]$Artifacts,
         [string]$Mode = 'Smart',
         [string]$Action = 'Allow',

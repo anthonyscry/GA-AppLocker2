@@ -115,12 +115,11 @@ function script:Get-CollectionType {
 function script:New-RuleId {
     <#
     .SYNOPSIS
-        Generates a new unique rule GUID.
-
+        Generates a new unique rule GUID (uppercase).
     .DESCRIPTION
-        Generates a new unique rule GUID.
+        Generates a new unique rule GUID in uppercase format for consistency with AppLocker schema.
     #>
-    return [guid]::NewGuid().ToString()
+    return [guid]::NewGuid().ToString().ToUpper()
 }
 
 function script:Save-Rule {

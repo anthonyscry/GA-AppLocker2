@@ -11,7 +11,7 @@ function global:Invoke-ViewRuleHistory {
     .SYNOPSIS
         Shows the version history for the selected rule.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     $dataGrid = $Window.FindName('RulesDataGrid')
     if (-not $dataGrid -or -not $dataGrid.SelectedItem) {
@@ -60,7 +60,7 @@ function global:Show-RuleHistoryDialog {
         Shows a dialog with rule version history.
     #>
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [string]$RuleName,
         [string]$RuleId,
         [array]$Versions
@@ -126,6 +126,14 @@ function global:Show-RuleHistoryDialog {
     $reader = [System.Xml.XmlReader]::Create([System.IO.StringReader]::new($dialogXaml))
     $dialog = [System.Windows.Markup.XamlReader]::Load($reader)
     $dialog.Owner = $Window
+    
+    # Add Escape key handler
+    $dialog.Add_KeyDown({
+        param($sender, $e)
+        if ($e.Key -eq 'Escape') {
+            $sender.Close()
+        }
+    })
     
     $versionsList = $dialog.FindName('VersionsList')
     $txtDetails = $dialog.FindName('TxtVersionDetails')
@@ -258,7 +266,7 @@ function global:Show-AddRulesToPolicyDialog {
         Returns the selected policy ID or $null if cancelled.
     #>
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [array]$SelectedRules,
         [array]$Policies
     )
@@ -272,6 +280,14 @@ function global:Show-AddRulesToPolicyDialog {
     $dialog.Owner = $Window
     $dialog.Background = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#1E1E1E')
     $dialog.ResizeMode = 'NoResize'
+
+    # Add Escape key handler
+    $dialog.Add_KeyDown({
+        param($sender, $e)
+        if ($e.Key -eq 'Escape') {
+            $sender.Close()
+        }
+    })
 
     $stack = [System.Windows.Controls.StackPanel]::new()
     $stack.Margin = [System.Windows.Thickness]::new(20)
@@ -364,7 +380,7 @@ function global:Show-RuleDetailsDialog {
         Shows details of a selected rule in a message box.
     #>
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [PSCustomObject]$Rule
     )
     

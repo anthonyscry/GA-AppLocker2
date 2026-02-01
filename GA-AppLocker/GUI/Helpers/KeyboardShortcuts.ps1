@@ -45,7 +45,7 @@ function Register-KeyboardShortcuts {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
-        [System.Windows.Window]$Window
+        $Window
     )
 
     # Add PreviewKeyDown handler for global shortcuts
@@ -78,7 +78,7 @@ function global:Invoke-KeyboardShortcut {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
-        [System.Windows.Window]$Window,
+        $Window,
 
         [Parameter(Mandatory)]
         $KeyEventArgs
@@ -296,7 +296,7 @@ function Invoke-PanelRefresh {
     .SYNOPSIS
         Refreshes the current active panel.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $currentPanel = $script:CurrentActivePanel
     
@@ -344,7 +344,7 @@ function Invoke-FocusSearch {
     .SYNOPSIS
         Focuses the search box in the current panel if available.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $currentPanel = $script:CurrentActivePanel
     $searchBoxName = $null
@@ -374,7 +374,7 @@ function Invoke-ContextSave {
     .SYNOPSIS
         Saves in the current context (policy changes, credentials, etc).
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $currentPanel = $script:CurrentActivePanel
 
@@ -407,7 +407,7 @@ function Invoke-ContextExport {
     .SYNOPSIS
         Exports data from the current panel.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $currentPanel = $script:CurrentActivePanel
 
@@ -433,7 +433,7 @@ function Invoke-ContextNew {
     .SYNOPSIS
         Creates new item in the current panel context.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $currentPanel = $script:CurrentActivePanel
 
@@ -469,7 +469,7 @@ function Invoke-SelectAllInGrid {
     .SYNOPSIS
         Selects all items in the current panel's data grid.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $currentPanel = $script:CurrentActivePanel
     $gridName = $null
@@ -499,7 +499,7 @@ function Invoke-CancelOrClose {
     .SYNOPSIS
         Cancels current operation or closes dialogs.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     # Check for loading overlay
     $overlay = $Window.FindName('LoadingOverlay')
@@ -557,7 +557,7 @@ function Invoke-DeleteSelected {
     .SYNOPSIS
         Deletes selected items with confirmation.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $currentPanel = $script:CurrentActivePanel
 

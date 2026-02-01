@@ -370,7 +370,7 @@ function Clear-AuditLog {
 
         # Audit the cleanup itself
         Write-AuditLog -Action 'AuditLogCleanup' -Category 'System' `
-            -Details "Removed $($originalCount - $auditLog.Count) entries older than $DaysToKeep days"
+            -Details "Removed $($originalCount - $auditLog.Count) entries older than $DaysToKeep days" | Out-Null
 
         return @{
             Success = $true

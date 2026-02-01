@@ -1,7 +1,7 @@
 #region Deploy Panel Functions
 # Deploy.ps1 - Deploy panel handlers
 function Initialize-DeploymentPanel {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     # Wire up filter buttons
     $filterButtons = @(
@@ -121,7 +121,7 @@ function Initialize-DeploymentPanel {
 }
 
 function Update-ModuleStatus {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $gpStatus = $Window.FindName('TxtGPModuleStatus')
     $alStatus = $Window.FindName('TxtALModuleStatus')
@@ -154,7 +154,7 @@ function global:Refresh-DeployPolicyCombo {
     .SYNOPSIS
         Refreshes the policy dropdowns on the Deployment panel (Create + Edit tabs).
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $policyCombo = $Window.FindName('CboDeployPolicy')
     $editPolicyCombo = $Window.FindName('CboDeployEditPolicy')
@@ -210,7 +210,7 @@ function global:Refresh-DeployPolicyCombo {
 
 function global:Update-DeploymentJobsDataGrid {
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [switch]$Async
     )
 
@@ -293,7 +293,7 @@ function global:Update-DeploymentJobsDataGrid {
 
 function Update-JobCounters {
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [array]$Jobs
     )
 
@@ -310,7 +310,7 @@ function Update-JobCounters {
 
 function global:Update-DeploymentFilter {
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [string]$Filter
     )
 
@@ -360,7 +360,7 @@ function global:Update-DeploymentFilter {
 }
 
 function global:Update-SelectedJobInfo {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $dataGrid = $Window.FindName('DeploymentJobsDataGrid')
     if (-not $dataGrid) { return }
@@ -381,7 +381,7 @@ function global:Update-SelectedJobInfo {
 }
 
 function global:Invoke-CreateDeploymentJob {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $policyCombo = $Window.FindName('CboDeployPolicy')
     $gpoCombo = $Window.FindName('CboDeployTargetGPO')
@@ -442,7 +442,7 @@ function global:Invoke-CreateDeploymentJob {
 }
 
 function global:Invoke-DeploySelectedJob {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     if ($script:DeploymentInProgress) {
         Show-Toast -Message 'A deployment is already in progress.' -Type 'Warning'
@@ -609,7 +609,7 @@ function global:Invoke-DeploySelectedJob {
 }
 
 function global:Invoke-StopDeployment {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     if (-not $script:DeploymentInProgress) {
         Show-Toast -Message 'No deployment in progress.' -Type 'Info'
@@ -622,7 +622,7 @@ function global:Invoke-StopDeployment {
 
 function Update-DeploymentUIState {
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [bool]$Deploying
     )
 
@@ -635,7 +635,7 @@ function Update-DeploymentUIState {
 
 function Update-DeploymentProgress {
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [string]$Text,
         [int]$Percent
     )
@@ -648,7 +648,7 @@ function Update-DeploymentProgress {
 }
 
 function global:Invoke-CancelDeploymentJob {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     if (-not $script:SelectedDeploymentJobId) {
         [System.Windows.MessageBox]::Show('Please select a deployment job to cancel.', 'No Selection', 'OK', 'Information')
@@ -681,7 +681,7 @@ function global:Invoke-CancelDeploymentJob {
 }
 
 function global:Show-DeploymentLog {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     try {
         $result = Get-AllDeploymentJobs
@@ -718,7 +718,7 @@ function global:Invoke-BackupGpoPolicy {
     .SYNOPSIS
         Backs up the current AppLocker policy from a GPO to an XML file.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     # Ask which GPO to backup from
     $gpoCombo = $Window.FindName('CboDeployTargetGPO')
@@ -805,7 +805,7 @@ function global:Invoke-ExportDeployPolicyXml {
     .SYNOPSIS
         Exports a GA-AppLocker policy to AppLocker XML format.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     # Get policies
     $result = Get-AllPolicies
@@ -860,7 +860,7 @@ function global:Invoke-ImportDeployPolicyXml {
     .SYNOPSIS
         Imports rules from an AppLocker XML policy file.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $openDialog = New-Object Microsoft.Win32.OpenFileDialog
     $openDialog.Filter = 'XML Files (*.xml)|*.xml|All Files (*.*)|*.*'
@@ -898,7 +898,7 @@ function global:Update-DeployPolicyEditTab {
         Accepts -Source 'Edit' to use the Edit tab's own dropdown, or 'Create' for the Create tab's.
     #>
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [string]$Source = 'Edit'
     )
 
@@ -979,7 +979,7 @@ function global:Invoke-SaveDeployPolicyChanges {
     .SYNOPSIS
         Saves policy name, description, and target GPO changes from the Deploy Edit tab.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     # Get the selected policy from the Edit tab combo (fall back to Create tab combo)
     $editCombo = $Window.FindName('CboDeployEditPolicy')
@@ -1048,7 +1048,7 @@ function global:Update-AppLockerGpoLinkStatus {
     .SYNOPSIS
         Checks link status for the 3 AppLocker GPOs and updates the Deploy Actions pill toggles.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     # GPO name -> UI control suffix mapping
     $gpoMap = @(
@@ -1145,7 +1145,7 @@ function global:Invoke-ToggleAppLockerGpoLink {
         Toggles the link state for an AppLocker GPO (DC, Servers, or Workstations).
     #>
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [ValidateSet('DC', 'Servers', 'Workstations')]
         [string]$GPOType
     )

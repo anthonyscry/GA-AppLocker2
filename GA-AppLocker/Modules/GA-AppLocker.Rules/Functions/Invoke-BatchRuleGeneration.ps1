@@ -747,7 +747,7 @@ function script:New-RuleObjectFromArtifact {
         -IsSigned $Artifact.IsSigned
     $suggestedGroup = if ($groupSuggestion.Success) { $groupSuggestion.Data } else { $null }
     
-    $ruleId = [guid]::NewGuid().ToString()
+    $ruleId = [guid]::NewGuid().ToString().ToUpper()
     $now = Get-Date -Format 'o'
     
     switch ($ruleType) {

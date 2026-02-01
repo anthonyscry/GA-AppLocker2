@@ -39,7 +39,7 @@ $script:WizardState = @{
 function Show-SetupWizard {
     [CmdletBinding()]
     param(
-        [System.Windows.Window]$ParentWindow = $null,
+        $ParentWindow = $null,
         [int]$ResumeFromStep = 1
     )
 
@@ -52,6 +52,14 @@ function Show-SetupWizard {
     Add-Type -AssemblyName PresentationFramework
     $reader = [System.Xml.XmlReader]::Create([System.IO.StringReader]::new($xaml))
     $wizardWindow = [System.Windows.Markup.XamlReader]::Load($reader)
+
+    # Add Escape key handler
+    $wizardWindow.Add_KeyDown({
+        param($sender, $e)
+        if ($e.Key -eq 'Escape') {
+            $sender.Close()
+        }
+    })
 
     # Store reference
     $script:WizardWindow = $wizardWindow
@@ -349,7 +357,7 @@ function Get-WizardXaml {
 #region ===== WIZARD CONTROLS =====
 
 function Initialize-WizardControls {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     # Navigation buttons
     $Window.FindName('BackBtn').add_Click({ Move-WizardBack -Window $script:WizardWindow })
@@ -389,7 +397,7 @@ function Initialize-WizardControls {
 
 function Show-WizardStep {
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [int]$StepNumber
     )
 
@@ -423,7 +431,7 @@ function Show-WizardStep {
 }
 
 function Move-WizardBack {
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     if ($script:WizardState.CurrentStep -gt 1) {
         Show-WizardStep -Window $Window -StepNumber ($script:WizardState.CurrentStep - 1)
@@ -431,7 +439,7 @@ function Move-WizardBack {
 }
 
 function Move-WizardNext {
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     # Validate current step
     $valid = Validate-WizardStep -Window $Window -StepNumber $script:WizardState.CurrentStep
@@ -450,7 +458,7 @@ function Move-WizardNext {
 }
 
 function Skip-Wizard {
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     $result = [System.Windows.MessageBox]::Show(
         "Are you sure you want to skip the setup wizard?`n`nYou can run it again from Settings > Setup.",
@@ -467,7 +475,7 @@ function Skip-Wizard {
 }
 
 function Complete-Wizard {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     # Save configuration
     Save-WizardConfiguration
@@ -482,7 +490,7 @@ function Complete-Wizard {
 #region ===== STEP HANDLERS =====
 
 function Check-Prerequisites {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $prereqPs = $Window.FindName('PrereqPowerShell')
     $prereqAd = $Window.FindName('PrereqADModule')
@@ -543,7 +551,7 @@ function Check-Prerequisites {
 }
 
 function Auto-DetectDomain {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     try {
         $domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
@@ -571,7 +579,7 @@ function Auto-DetectDomain {
 }
 
 function Test-WizardCredentials {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $dc = $script:WizardState.Results.Domain['DC']
     if (-not $dc) { $dc = $Window.FindName('DomainController').Text }
@@ -619,7 +627,7 @@ function Test-WizardCredentials {
 }
 
 function Check-WinRMStatus {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $statusText = $Window.FindName('WinRMStatus')
     
@@ -644,7 +652,7 @@ function Check-WinRMStatus {
 }
 
 function Configure-WinRMGPO {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     if (Get-Command -Name 'Initialize-WinRMGPO' -ErrorAction SilentlyContinue) {
         try {
@@ -675,7 +683,7 @@ function Configure-WinRMGPO {
 }
 
 function Create-AppLockerGPOs {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $createAudit = $Window.FindName('CreateAuditGPO').IsChecked
     $createEnforce = $Window.FindName('CreateEnforceGPO').IsChecked
@@ -726,7 +734,7 @@ function Create-AppLockerGPOs {
 }
 
 function Refresh-WizardOUs {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $ouList = $Window.FindName('OUList')
     $ouList.Items.Clear()
@@ -762,7 +770,7 @@ function Refresh-WizardOUs {
 }
 
 function Update-WizardSummary {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $domain = $script:WizardState.Results.Domain['Name']
     $creds = $script:WizardState.Results.Credentials['Type']
@@ -790,7 +798,7 @@ function Update-WizardSummary {
 
 function Validate-WizardStep {
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [int]$StepNumber
     )
 
@@ -822,7 +830,7 @@ function Validate-WizardStep {
 
 function Save-WizardStepData {
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [int]$StepNumber
     )
 

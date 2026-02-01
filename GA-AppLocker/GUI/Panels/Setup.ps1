@@ -1,7 +1,7 @@
 #region Setup Panel Functions
 # Setup.ps1 - Setup panel handlers
 function Initialize-SetupPanel {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     # Wire up Setup tab buttons - WinRM GPOs
     $btnInitWinRM = $Window.FindName('BtnInitializeWinRM')
@@ -33,7 +33,7 @@ function Initialize-SetupPanel {
 }
 
 function Update-SetupStatus {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     try {
         # Use try-catch - Get-Command fails in WPF context
@@ -105,7 +105,7 @@ function Update-SetupStatus {
 }
 
 function global:Invoke-InitializeWinRM {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     try {
         $confirm = [System.Windows.MessageBox]::Show(
@@ -162,7 +162,7 @@ function global:Invoke-InitializeWinRM {
 
 function global:Invoke-ToggleWinRMGPO {
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [string]$GPOName,
         [string]$StatusProperty
     )
@@ -232,7 +232,7 @@ function global:Invoke-ToggleWinRMGPO {
 
 function global:Invoke-RemoveWinRMGPOByName {
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [string]$GPOName,
         [string]$StatusProperty,
         [string]$RemoveFunction
@@ -281,7 +281,7 @@ function global:Invoke-RemoveWinRMGPOByName {
 }
 
 function global:Invoke-InitializeAppLockerGPOs {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     try {
         $confirm = [System.Windows.MessageBox]::Show(
@@ -319,7 +319,7 @@ function global:Invoke-InitializeAppLockerGPOs {
 }
 
 function global:Invoke-InitializeADStructure {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     try {
         $confirm = [System.Windows.MessageBox]::Show(
@@ -364,7 +364,7 @@ function global:Invoke-InitializeADStructure {
 }
 
 function global:Invoke-InitializeAll {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     try {
         $confirm = [System.Windows.MessageBox]::Show(

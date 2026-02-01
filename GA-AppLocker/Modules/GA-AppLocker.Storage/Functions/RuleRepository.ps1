@@ -143,9 +143,9 @@ function Save-RuleToRepository {
         # Invalidate cache (use try-catch - Get-Command fails in WPF context)
         $cacheKey = "Rule_$ruleId"
         try {
-            Clear-AppLockerCache -Key $cacheKey
-            Clear-AppLockerCache -Pattern 'RuleCounts*'
-            Clear-AppLockerCache -Pattern 'RuleQuery*'
+            Clear-AppLockerCache -Key $cacheKey | Out-Null
+            Clear-AppLockerCache -Pattern 'RuleCounts*' | Out-Null
+            Clear-AppLockerCache -Pattern 'RuleQuery*' | Out-Null
         } catch { }
 
         # Publish event (use try-catch - Get-Command fails in WPF context)
@@ -154,7 +154,7 @@ function Save-RuleToRepository {
                 RuleId = $ruleId
                 RuleType = $Rule.RuleType
                 Status = $Rule.Status
-            }
+            } | Out-Null
         } catch { }
 
         $result.Success = $true
@@ -209,9 +209,9 @@ function Remove-RuleFromRepository {
 
         # Invalidate cache (use try-catch - Get-Command fails in WPF context)
         try {
-            Clear-AppLockerCache -Key "Rule_$RuleId"
-            Clear-AppLockerCache -Pattern 'RuleCounts*'
-            Clear-AppLockerCache -Pattern 'RuleQuery*'
+            Clear-AppLockerCache -Key "Rule_$RuleId" | Out-Null
+            Clear-AppLockerCache -Pattern 'RuleCounts*' | Out-Null
+            Clear-AppLockerCache -Pattern 'RuleQuery*' | Out-Null
         } catch { }
 
         # Publish event (use try-catch - Get-Command fails in WPF context)
@@ -220,7 +220,7 @@ function Remove-RuleFromRepository {
                 Publish-AppLockerEvent -EventName 'RuleDeleted' -EventData @{
                     RuleId = $RuleId
                     RuleType = $rule.RuleType
-                }
+                } | Out-Null
             } catch { }
         }
 

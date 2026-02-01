@@ -248,7 +248,7 @@ function Restore-RuleVersion {
         }
 
         # Save this restore as a new version
-        Save-RuleVersion -Rule $restoredRule -ChangeType 'Restored' -ChangeSummary "Restored from version $Version"
+        Save-RuleVersion -Rule $restoredRule -ChangeType 'Restored' -ChangeSummary "Restored from version $Version" | Out-Null
 
         $result.Success = $true
         $result.Data = $restoredRule

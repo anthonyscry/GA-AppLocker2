@@ -4,7 +4,7 @@ $script:SuppressRulesSelectionChanged = $false
 #region Rules Panel Functions
 # Rules.ps1 - Rules panel handlers
 function Initialize-RulesPanel {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     # Wire up filter buttons
     $filterButtons = @(
@@ -126,7 +126,7 @@ function Initialize-RulesPanel {
 
 function global:Update-RulesDataGrid {
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [switch]$Async
     )
 
@@ -303,7 +303,7 @@ function global:Update-RulesDataGrid {
 
 function global:Update-RuleCounters {
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [array]$Rules
     )
 
@@ -337,7 +337,7 @@ function global:Update-RuleCounters {
 }
 
 function global:Update-RulesSelectionCount {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $dataGrid = $Window.FindName('RulesDataGrid')
     $countText = $Window.FindName('TxtSelectedRuleCount')
@@ -364,7 +364,7 @@ function global:Update-RulesSelectionCount {
 
 function global:Invoke-SelectAllRules {
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [bool]$SelectAll = $true
     )
 
@@ -412,7 +412,7 @@ function global:Invoke-SelectAllRules {
 
 # Helper to get selected rules (respects virtual selection)
 function global:Get-SelectedRules {
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     $dataGrid = $Window.FindName('RulesDataGrid')
     if (-not $dataGrid) { return @() }
@@ -428,7 +428,7 @@ function global:Get-SelectedRules {
 
 # Helper to reset selection state after grid-modifying operations
 function global:Reset-RulesSelectionState {
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     # Reset virtual selection flag
     $script:AllRulesSelected = $false
@@ -450,7 +450,7 @@ function global:Reset-RulesSelectionState {
 }
 
 function global:Invoke-AddSelectedRulesToPolicy {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $selectedItems = Get-SelectedRules -Window $Window
 
@@ -507,7 +507,7 @@ function global:Invoke-AddSelectedRulesToPolicy {
 
 function global:Update-RulesFilter {
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [string]$Filter
     )
 
@@ -592,22 +592,22 @@ function global:Update-RulesFilter {
     Update-RulesDataGrid -Window $Window
 }
 
-# Legacy function - redirects to the Rule Generation Wizard
-# The wizard provides a better UX with preview, progress, and all options in one place
-function Invoke-GenerateRulesFromArtifacts {
-    param([System.Windows.Window]$Window)
-
-    # Redirect to the wizard - it handles everything including validation
-    Invoke-LaunchRuleWizard -Window $Window
-}
+# Legacy function removed - use Rule Generation Wizard
+# Was: Invoke-GenerateRulesFromArtifacts
 
 function global:Invoke-CreateManualRule {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $typeCombo = $Window.FindName('CboManualRuleType')
-    $value = $Window.FindName('TxtManualRuleValue').Text
-    $desc = $Window.FindName('TxtManualRuleDesc').Text
-    $action = if ($Window.FindName('RbManualRuleAllow').IsChecked) { 'Allow' } else { 'Deny' }
+    
+    $txtValue = $Window.FindName('TxtManualRuleValue')
+    $value = if ($txtValue) { $txtValue.Text } else { '' }
+    
+    $txtDesc = $Window.FindName('TxtManualRuleDesc')
+    $desc = if ($txtDesc) { $txtDesc.Text } else { '' }
+    
+    $rbAllow = $Window.FindName('RbManualRuleAllow')
+    $action = if ($rbAllow -and $rbAllow.IsChecked) { 'Allow' } else { 'Deny' }
 
     # Get target group SID (resolve AD group names if needed)
     $targetGroupCombo = $Window.FindName('CboManualRuleTargetGroup')
@@ -671,7 +671,7 @@ function global:Invoke-CreateManualRule {
 
 function global:Set-SelectedRuleStatus {
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [string]$Status
     )
 
@@ -769,7 +769,7 @@ function global:Set-SelectedRuleStatus {
 }
 
 function global:Invoke-DeleteSelectedRules {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $selectedItems = Get-SelectedRules -Window $Window
 
@@ -857,7 +857,7 @@ function global:Invoke-DeleteSelectedRules {
 }
 
 function global:Invoke-ApproveTrustedVendors {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     # Confirm action
     $confirm = [System.Windows.MessageBox]::Show(
@@ -892,7 +892,7 @@ function global:Invoke-ApproveTrustedVendors {
 }
 
 function global:Invoke-RemoveDuplicateRules {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     # Synchronous - duplicate detection is now O(n) and takes <1 second
     try {
@@ -918,23 +918,26 @@ function global:Invoke-RemoveDuplicateRules {
 
         if ($confirm -ne 'Yes') { return }
 
-        # Actual removal
-        $Result = Remove-DuplicateRules -RuleType All -Strategy KeepOldest
-        
-        if ($Result.Success) {
-            $msg = "Removed $($Result.RemovedCount) duplicate rules."
-            Show-Toast -Message $msg -Type 'Success'
-            Write-Log -Message $msg
-            # Reset selection state before refreshing grid
-            Reset-RulesSelectionState -Window $Window
-            Update-RulesDataGrid -Window $Window
-            # Refresh dashboard stats and sidebar counts
-            Update-DashboardStats -Window $Window
-            Update-WorkflowBreadcrumb -Window $Window
-        }
-        else {
-            Show-Toast -Message "Failed to remove duplicates: $($Result.Error)" -Type 'Error'
-        }
+        # Actual removal - run async to prevent UI freeze on large datasets
+        Invoke-AsyncOperation -ScriptBlock {
+            Remove-DuplicateRules -RuleType All -Strategy KeepOldest
+        } -LoadingMessage 'Removing duplicate rules...' -OnComplete {
+            param($Result)
+            if ($Result.Success) {
+                $msg = "Removed $($Result.RemovedCount) duplicate rules."
+                Show-Toast -Message $msg -Type 'Success'
+                Write-Log -Message $msg
+                # Reset selection state before refreshing grid
+                Reset-RulesSelectionState -Window $Window
+                Update-RulesDataGrid -Window $Window
+                # Refresh dashboard stats and sidebar counts
+                Update-DashboardStats -Window $Window
+                try { Update-WorkflowBreadcrumb -Window $Window } catch { }
+            }
+            else {
+                Show-Toast -Message "Failed to remove duplicates: $($Result.Error)" -Type 'Error'
+            }
+        }.GetNewClosure()
     }
     catch {
         Show-Toast -Message "Error: $($_.Exception.Message)" -Type 'Error'
@@ -943,9 +946,10 @@ function global:Invoke-RemoveDuplicateRules {
 }
 
 function global:Invoke-ExportRulesToXml {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
-    $approvedOnly = $Window.FindName('ChkExportApprovedOnly').IsChecked
+    $chk = $Window.FindName('ChkExportApprovedOnly')
+    $approvedOnly = if ($chk) { $chk.IsChecked } else { $false }
 
     Add-Type -AssemblyName System.Windows.Forms
 
@@ -980,10 +984,11 @@ function global:Invoke-ExportRulesToXml {
 }
 
 function global:Invoke-ExportRulesToCsv {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $dataGrid = $Window.FindName('RulesDataGrid')
-    $approvedOnly = $Window.FindName('ChkExportApprovedOnly').IsChecked
+    $chk = $Window.FindName('ChkExportApprovedOnly')
+    $approvedOnly = if ($chk) { $chk.IsChecked } else { $false }
     
     # Get data from DataGrid (respects current filters)
     $rules = if ($dataGrid -and $dataGrid.ItemsSource) {
@@ -1031,10 +1036,12 @@ function global:Invoke-ImportRulesFromXmlFile {
     .SYNOPSIS
         Opens file dialog and imports rules from AppLocker XML.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     # Get import options from UI
-    $skipDuplicates = $Window.FindName('ChkImportSkipDuplicates').IsChecked
+    $chkSkip = $Window.FindName('ChkImportSkipDuplicates')
+    $skipDuplicates = if ($chkSkip) { $chkSkip.IsChecked } else { $true }
+    
     $statusCombo = $Window.FindName('CboImportStatus')
     $status = if ($statusCombo -and $statusCombo.SelectedItem) {
         $statusCombo.SelectedItem.Tag
@@ -1112,7 +1119,7 @@ function global:Invoke-ImportRulesFromXmlFile {
 }
 
 function global:Show-RuleDetails {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $dataGrid = $Window.FindName('RulesDataGrid')
     # Use extracted dialog function from RulesDialogs.ps1
@@ -1126,7 +1133,7 @@ function global:Invoke-RulesContextAction {
     #>
     param(
         [string]$Action,
-        [System.Windows.Window]$Window
+        $Window
     )
     
     $dataGrid = $Window.FindName('RulesDataGrid')
@@ -1236,7 +1243,7 @@ function global:Invoke-AddCommonDenyRules {
         Generates deny rules for 7 user-writable paths across Exe, Msi, and Script
         collection types. These paths are commonly exploited for malware execution.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     # Confirm action with the user
     $confirm = [System.Windows.MessageBox]::Show(
@@ -1334,7 +1341,7 @@ function global:Invoke-AddDenyBrowserRules {
         Denies Internet Explorer, Microsoft Edge, Google Chrome, and Mozilla Firefox
         for the AppLocker-Admins group. Covers both Program Files and Program Files (x86).
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $confirm = [System.Windows.MessageBox]::Show(
         "This will create Deny rules for internet browsers:`n`n" +
@@ -1423,7 +1430,7 @@ function global:Invoke-AddAdminAllowRules {
         Uses the AppLocker-Admins Default (Allow All) template to create 4 allow-all
         path rules (EXE, DLL, MSI, Script) so admins can run anything.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $confirm = [System.Windows.MessageBox]::Show(
         "This will create Allow-All rules for AppLocker-Admins:`n`n" +
@@ -1471,7 +1478,7 @@ function global:Invoke-ChangeSelectedRulesAction {
     .SYNOPSIS
         Changes the Action (Allow/Deny) of selected rules in the DataGrid.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $selectedItems = Get-SelectedRules -Window $Window
     if ($selectedItems.Count -eq 0) {
@@ -1574,7 +1581,7 @@ function global:Invoke-ChangeSelectedRulesGroup {
     .SYNOPSIS
         Changes the target group (UserOrGroupSid) of selected rules in the DataGrid.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $selectedItems = Get-SelectedRules -Window $Window
     if ($selectedItems.Count -eq 0) {

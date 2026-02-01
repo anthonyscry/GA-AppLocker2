@@ -187,7 +187,7 @@ function Backup-AppLockerData {
         # Audit log
         if (Get-Command -Name 'Write-AuditLog' -ErrorAction SilentlyContinue) {
             Write-AuditLog -Action 'BackupCreated' -Category 'System' -Target $OutputPath `
-                -Details "Size: $([math]::Round($backupSize / 1MB, 2)) MB, Items: $($backupManifest.Contents.Count)"
+                -Details "Size: $([math]::Round($backupSize / 1MB, 2)) MB, Items: $($backupManifest.Contents.Count)" | Out-Null
         }
 
         return @{
@@ -401,7 +401,7 @@ function Restore-AppLockerData {
         # Audit log
         if (Get-Command -Name 'Write-AuditLog' -ErrorAction SilentlyContinue) {
             Write-AuditLog -Action 'BackupRestored' -Category 'System' -Target $BackupPath `
-                -Details "Restored: $($restoredItems -join ', ')"
+                -Details "Restored: $($restoredItems -join ', ')" | Out-Null
         }
 
         return @{

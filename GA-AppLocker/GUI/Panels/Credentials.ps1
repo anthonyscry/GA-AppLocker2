@@ -5,7 +5,7 @@
 $script:Credentials_Handlers = @{}
 
 function Initialize-CredentialsPanel {
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     # Clean up any existing handlers first to prevent accumulation
     Unregister-CredentialsPanelEvents -Window $Window
@@ -62,7 +62,7 @@ function Unregister-CredentialsPanelEvents {
         Called when switching away from the panel to prevent handler accumulation
         and memory leaks.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     if (-not $Window) { $Window = $global:GA_MainWindow }
     if (-not $Window) { return }
@@ -89,7 +89,7 @@ function Unregister-CredentialsPanelEvents {
 }
 
 function global:Invoke-SaveCredential {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $profileName = $Window.FindName('CredProfileName')
     $tierCombo = $Window.FindName('CredTierCombo')
@@ -164,7 +164,7 @@ function global:Invoke-SaveCredential {
 }
 
 function global:Update-CredentialsDataGrid {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $dataGrid = $Window.FindName('CredentialsDataGrid')
     if (-not $dataGrid) { return }
@@ -194,7 +194,7 @@ function global:Update-CredentialsDataGrid {
 }
 
 function global:Invoke-TestSelectedCredential {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $dataGrid = $Window.FindName('CredentialsDataGrid')
     $testTarget = $Window.FindName('CredTestTarget')
@@ -239,7 +239,7 @@ function global:Invoke-TestSelectedCredential {
 }
 
 function global:Invoke-DeleteSelectedCredential {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $dataGrid = $Window.FindName('CredentialsDataGrid')
 
@@ -281,7 +281,7 @@ function global:Invoke-DeleteSelectedCredential {
 }
 
 function global:Invoke-SetDefaultCredential {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $dataGrid = $Window.FindName('CredentialsDataGrid')
 

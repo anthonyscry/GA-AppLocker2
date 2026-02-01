@@ -330,6 +330,10 @@ Width="1450"
             <Setter Property="HeadersVisibility" Value="Column"/>
             <Setter Property="CanUserSortColumns" Value="True"/>
             <Setter Property="CanUserReorderColumns" Value="True"/>
+            <Setter Property="VirtualizingStackPanel.IsVirtualizing" Value="True"/>
+            <Setter Property="VirtualizingStackPanel.VirtualizationMode" Value="Recycling"/>
+            <Setter Property="EnableRowVirtualization" Value="True"/>
+            <Setter Property="ScrollViewer.IsDeferredScrollingEnabled" Value="True"/>
             <Setter Property="ColumnHeaderStyle">
                 <Setter.Value>
                     <Style TargetType="DataGridColumnHeader">
@@ -1152,42 +1156,31 @@ Width="1450"
                                 
                                 <!-- Tab 1: Configuration -->
                                 <TabItem Header="Config">
-                                    <StackPanel Margin="15">
-                                        <!-- Scan Type -->
-                                        <TextBlock Text="SCAN OPTIONS" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
-                                        <CheckBox x:Name="ChkScanLocal" Content="Scan Local Machine" Foreground="{StaticResource ForegroundBrush}" IsChecked="True" Margin="0,0,0,6"/>
-                                        <CheckBox x:Name="ChkScanRemote" Content="Scan Remote Machines" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,6"/>
-                                        <CheckBox x:Name="ChkIncludeAppx" Content="Include Appx/MSIX Packages" 
-                                                  Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,6" IsChecked="True"
-                                                  ToolTip="Enumerate installed Windows App packages (UWP/MSIX)"/>
-                                        <CheckBox x:Name="ChkIncludeEventLogs" Content="Include Event Logs" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,6"/>
-                                        <CheckBox x:Name="ChkIncludeHighRisk" Content="Include High Risk Paths" 
-                                                  Foreground="{StaticResource WarningBrush}" Margin="0,0,0,6"
-                                                  ToolTip="Adds Downloads, Desktop, Temp folders to scan"/>
-                                        <TextBlock Text="PERFORMANCE FILTERS" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,10,0,6"/>
-                                        <CheckBox x:Name="ChkSkipDllScanning" Content="Skip DLLs (60-70% faster scans)" 
-                                                  Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,6" IsChecked="True"
-                                                  ToolTip="Skip .dll files during scanning. Most environments don't use DLL rules. Dramatically reduces scan time."/>
-                                        <CheckBox x:Name="ChkSkipWshScanning" Content="Skip WSH Scripts (.js, .vbs, .wsf)" 
-                                                  Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,6" IsChecked="True"
-                                                  ToolTip="Skip legacy Windows Script Host files. These are common malware vectors with no modern enterprise use."/>
-                                        <CheckBox x:Name="ChkSkipShellScanning" Content="Skip Shell Scripts (.ps1, .bat, .cmd)" 
-                                                  Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,6"
-                                                  ToolTip="Skip PowerShell and batch scripts. Disable this if you need Script rules for admin tools, login scripts, etc."/>
-                                        <CheckBox x:Name="ChkSaveResults" Content="Auto-Save Results" Foreground="{StaticResource ForegroundBrush}" IsChecked="True" Margin="0,0,0,15"/>
-                                        
-                                        <!-- Scan Name -->
-                                        <TextBlock Text="SCAN NAME" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,6"/>
-                                        <TextBox x:Name="TxtScanName" Background="#1E1E1E" Foreground="{StaticResource ForegroundBrush}" BorderBrush="#3E3E42" Padding="8,6" Text="Baseline Scan" Margin="0,0,0,15"/>
-                                        
-                                        <!-- Scan Paths -->
-                                        <TextBlock Text="SCAN PATHS" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,6"/>
-                                        <TextBox x:Name="TxtScanPaths" Background="#1E1E1E" Foreground="{StaticResource ForegroundBrush}" BorderBrush="#3E3E42" Padding="8,6" AcceptsReturn="True" TextWrapping="Wrap" Height="120" VerticalScrollBarVisibility="Auto"/>
-                                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                                            <Button x:Name="BtnBrowsePath" Content="Browse" Background="Transparent" Foreground="{StaticResource PrimaryBrush}" BorderThickness="0" Padding="0" Cursor="Hand" Margin="0,0,12,0"/>
-                                            <Button x:Name="BtnResetPaths" Content="Reset" Background="Transparent" Foreground="{StaticResource MutedBrush}" BorderThickness="0" Padding="0" Cursor="Hand"/>
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <StackPanel Margin="15">
+                                            <!-- Scan Type -->
+                                            <TextBlock Text="SCAN OPTIONS" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
+                                            <CheckBox x:Name="ChkScanLocal" Content="Scan Local Machine" Foreground="{StaticResource ForegroundBrush}" IsChecked="True" Margin="0,0,0,6"/>
+                                            <CheckBox x:Name="ChkScanRemote" Content="Scan Remote Machines" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,6"/>
+                                            <CheckBox x:Name="ChkIncludeAppx" Content="Include Appx/MSIX Packages" 
+                                                      Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,6" IsChecked="True"
+                                                      ToolTip="Enumerate installed Windows App packages (UWP/MSIX)"/>
+                                            <CheckBox x:Name="ChkIncludeEventLogs" Content="Include Event Logs" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,6"/>
+                                            <CheckBox x:Name="ChkIncludeHighRisk" Content="Include High Risk Paths" 
+                                                      Foreground="{StaticResource WarningBrush}" Margin="0,0,0,6"
+                                                      ToolTip="Adds Downloads, Desktop, Temp folders to scan"/>
+                                            <TextBlock Text="PERFORMANCE FILTERS" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,10,0,6"/>
+                                            <CheckBox x:Name="ChkSkipDllScanning" Content="Skip DLLs (60-70% faster scans)" 
+                                                      Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,6" IsChecked="True"
+                                                      ToolTip="Skip .dll files during scanning. Most environments don't use DLL rules. Dramatically reduces scan time."/>
+                                            <CheckBox x:Name="ChkSkipWshScanning" Content="Skip WSH Scripts (.js, .vbs, .wsf)" 
+                                                      Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,6" IsChecked="True"
+                                                      ToolTip="Skip legacy Windows Script Host files. These are common malware vectors with no modern enterprise use."/>
+                                            <CheckBox x:Name="ChkSkipShellScanning" Content="Skip Shell Scripts (.ps1, .bat, .cmd)" 
+                                                      Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,6"
+                                                      ToolTip="Skip PowerShell and batch scripts. Disable this if you need Script rules for admin tools, login scripts, etc."/>
                                         </StackPanel>
-                                    </StackPanel>
+                                    </ScrollViewer>
                                 </TabItem>
                                 
                                 <!-- Tab 2: Machines -->
@@ -1460,98 +1453,91 @@ Width="1450"
                                 
                                 <!-- Tab 2: Manual Rule Creation -->
                                 <TabItem Header="Manual">
-                                    <StackPanel Margin="15">
-                                        <TextBlock Text="MANUAL RULE CREATION" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <StackPanel Margin="15">
+                                            <TextBlock Text="MANUAL RULE CREATION" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
 
-                                        <TextBlock Text="Rule Type:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <ComboBox x:Name="CboManualRuleType" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,10">
-                                            <ComboBoxItem Content="Path Rule" IsSelected="True"/>
-                                            <ComboBoxItem Content="Hash Rule"/>
-                                            <ComboBoxItem Content="Publisher Rule"/>
-                                        </ComboBox>
+                                            <TextBlock Text="Rule Type:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                            <ComboBox x:Name="CboManualRuleType" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,10">
+                                                <ComboBoxItem Content="Path Rule" IsSelected="True"/>
+                                                <ComboBoxItem Content="Hash Rule"/>
+                                                <ComboBoxItem Content="Publisher Rule"/>
+                                            </ComboBox>
 
-                                        <TextBlock Text="Path / Hash / Publisher:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <TextBox x:Name="TxtManualRuleValue" 
-                                                 Style="{StaticResource TextBoxStyle}"
-                                                 Height="80" TextWrapping="Wrap" AcceptsReturn="True"
-                                                 VerticalContentAlignment="Top" Margin="0,0,0,10"/>
+                                            <TextBlock Text="Path / Hash / Publisher:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                            <TextBox x:Name="TxtManualRuleValue" 
+                                                     Style="{StaticResource TextBoxStyle}"
+                                                     Height="80" TextWrapping="Wrap" AcceptsReturn="True"
+                                                     VerticalContentAlignment="Top" Margin="0,0,0,10"/>
 
-                                        <TextBlock Text="Description:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <TextBox x:Name="TxtManualRuleDesc" 
-                                                 Style="{StaticResource TextBoxStyle}" Margin="0,0,0,10"/>
+                                            <TextBlock Text="Description:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                            <TextBox x:Name="TxtManualRuleDesc" 
+                                                     Style="{StaticResource TextBoxStyle}" Margin="0,0,0,10"/>
 
-                                        <TextBlock Text="Apply To:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <ComboBox x:Name="CboManualRuleTargetGroup" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,10">
-                                            <ComboBoxItem Content="AppLocker-Users" IsSelected="True" Tag="RESOLVE:AppLocker-Users"/>
-                                            <ComboBoxItem Content="AppLocker-Admins" Tag="RESOLVE:AppLocker-Admins"/>
-                                            <ComboBoxItem Content="AppLocker-Exempt" Tag="RESOLVE:AppLocker-Exempt"/>
-                                            <ComboBoxItem Content="AppLocker-Audit" Tag="RESOLVE:AppLocker-Audit"/>
-                                            <ComboBoxItem Content="AppLocker-Installers" Tag="RESOLVE:AppLocker-Installers"/>
-                                            <ComboBoxItem Content="AppLocker-Developers" Tag="RESOLVE:AppLocker-Developers"/>
-                                            <ComboBoxItem Content="Everyone" Tag="S-1-1-0"/>
-                                            <ComboBoxItem Content="Administrators" Tag="S-1-5-32-544"/>
-                                            <ComboBoxItem Content="Users" Tag="S-1-5-32-545"/>
-                                            <ComboBoxItem Content="Authenticated Users" Tag="S-1-5-11"/>
-                                            <ComboBoxItem Content="Domain Users" Tag="S-1-5-21-*-513"/>
-                                            <ComboBoxItem Content="Domain Admins" Tag="S-1-5-21-*-512"/>
-                                        </ComboBox>
+                                            <TextBlock Text="Apply To:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                            <ComboBox x:Name="CboManualRuleTargetGroup" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,10">
+                                                <ComboBoxItem Content="AppLocker-Users" IsSelected="True" Tag="RESOLVE:AppLocker-Users"/>
+                                                <ComboBoxItem Content="AppLocker-Admins" Tag="RESOLVE:AppLocker-Admins"/>
+                                                <ComboBoxItem Content="Everyone" Tag="S-1-1-0"/>
+                                            </ComboBox>
 
-                                        <TextBlock Text="Action:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
-                                            <RadioButton x:Name="RbManualRuleAllow" Content="Allow" IsChecked="True"
-                                                         Foreground="{StaticResource ForegroundBrush}" Margin="0,0,15,0"/>
-                                            <RadioButton x:Name="RbManualRuleDeny" Content="Deny"
-                                                         Foreground="{StaticResource ForegroundBrush}"/>
+                                            <TextBlock Text="Action:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
+                                                <RadioButton x:Name="RbManualRuleAllow" Content="Allow" IsChecked="True" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,15,0"/>
+                                                <RadioButton x:Name="RbManualRuleDeny" Content="Deny" Foreground="{StaticResource ForegroundBrush}"/>
+                                            </StackPanel>
+
+                                            <Button x:Name="BtnCreateManualRule" 
+                                                    Content="Create Rule"
+                                                    Style="{StaticResource ButtonStyle}"
+                                                    Tag="CreateManualRule"/>
                                         </StackPanel>
-
-                                        <Button x:Name="BtnCreateManualRule" 
-                                                Content="Create Rule"
-                                                Style="{StaticResource ButtonStyle}"
-                                                Tag="CreateManualRule"/>
-                                    </StackPanel>
+                                    </ScrollViewer>
                                 </TabItem>
                                 
                                 <!-- Tab 3: Import / Export -->
                                 <TabItem Header="Import / Export">
-                                    <StackPanel Margin="15">
-                                        <!-- Import Section -->
-                                        <TextBlock Text="IMPORT FROM XML" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <StackPanel Margin="15">
+                                            <!-- Import Section -->
+                                            <TextBlock Text="IMPORT FROM XML" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
 
-                                        <CheckBox x:Name="ChkImportSkipDuplicates" 
-                                                  Content="Skip duplicate rules"
-                                                  IsChecked="True"
-                                                  Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,10"/>
+                                            <CheckBox x:Name="ChkImportSkipDuplicates" 
+                                                      Content="Skip duplicate rules"
+                                                      IsChecked="True"
+                                                      Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,10"/>
 
-                                        <TextBlock Text="Initial Status:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <ComboBox x:Name="CboImportStatus" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,10">
-                                            <ComboBoxItem Content="Pending" Tag="Pending" IsSelected="True"/>
-                                            <ComboBoxItem Content="Approved" Tag="Approved"/>
-                                            <ComboBoxItem Content="Review" Tag="Review"/>
-                                        </ComboBox>
+                                            <TextBlock Text="Initial Status:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                            <ComboBox x:Name="CboImportStatus" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,10">
+                                                <ComboBoxItem Content="Pending" Tag="Pending" IsSelected="True"/>
+                                                <ComboBoxItem Content="Approved" Tag="Approved"/>
+                                                <ComboBoxItem Content="Review" Tag="Review"/>
+                                            </ComboBox>
 
-                                        <Button x:Name="BtnImportRulesXml" 
-                                                Content="Import AppLocker XML..."
-                                                Style="{StaticResource PrimaryButtonStyle}"
-                                                Tag="ImportRulesXml" Margin="0,0,0,20"/>
+                                            <Button x:Name="BtnImportRulesXml" 
+                                                    Content="Import AppLocker XML..."
+                                                    Style="{StaticResource PrimaryButtonStyle}"
+                                                    Tag="ImportRulesXml" Margin="0,0,0,20"/>
 
-                                        <!-- Export Section -->
-                                        <TextBlock Text="EXPORT OPTIONS" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
+                                            <!-- Export Section -->
+                                            <TextBlock Text="EXPORT RULES" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
 
-                                        <CheckBox x:Name="ChkExportApprovedOnly" 
-                                                  Content="Export approved rules only"
-                                                  IsChecked="True"
-                                                  Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,15"/>
+                                            <CheckBox x:Name="ChkExportApprovedOnly" 
+                                                      Content="Only export Approved rules"
+                                                      IsChecked="False"
+                                                      Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,10"/>
 
-                                        <Button x:Name="BtnExportRulesXml" 
-                                                Content="Export to AppLocker XML"
-                                                Style="{StaticResource PrimaryButtonStyle}"
-                                                Tag="ExportRulesXml" Margin="0,0,0,10"/>
-                                        
-                                        <Button x:Name="BtnExportRulesCsv" 
-                                                Content="Export to CSV"
-                                                Style="{StaticResource ButtonStyle}"
-                                                Tag="ExportRulesCsv"/>
-                                    </StackPanel>
+                                            <Button x:Name="BtnExportRulesXml" 
+                                                    Content="Export to XML..."
+                                                    Style="{StaticResource ButtonStyle}"
+                                                    Tag="ExportRulesXml" Margin="0,0,0,10"/>
+
+                                            <Button x:Name="BtnExportRulesCsv" 
+                                                    Content="Export to CSV..."
+                                                    Style="{StaticResource ButtonStyle}"
+                                                    Tag="ExportRulesCsv"/>
+                                        </StackPanel>
+                                    </ScrollViewer>
                                 </TabItem>
                             </TabControl>
                         </Border>
@@ -1833,43 +1819,42 @@ Width="1450"
                                 
                                 <!-- Tab 1: Create Policy -->
                                 <TabItem Header="Create">
-                                    <StackPanel Margin="15">
-                                        <TextBlock Text="CREATE POLICY" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <StackPanel Margin="15">
+                                            <TextBlock Text="CREATE POLICY" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
 
-                                        <TextBlock Text="Policy Name:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <TextBox x:Name="TxtPolicyName" 
-                                                 Style="{StaticResource TextBoxStyle}" Margin="0,0,0,10"/>
+                                            <TextBlock Text="Policy Name:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                            <TextBox x:Name="TxtPolicyName" 
+                                                     Style="{StaticResource TextBoxStyle}" Margin="0,0,0,10"/>
 
-                                        <TextBlock Text="Description:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <TextBox x:Name="TxtPolicyDescription" 
-                                                 Style="{StaticResource TextBoxStyle}"
-                                                 Height="60" TextWrapping="Wrap" AcceptsReturn="True"
-                                                 VerticalContentAlignment="Top" Margin="0,0,0,10"/>
+                                            <TextBlock Text="Description:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                            <TextBox x:Name="TxtPolicyDescription" 
+                                                     Style="{StaticResource TextBoxStyle}"
+                                                     Height="60" TextWrapping="Wrap" AcceptsReturn="True"
+                                                     VerticalContentAlignment="Top" Margin="0,0,0,10"/>
 
-                                        <TextBlock Text="Enforcement Mode:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <ComboBox x:Name="CboPolicyEnforcement" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,15">
-                                            <ComboBoxItem Content="Audit Only (Recommended)" IsSelected="True"/>
-                                            <ComboBoxItem Content="Enabled (Enforce)"/>
-                                            <ComboBoxItem Content="Not Configured"/>
-                                        </ComboBox>
+                                            <TextBlock Text="Enforcement Mode:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                            <ComboBox x:Name="CboPolicyEnforcement" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,15">
+                                                <ComboBoxItem Content="Audit Only (Recommended)" IsSelected="True"/>
+                                                <ComboBoxItem Content="Enabled (Enforce)"/>
+                                                <ComboBoxItem Content="Not Configured"/>
+                                            </ComboBox>
 
-                                        <TextBlock Text="Deployment Phase:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <ComboBox x:Name="CboPolicyPhase" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,5">
-                                            <ComboBoxItem Content="Phase 1: EXE Only" IsSelected="True" Tag="1"/>
-                                            <ComboBoxItem Content="Phase 2: EXE + Script" Tag="2"/>
-                                            <ComboBoxItem Content="Phase 3: EXE + Script + MSI" Tag="3"/>
-                                            <ComboBoxItem Content="Phase 4: EXE + Script + MSI + APPX" Tag="4"/>
-                                            <ComboBoxItem Content="Phase 5: All + DLL (Full Enforcement)" Tag="5"/>
-                                        </ComboBox>
-                                        <TextBlock Text="Phase controls which collection types are added to the policy. DLL is Phase 5 only." 
-                                                   Foreground="{StaticResource MutedBrush}" 
-                                                   FontSize="10" FontStyle="Italic" TextWrapping="Wrap" Margin="0,0,0,15"/>
+                                            <TextBlock Text="Deployment Phase:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                            <ComboBox x:Name="CboPolicyPhase" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,15">
+                                                <ComboBoxItem Content="Phase 1: Audit &amp; Discovery" Tag="1" IsSelected="True"/>
+                                                <ComboBoxItem Content="Phase 2: Analysis &amp; Rationalization" Tag="2"/>
+                                                <ComboBoxItem Content="Phase 3: Initial Enforcement (Workstations)" Tag="3"/>
+                                                <ComboBoxItem Content="Phase 4: Full Enforcement (Servers)" Tag="4"/>
+                                                <ComboBoxItem Content="Phase 5: Maintenance &amp; Operations" Tag="5"/>
+                                            </ComboBox>
 
-                                        <Button x:Name="BtnCreatePolicy" 
-                                                Content="Create New Policy"
-                                                Style="{StaticResource PrimaryButtonStyle}"
-                                                Tag="CreatePolicy"/>
-                                    </StackPanel>
+                                            <Button x:Name="BtnCreatePolicy" 
+                                                    Content="Create Policy"
+                                                    Style="{StaticResource PrimaryButtonStyle}"
+                                                    Tag="CreatePolicy"/>
+                                        </StackPanel>
+                                    </ScrollViewer>
                                 </TabItem>
                                 
                                 <!-- Tab 2: Edit Policy -->
@@ -2130,38 +2115,40 @@ Width="1450"
                                 
                                 <!-- Tab 1: New Deployment -->
                                 <TabItem Header="Create">
-                                    <StackPanel Margin="15">
-                                        <TextBlock Text="NEW DEPLOYMENT" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <StackPanel Margin="15">
+                                            <TextBlock Text="NEW DEPLOYMENT" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
 
-                                        <TextBlock Text="Select Policy:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <ComboBox x:Name="CboDeployPolicy" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,10"/>
+                                            <TextBlock Text="Select Policy:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                            <ComboBox x:Name="CboDeployPolicy" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,10"/>
 
-                                        <TextBlock Text="Target GPO:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <ComboBox x:Name="CboDeployTargetGPO" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,5">
-                                            <ComboBoxItem Content="AppLocker-DC" Tag="AppLocker-DC"/>
-                                            <ComboBoxItem Content="AppLocker-Servers" Tag="AppLocker-Servers" IsSelected="True"/>
-                                            <ComboBoxItem Content="AppLocker-Workstations" Tag="AppLocker-Workstations"/>
-                                            <ComboBoxItem Content="Custom GPO..." Tag="Custom"/>
-                                        </ComboBox>
-                                        
-                                        <TextBox x:Name="TxtDeployCustomGPO" 
-                                                 Style="{StaticResource TextBoxStyle}" 
-                                                 Visibility="Collapsed"
-                                                 Tag="Enter custom GPO name..."
-                                                 Margin="0,0,0,10"/>
+                                            <TextBlock Text="Target GPO:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                            <ComboBox x:Name="CboDeployTargetGPO" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,5">
+                                                <ComboBoxItem Content="AppLocker-DC" Tag="AppLocker-DC"/>
+                                                <ComboBoxItem Content="AppLocker-Servers" Tag="AppLocker-Servers" IsSelected="True"/>
+                                                <ComboBoxItem Content="AppLocker-Workstations" Tag="AppLocker-Workstations"/>
+                                                <ComboBoxItem Content="Custom GPO..." Tag="Custom"/>
+                                            </ComboBox>
+                                            
+                                            <TextBox x:Name="TxtDeployCustomGPO" 
+                                                     Style="{StaticResource TextBoxStyle}" 
+                                                     Visibility="Collapsed"
+                                                     Tag="Enter custom GPO name..."
+                                                     Margin="0,0,0,10"/>
 
-                                        <TextBlock Text="Schedule:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <ComboBox x:Name="CboDeploySchedule" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,15">
-                                            <ComboBoxItem Content="Manual (Deploy Now)" IsSelected="True"/>
-                                            <ComboBoxItem Content="Immediate"/>
-                                            <ComboBoxItem Content="Scheduled"/>
-                                        </ComboBox>
+                                            <TextBlock Text="Schedule:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                            <ComboBox x:Name="CboDeploySchedule" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,15">
+                                                <ComboBoxItem Content="Manual (Deploy Now)" IsSelected="True"/>
+                                                <ComboBoxItem Content="Immediate"/>
+                                                <ComboBoxItem Content="Daily at 3 AM"/>
+                                            </ComboBox>
 
-                                        <Button x:Name="BtnCreateDeployment" 
-                                                Content="Create Deployment Job"
-                                                Style="{StaticResource PrimaryButtonStyle}"
-                                                Tag="CreateDeploymentJob"/>
-                                    </StackPanel>
+                                            <Button x:Name="BtnDeployPolicy" 
+                                                    Content="Deploy Policy"
+                                                    Style="{StaticResource PrimaryButtonStyle}"
+                                                    Tag="DeployPolicy"/>
+                                        </StackPanel>
+                                    </ScrollViewer>
                                 </TabItem>
                                 
                                 <!-- Tab 2: Edit Policy -->

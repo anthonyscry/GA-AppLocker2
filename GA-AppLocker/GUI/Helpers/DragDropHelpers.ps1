@@ -27,7 +27,7 @@ function Register-DragDropHandlers {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
-        [System.Windows.Window]$Window
+        $Window
     )
 
     # Enable drop on the main window
@@ -57,7 +57,7 @@ function Register-ScannerPanelDrop {
     .SYNOPSIS
         Registers drop handler for the Scanner panel.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $scannerPanel = $Window.FindName('PanelScanner')
     if ($scannerPanel) {
@@ -97,7 +97,7 @@ function Register-RulesPanelDrop {
     .SYNOPSIS
         Registers drop handler for the Rules panel.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $rulesPanel = $Window.FindName('PanelRules')
     if ($rulesPanel) {
@@ -138,7 +138,7 @@ function Register-PolicyPanelDrop {
     .SYNOPSIS
         Registers drop handler for the Policy panel.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $policyPanel = $Window.FindName('PanelPolicy')
     if ($policyPanel) {
@@ -193,7 +193,7 @@ function Invoke-WindowDrop {
         Handles file drops on the main window.
     #>
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         $DragEventArgs
     )
 
@@ -279,7 +279,7 @@ function Invoke-DragOver {
         Handles drag-over events to show appropriate cursor.
     #>
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         $DragEventArgs
     )
 
@@ -298,7 +298,7 @@ function Invoke-ScannerPanelDrop {
         Handles file drops on the Scanner panel - scans dropped files.
     #>
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         $DragEventArgs = $null,
         [string[]]$Files = $null
     )
@@ -358,7 +358,7 @@ function Invoke-RulesPanelDrop {
         Handles file drops on the Rules panel - creates rules from artifacts.
     #>
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         $DragEventArgs = $null,
         [string[]]$Files = $null
     )
@@ -412,7 +412,7 @@ function Invoke-PolicyPanelDrop {
         Handles file drops on the Policy panel - imports policy XML.
     #>
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         $DragEventArgs = $null,
         [string[]]$Files = $null
     )
@@ -448,7 +448,7 @@ function Invoke-PolicyRulesGridDrop {
         Handles rule drops onto the policy rules grid - adds rules to policy.
     #>
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         $DragEventArgs
     )
 
@@ -490,7 +490,7 @@ function Invoke-DroppedFileScan {
         Scans dropped files and adds to current artifacts list.
     #>
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [string[]]$FilePaths
     )
 
@@ -538,7 +538,7 @@ function Invoke-CreateRulesFromDroppedFiles {
         Creates rules from dropped executable files.
     #>
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [string[]]$FilePaths
     )
 
@@ -583,7 +583,7 @@ function Invoke-ImportRulesFromXml {
         Imports rules from AppLocker XML files.
     #>
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [string[]]$XmlPaths
     )
 
@@ -614,7 +614,7 @@ function Invoke-ImportArtifactsFromJson {
         Imports artifacts from JSON export files.
     #>
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [string[]]$JsonPaths
     )
 
@@ -652,7 +652,7 @@ function Invoke-ImportPoliciesFromXml {
         Imports policies from AppLocker XML files.
     #>
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [string[]]$XmlPaths
     )
 
@@ -745,7 +745,7 @@ function Enable-RuleDragSource {
     .SYNOPSIS
         Enables drag-from-source on the rules data grid.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $rulesGrid = $Window.FindName('RulesDataGrid')
     if ($rulesGrid) {

@@ -8,7 +8,7 @@ $script:SoftwareImportedFile = ''     # Name of imported file
 $script:CurrentSoftwareSourceFilter = 'All'  # Source filter for comparison results
 
 function Initialize-SoftwarePanel {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     # Wire up sidebar buttons via Tag -> Invoke-ButtonAction
     $buttons = @(
@@ -83,7 +83,7 @@ function script:Get-SoftwareRemoteMachineList {
         Parses the remote machine textbox into a list of hostnames.
         Falls back to $script:SelectedScanMachines (Scanner panel list) if textbox is empty.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $machineBox = $Window.FindName('TxtSoftwareRemoteMachines')
     $rawText = if ($machineBox) { $machineBox.Text } else { '' }
@@ -114,7 +114,7 @@ function global:Invoke-ScanLocalSoftware {
     .SYNOPSIS
         Scans installed software on the local machine via registry.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     Show-LoadingOverlay -Message 'Scanning installed software...' -SubMessage $env:COMPUTERNAME
 
@@ -165,7 +165,7 @@ function global:Invoke-ScanRemoteSoftware {
     .SYNOPSIS
         Scans installed software on remote machines via WinRM (background runspace).
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $hostnames = @(Get-SoftwareRemoteMachineList -Window $Window)
     if ($hostnames.Count -eq 0) {
@@ -461,7 +461,7 @@ function global:Invoke-ExportSoftwareCsv {
     .SYNOPSIS
         Exports the current software inventory DataGrid to a CSV file.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     if ($script:SoftwareInventory.Count -eq 0) {
         Show-Toast -Message 'No software data to export. Run a scan first.' -Type 'Warning'
@@ -502,7 +502,7 @@ function script:Import-SoftwareCsvFile {
         Returns $null on cancel/error, or a hashtable with FileName and Data.
     #>
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [string]$Title = 'Import Software Inventory CSV'
     )
 
@@ -559,7 +559,7 @@ function global:Invoke-ImportBaselineCsv {
         Imports a CSV as the baseline (left side of comparison).
         Replaces any existing scan/baseline data.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $csv = Import-SoftwareCsvFile -Window $Window -Title 'Import Baseline CSV'
     if (-not $csv) { return }
@@ -600,7 +600,7 @@ function global:Invoke-ImportComparisonCsv {
         Imports a CSV into the comparison slot (right side of comparison).
         Requires a baseline (scan data or prior baseline import) to exist.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     # Check baseline exists
     $hasBaseline = @($script:SoftwareInventory | Where-Object { $_.Source -ne 'Imported' -and $_.Source -ne 'Compare' }).Count -gt 0
@@ -625,24 +625,8 @@ function global:Invoke-ImportComparisonCsv {
     Write-AppLockerLog -Message "Imported software CSV for comparison: $($csv.FullPath) ($($csv.Data.Count) items)" -Level 'INFO'
 }
 
-function global:Invoke-ImportSoftwareCsv {
-    <#
-    .SYNOPSIS
-        Legacy single-button import. Auto-detects baseline vs comparison slot.
-        Kept for backward compatibility (drag-drop, etc.).
-    #>
-    param([System.Windows.Window]$Window)
-
-    $hasBaseline = @($script:SoftwareInventory | Where-Object { $_.Source -ne 'Imported' -and $_.Source -ne 'Compare' }).Count -gt 0
-    $hasBaselineFromImport = $script:SoftwareInventory.Count -gt 0 -and $script:SoftwareImportedData.Count -eq 0
-
-    if (-not $hasBaseline -and -not $hasBaselineFromImport) {
-        Invoke-ImportBaselineCsv -Window $Window
-    }
-    else {
-        Invoke-ImportComparisonCsv -Window $Window
-    }
-}
+# Legacy function removed - use Invoke-ImportBaselineCsv or Invoke-ImportComparisonCsv
+# Was: Invoke-ImportSoftwareCsv
 
 #endregion
 
@@ -654,7 +638,7 @@ function global:Invoke-CompareSoftware {
         Compares baseline data (scan or first CSV) against imported CSV data.
         Shows four categories: Match, Version Diff, Only in Baseline, Only in Import.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     # Need both a baseline and an import to compare
     if ($script:SoftwareImportedData.Count -eq 0) {
@@ -802,7 +786,7 @@ function global:Invoke-ClearSoftwareComparison {
     .SYNOPSIS
         Clears comparison results and imported data.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     $script:SoftwareImportedData = @()
     $script:SoftwareImportedFile = ''
@@ -839,7 +823,7 @@ function global:Update-SoftwareSourceFilter {
         Updates the source filter and refreshes the DataGrid + button highlights.
     #>
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [string]$Filter
     )
 
@@ -902,7 +886,7 @@ function global:Update-SoftwareDataGrid {
     .SYNOPSIS
         Updates the SoftwareDataGrid with current inventory data, applying text filter.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     if (-not $Window) { return }
     $dataGrid = $Window.FindName('SoftwareDataGrid')
@@ -943,7 +927,7 @@ function global:Update-SoftwareStats {
     .SYNOPSIS
         Updates the sidebar stats displays.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     if (-not $Window) { return }
     $totalCount = $Window.FindName('TxtSoftwareTotalCount')

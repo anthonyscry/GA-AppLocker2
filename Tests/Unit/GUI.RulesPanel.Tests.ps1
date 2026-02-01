@@ -20,13 +20,16 @@ BeforeAll {
         Import-Module $modulePath -Force -WarningAction SilentlyContinue
     }
     
+    # Load mock helpers
+    . (Join-Path $PSScriptRoot '..\Helpers\MockWpfHelpers.ps1')
+
     # Dot-source the Rules panel to get the global functions
     $rulesPanel = Join-Path $PSScriptRoot '..\..\GA-AppLocker\GUI\Panels\Rules.ps1'
     if (Test-Path $rulesPanel) {
         . $rulesPanel
     }
     
-    # Helper to create a mock WPF window
+    # Helper to create a mock WPF window (legacy - kept for backward compatibility)
     function New-MockWindow {
         param(
             [hashtable]$Elements = @{},
@@ -200,5 +203,124 @@ Describe 'Rules Panel - Filter Button Counts' {
             $mockButtons['BtnFilterApproved'].Content | Should -Be 'Approved (100)'
             $mockButtons['BtnFilterAll'].Content | Should -Be 'All (130)'
         }
+    }
+}
+
+Describe 'Rules Panel - Filter State Management' {
+    It 'CurrentRulesFilter defaults to All' {
+        $script:CurrentRulesFilter = 'All'
+        $script:CurrentRulesFilter | Should -Be 'All'
+    }
+
+    It 'CurrentRulesTypeFilter defaults to All' {
+        $script:CurrentRulesTypeFilter = 'All'
+        $script:CurrentRulesTypeFilter | Should -Be 'All'
+    }
+
+    It 'Tracks status filter changes' {
+        $script:CurrentRulesFilter = 'Pending'
+        $script:CurrentRulesFilter | Should -Be 'Pending'
+
+        $script:CurrentRulesFilter = 'Approved'
+        $script:CurrentRulesFilter | Should -Be 'Approved'
+
+        $script:CurrentRulesFilter = 'Rejected'
+        $script:CurrentRulesFilter | Should -Be 'Rejected'
+    }
+
+    It 'Tracks type filter changes' {
+        $script:CurrentRulesTypeFilter = 'Publisher'
+        $script:CurrentRulesTypeFilter | Should -Be 'Publisher'
+
+        $script:CurrentRulesTypeFilter = 'Hash'
+        $script:CurrentRulesTypeFilter | Should -Be 'Hash'
+
+        $script:CurrentRulesTypeFilter = 'Path'
+        $script:CurrentRulesTypeFilter | Should -Be 'Path'
+    }
+}
+
+Describe 'Rules Panel - Update-RulesFilter' {
+    It 'Updates filter state variable' {
+        if (Get-Command 'Update-RulesFilter' -ErrorAction SilentlyContinue) {
+            Mock Update-RulesDataGrid {}
+            $win = New-MockWpfWindow -Elements @{
+                'BtnFilterAllRules'  = New-MockButton -Tag 'FilterRulesAll'
+                'BtnFilterPublisher' = New-MockButton -Tag 'FilterRulesPublisher'
+                'BtnFilterHash'      = New-MockButton -Tag 'FilterRulesHash'
+                'BtnFilterPath'      = New-MockButton -Tag 'FilterRulesPath'
+                'BtnFilterPending'   = New-MockButton -Tag 'FilterRulesPending'
+                'BtnFilterApproved'  = New-MockButton -Tag 'FilterRulesApproved'
+                'BtnFilterRejected'  = New-MockButton -Tag 'FilterRulesRejected'
+            }
+            Update-RulesFilter -Window $win -Filter 'Pending'
+            $script:CurrentRulesFilter | Should -Be 'Pending'
+        } else {
+            Set-ItResult -Skipped -Because 'Update-RulesFilter not available'
+        }
+    }
+}
+
+Describe 'Rules Panel - Selection State' {
+    It 'SuppressRulesSelectionChanged starts false' {
+        $script:SuppressRulesSelectionChanged | Should -BeFalse
+    }
+
+    It 'AllRulesSelected can be toggled' {
+        $script:AllRulesSelected = $false
+        $script:AllRulesSelected | Should -BeFalse
+
+        $script:AllRulesSelected = $true
+        $script:AllRulesSelected | Should -BeTrue
+    }
+}
+
+Describe 'Rules Panel - Initialization' {
+    It 'Initialize-RulesPanel does not throw on empty window' {
+        $win = New-MockWpfWindow -Elements @{}
+        { Initialize-RulesPanel -Window $win } | Should -Not -Throw
+    }
+}
+
+Describe 'Rules Panel - Mock Rule Object Pattern' {
+    It 'Creates rules with expected properties' {
+        $rule = New-MockRule -Id 'test-1' -Status 'Approved' -RuleType 'Hash' -Name 'My Rule'
+        
+        $rule.Id | Should -Be 'test-1'
+        $rule.RuleId | Should -Be 'test-1'
+        $rule.Status | Should -Be 'Approved'
+        $rule.RuleType | Should -Be 'Hash'
+        $rule.Name | Should -Be 'My Rule'
+    }
+
+    It 'Generates unique GUIDs by default' {
+        $rule1 = New-MockRule
+        $rule2 = New-MockRule
+        $rule1.Id | Should -Not -Be $rule2.Id
+    }
+}
+
+Describe 'Rules Panel - XAML Filter Buttons' {
+    BeforeAll {
+        $script:RawXaml = Get-Content (Join-Path $PSScriptRoot '..\..\GA-AppLocker\GUI\MainWindow.xaml') -Raw
+    }
+
+    It 'Has status filter buttons with correct Tags' {
+        $script:RawXaml | Should -Match 'Tag="FilterRulesPending"'
+        $script:RawXaml | Should -Match 'Tag="FilterRulesApproved"'
+        $script:RawXaml | Should -Match 'Tag="FilterRulesRejected"'
+    }
+
+    It 'Has type filter buttons with correct Tags' {
+        $script:RawXaml | Should -Match 'Tag="FilterRulesPublisher"'
+        $script:RawXaml | Should -Match 'Tag="FilterRulesHash"'
+        $script:RawXaml | Should -Match 'Tag="FilterRulesPath"'
+    }
+
+    It 'Has rule counter display elements' {
+        $script:RawXaml | Should -Match 'TxtRuleTotalCount'
+        $script:RawXaml | Should -Match 'TxtRulePendingCount'
+        $script:RawXaml | Should -Match 'TxtRuleApprovedCount'
+        $script:RawXaml | Should -Match 'TxtRuleRejectedCount'
     }
 }

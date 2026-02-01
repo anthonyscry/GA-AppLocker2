@@ -20,7 +20,7 @@ function Initialize-GlobalSearch {
     .SYNOPSIS
         Initializes global search functionality.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     $searchBox = $Window.FindName('GlobalSearchBox')
     $placeholder = $Window.FindName('GlobalSearchPlaceholder')
@@ -354,7 +354,7 @@ function Update-SearchResultsPopup {
         Updates the search results popup with categorized results.
     #>
     param(
-        [System.Windows.Window]$Window,
+        $Window,
         [hashtable]$Results
     )
     

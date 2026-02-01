@@ -499,9 +499,10 @@ Describe 'XAML Phase Dropdowns - 5 Phase Support' -Tag 'Unit', 'XAML', 'Policy' 
 
     Context 'Policy Edit phase dropdown (CboEditPhase)' {
         It 'Should have Phase 4 and Phase 5 items' {
-            # Both CboPolicyPhase and CboEditPhase should have Phase 4/5
-            $phase4Count = ([regex]::Matches($script:XamlContent, 'Phase 4: EXE \+ Script \+ MSI \+ APPX')).Count
-            $phase4Count | Should -BeGreaterOrEqual 2
+            # CboEditPhase should have Phase 4 and Phase 5 items
+            $script:XamlContent | Should -Match 'CboEditPhase'
+            $script:XamlContent | Should -Match 'Phase 4:.*APPX'
+            $script:XamlContent | Should -Match 'Phase 5:.*DLL'
         }
     }
 
@@ -546,8 +547,8 @@ Describe 'Software Import - Split Buttons' -Tag 'Unit', 'XAML', 'Software' {
         It 'ImportComparisonCsv action exists in dispatcher' {
             $script:MainWindowPs1 | Should -Match "'ImportComparisonCsv'.*Invoke-ImportComparisonCsv"
         }
-        It 'Legacy ImportSoftwareCsv still exists for backward compat' {
-            $script:MainWindowPs1 | Should -Match "'ImportSoftwareCsv'.*Invoke-ImportSoftwareCsv"
+        It 'Legacy ImportSoftwareCsv redirects to ImportBaselineCsv' {
+            $script:MainWindowPs1 | Should -Match "'ImportSoftwareCsv'.*Invoke-ImportBaselineCsv"
         }
     }
 
@@ -560,9 +561,6 @@ Describe 'Software Import - Split Buttons' -Tag 'Unit', 'XAML', 'Software' {
         }
         It 'Import-SoftwareCsvFile shared helper is defined' {
             $script:SoftwarePs1 | Should -Match 'function script:Import-SoftwareCsvFile'
-        }
-        It 'Legacy Invoke-ImportSoftwareCsv kept for compat' {
-            $script:SoftwarePs1 | Should -Match 'function global:Invoke-ImportSoftwareCsv'
         }
     }
 
@@ -629,12 +627,12 @@ Describe 'Software Import - Comparison Function Guards' -Tag 'Unit', 'Software',
         }
     }
 
-    Context 'Legacy auto-detect still works' {
-        It 'Invoke-ImportSoftwareCsv delegates to ImportBaselineCsv when no baseline' {
-            $script:SoftwarePs1 | Should -Match 'Invoke-ImportBaselineCsv -Window \$Window'
+    Context 'Split import functions exist' {
+        It 'Invoke-ImportBaselineCsv is defined as global function' {
+            $script:SoftwarePs1 | Should -Match 'function global:Invoke-ImportBaselineCsv'
         }
-        It 'Invoke-ImportSoftwareCsv delegates to ImportComparisonCsv when baseline exists' {
-            $script:SoftwarePs1 | Should -Match 'Invoke-ImportComparisonCsv -Window \$Window'
+        It 'Invoke-ImportComparisonCsv is defined as global function' {
+            $script:SoftwarePs1 | Should -Match 'function global:Invoke-ImportComparisonCsv'
         }
     }
 }

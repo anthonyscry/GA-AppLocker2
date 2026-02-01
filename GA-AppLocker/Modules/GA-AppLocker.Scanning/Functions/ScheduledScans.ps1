@@ -254,14 +254,14 @@ function Set-ScheduledScanEnabled {
         if ($Enabled) {
             $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
             if ($existingTask) {
-                Enable-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+                Enable-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue | Out-Null
             }
             else {
-                Register-ScheduledScanTask -ScheduledScan $schedule
+                Register-ScheduledScanTask -ScheduledScan $schedule | Out-Null
             }
         }
         else {
-            Disable-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+            Disable-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue | Out-Null
         }
 
         return @{

@@ -159,7 +159,7 @@ function global:Invoke-ButtonAction {
         'ScanLocalSoftware' { Invoke-ScanLocalSoftware -Window $win }
         'ScanRemoteSoftware' { Invoke-ScanRemoteSoftware -Window $win }
         'ExportSoftwareCsv' { Invoke-ExportSoftwareCsv -Window $win }
-        'ImportSoftwareCsv' { Invoke-ImportSoftwareCsv -Window $win }
+        'ImportSoftwareCsv' { Invoke-ImportBaselineCsv -Window $win }  # Legacy redirect
         'ImportBaselineCsv' { Invoke-ImportBaselineCsv -Window $win }
         'ImportComparisonCsv' { Invoke-ImportComparisonCsv -Window $win }
         'CompareSoftware' { Invoke-CompareSoftware -Window $win }
@@ -362,10 +362,38 @@ function script:Save-CurrentSessionState {
         activePanel = $script:CurrentActivePanel
         discovery = @{
             discoveredMachines = @($script:DiscoveredMachines | ForEach-Object { 
-                if ($_ -is [string]) { $_ } else { $_.Hostname } 
+                if ($_ -is [string]) { 
+                    @{ Hostname = $_ } 
+                } elseif ($_.PSObject) {
+                    @{
+                        Hostname = $_.Hostname
+                        MachineType = $_.MachineType
+                        OperatingSystem = $_.OperatingSystem
+                        LastLogon = $_.LastLogon
+                        WinRMStatus = $_.WinRMStatus
+                        IsOnline = $_.IsOnline
+                        DistinguishedName = $_.DistinguishedName
+                        OU = $_.OU
+                    }
+                } else {
+                    @{ Hostname = $_ }
+                }
             })
             selectedForScan = @($script:SelectedScanMachines | ForEach-Object { 
-                if ($_ -is [string]) { $_ } else { $_.Hostname } 
+                if ($_ -is [string]) { 
+                    @{ Hostname = $_ } 
+                } elseif ($_.PSObject) {
+                    @{
+                        Hostname = $_.Hostname
+                        MachineType = $_.MachineType
+                        OperatingSystem = $_.OperatingSystem
+                        WinRMStatus = $_.WinRMStatus
+                        IsOnline = $_.IsOnline
+                        OU = $_.OU
+                    }
+                } else {
+                    @{ Hostname = $_ }
+                }
             })
         }
         scanner = @{
@@ -393,7 +421,7 @@ function script:Save-CurrentSessionState {
 }
 
 function script:Restore-PreviousSessionState {
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     try {
         $result = Restore-SessionState
@@ -411,18 +439,47 @@ function script:Restore-PreviousSessionState {
             if ($session.discovery.discoveredMachines) {
                 # Convert back to objects for the UI
                 $script:DiscoveredMachines = @($session.discovery.discoveredMachines | ForEach-Object {
-                    [PSCustomObject]@{
-                        Hostname = $_
-                        StatusIcon = '?'
-                        MachineType = 'Unknown'
-                        OperatingSystem = ''
-                        LastLogon = $null
-                        WinRMStatus = 'Unknown'
+                    if ($_ -is [string]) {
+                        # Legacy format fallback
+                        [PSCustomObject]@{
+                            Hostname = $_
+                            StatusIcon = '?'
+                            MachineType = 'Unknown'
+                            OperatingSystem = ''
+                            LastLogon = $null
+                            WinRMStatus = 'Unknown'
+                        }
+                    } else {
+                        # Full object restore
+                        [PSCustomObject]@{
+                            Hostname = $_.Hostname
+                            StatusIcon = if ($_.IsOnline) { '✓' } else { '?' }
+                            MachineType = if ($_.MachineType) { $_.MachineType } else { 'Unknown' }
+                            OperatingSystem = $_.OperatingSystem
+                            LastLogon = $_.LastLogon
+                            WinRMStatus = $_.WinRMStatus
+                            IsOnline = $_.IsOnline
+                            DistinguishedName = $_.DistinguishedName
+                            OU = $_.OU
+                        }
                     }
                 })
             }
             if ($session.discovery.selectedForScan) {
-                $script:SelectedScanMachines = @($session.discovery.selectedForScan)
+                $script:SelectedScanMachines = @($session.discovery.selectedForScan | ForEach-Object {
+                    if ($_ -is [string]) {
+                        [PSCustomObject]@{ Hostname = $_; MachineType = 'Unknown'; OU = 'Unknown' }
+                    } else {
+                        [PSCustomObject]@{
+                            Hostname = $_.Hostname
+                            MachineType = if ($_.MachineType) { $_.MachineType } else { 'Unknown' }
+                            OperatingSystem = $_.OperatingSystem
+                            WinRMStatus = $_.WinRMStatus
+                            IsOnline = $_.IsOnline
+                            OU = $_.OU
+                        }
+                    }
+                })
             }
         }
         
@@ -458,7 +515,7 @@ function script:Restore-PreviousSessionState {
 }
 
 function global:Update-WorkflowBreadcrumb {
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     if (-not $Window) { $Window = $global:GA_MainWindow }
     if (-not $Window) { return }
@@ -540,7 +597,7 @@ function global:Update-WorkflowBreadcrumb {
 #region ===== NAVIGATION INITIALIZATION =====
 # Wire up navigation event handlers
 function Initialize-Navigation {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     # Store window reference
     $global:GA_MainWindow = $Window
@@ -664,7 +721,7 @@ function Initialize-Navigation {
 #region ===== WINDOW INITIALIZATION =====
 function Initialize-MainWindow {
     param(
-        [System.Windows.Window]$Window
+        $Window
     )
 
     # Store window reference for script-level access
@@ -928,7 +985,7 @@ function Initialize-WizardButtons {
     .SYNOPSIS
         Wires up the Rule Generation Wizard overlay buttons.
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     # Wizard navigation buttons - call global functions directly
     $btnNext = $Window.FindName('WizardBtnNext')

@@ -2,7 +2,7 @@
 # Dashboard.ps1 - Dashboard panel initialization and stats
 
 function Initialize-DashboardPanel {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     # Wire up navigation buttons
     $btnGoToScanner = $Window.FindName('BtnDashGoToScanner')
@@ -32,7 +32,7 @@ function Initialize-DashboardPanel {
 }
 
 function global:Update-DashboardStats {
-    param([System.Windows.Window]$Window)
+    param($Window)
 
     # Update stats from actual data
     try {
@@ -169,7 +169,7 @@ function Update-DashboardCharts {
         Uses Get-RuleCounts for fast O(n) counting from index instead of
         Get-AllRules which loads full payloads from disk (slow with many rules).
     #>
-    param([System.Windows.Window]$Window)
+    param($Window)
     
     try {
         $countsResult = Get-RuleCounts

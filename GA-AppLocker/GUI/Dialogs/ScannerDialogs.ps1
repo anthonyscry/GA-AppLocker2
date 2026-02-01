@@ -17,7 +17,7 @@ function global:Show-MachineSelectionDialog {
         Array of selected machine objects, or $null if cancelled.
     #>
     param(
-        [System.Windows.Window]$ParentWindow,
+        $ParentWindow,
         [array]$Machines
     )
     
@@ -91,6 +91,14 @@ function global:Show-MachineSelectionDialog {
     $reader = [System.Xml.XmlReader]::Create([System.IO.StringReader]::new($dialogXaml))
     $dialog = [System.Windows.Markup.XamlReader]::Load($reader)
     $dialog.Owner = $ParentWindow
+    
+    # Add Escape key handler
+    $dialog.Add_KeyDown({
+        param($sender, $e)
+        if ($e.Key -eq 'Escape') {
+            $sender.Close()
+        }
+    })
     
     $machineStack = $dialog.FindName('MachineStack')
     $txtFilter = $dialog.FindName('TxtFilter')

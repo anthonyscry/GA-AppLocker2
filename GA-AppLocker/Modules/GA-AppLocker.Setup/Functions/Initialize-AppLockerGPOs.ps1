@@ -106,7 +106,7 @@ function Initialize-AppLockerGPOs {
                         }
 
                         if ($targetExists) {
-                            New-GPLink -Name $gpoConfig.Name -Target $gpoConfig.TargetOU -ErrorAction SilentlyContinue
+                            New-GPLink -Name $gpoConfig.Name -Target $gpoConfig.TargetOU -ErrorAction SilentlyContinue | Out-Null
                             $linkedTo = $gpoConfig.TargetOU
                             Write-SetupLog -Message "Linked '$($gpoConfig.Name)' to $($gpoConfig.TargetOU)"
                         }

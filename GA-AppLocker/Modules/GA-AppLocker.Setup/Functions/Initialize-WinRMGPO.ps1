@@ -87,7 +87,7 @@ function Initialize-WinRMGPO {
         # NOTE: This writes to HKLM\SYSTEM (not Policies) so it persists after GPO removal.
         # Use Remove-WinRMGPO for full cleanup.
         $svcRegPath = 'HKLM\SYSTEM\CurrentControlSet\Services\WinRM'
-        Set-GPRegistryValue -Name $GPOName -Key $svcRegPath -ValueName 'Start' -Type DWord -Value 2 -ErrorAction SilentlyContinue
+        Set-GPRegistryValue -Name $GPOName -Key $svcRegPath -ValueName 'Start' -Type DWord -Value 2 -ErrorAction SilentlyContinue | Out-Null
         $settingsApplied += 'WinRM Service Auto-Start'
         Write-SetupLog -Message "Set WinRM service to auto-start"
         #endregion
@@ -99,9 +99,9 @@ function Initialize-WinRMGPO {
         # This creates an HTTP listener and allows WinRM to accept connections.
         # Policy-based: reverts when GPO is removed.
         $winrmPolicyPath = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\WinRM\Service'
-        Set-GPRegistryValue -Name $GPOName -Key $winrmPolicyPath -ValueName 'AllowAutoConfig' -Type DWord -Value 1 -ErrorAction SilentlyContinue
-        Set-GPRegistryValue -Name $GPOName -Key $winrmPolicyPath -ValueName 'IPv4Filter' -Type String -Value '*' -ErrorAction SilentlyContinue
-        Set-GPRegistryValue -Name $GPOName -Key $winrmPolicyPath -ValueName 'IPv6Filter' -Type String -Value '*' -ErrorAction SilentlyContinue
+        Set-GPRegistryValue -Name $GPOName -Key $winrmPolicyPath -ValueName 'AllowAutoConfig' -Type DWord -Value 1 -ErrorAction SilentlyContinue | Out-Null
+        Set-GPRegistryValue -Name $GPOName -Key $winrmPolicyPath -ValueName 'IPv4Filter' -Type String -Value '*' -ErrorAction SilentlyContinue | Out-Null
+        Set-GPRegistryValue -Name $GPOName -Key $winrmPolicyPath -ValueName 'IPv6Filter' -Type String -Value '*' -ErrorAction SilentlyContinue | Out-Null
         $settingsApplied += 'WinRM AllowAutoConfig (IPv4/IPv6: *)'
         Write-SetupLog -Message "Configured WinRM listener policy (AllowAutoConfig, IPv4/IPv6 filter: *)"
         #endregion
@@ -112,7 +112,7 @@ function Initialize-WinRMGPO {
         # This is the #1 cause of "Access Denied" when credentials are correct.
         # Policy-based path: reverts when GPO is removed.
         $uacPolicyPath = 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
-        Set-GPRegistryValue -Name $GPOName -Key $uacPolicyPath -ValueName 'LocalAccountTokenFilterPolicy' -Type DWord -Value 1 -ErrorAction SilentlyContinue
+        Set-GPRegistryValue -Name $GPOName -Key $uacPolicyPath -ValueName 'LocalAccountTokenFilterPolicy' -Type DWord -Value 1 -ErrorAction SilentlyContinue | Out-Null
         $settingsApplied += 'LocalAccountTokenFilterPolicy (UAC remote admin)'
         Write-SetupLog -Message "Set LocalAccountTokenFilterPolicy = 1 (enables remote admin for local accounts)"
         #endregion
@@ -122,7 +122,7 @@ function Initialize-WinRMGPO {
         # Policy-based: reverts when GPO is removed.
         $firewallRegPath = 'HKLM\SOFTWARE\Policies\Microsoft\WindowsFirewall\FirewallRules'
         $winrmHttpRule = 'v2.31|Action=Allow|Active=TRUE|Dir=In|Protocol=6|LPort=5985|Name=Windows Remote Management (HTTP-In)|Desc=Allow WinRM HTTP for AppLocker remote management|'
-        Set-GPRegistryValue -Name $GPOName -Key $firewallRegPath -ValueName 'WinRM-HTTP-In' -Type String -Value $winrmHttpRule -ErrorAction SilentlyContinue
+        Set-GPRegistryValue -Name $GPOName -Key $firewallRegPath -ValueName 'WinRM-HTTP-In' -Type String -Value $winrmHttpRule -ErrorAction SilentlyContinue | Out-Null
         $settingsApplied += 'Firewall: Port 5985 (WinRM HTTP) Inbound Allow'
         Write-SetupLog -Message "Configured firewall rule: WinRM HTTP (port 5985) inbound allow"
         #endregion
@@ -133,7 +133,7 @@ function Initialize-WinRMGPO {
             $domainDN = Get-DomainDN
             if ($domainDN) {
                 try {
-                    New-GPLink -Name $GPOName -Target $domainDN -ErrorAction SilentlyContinue
+                    New-GPLink -Name $GPOName -Target $domainDN -ErrorAction SilentlyContinue | Out-Null
                     Write-SetupLog -Message "Linked GPO to domain root: $domainDN"
                 }
                 catch {
@@ -145,7 +145,7 @@ function Initialize-WinRMGPO {
                 # Enforce the link so it overrides all lower-level GPOs
                 if ($Enforced) {
                     try {
-                        Set-GPLink -Name $GPOName -Target $domainDN -Enforced Yes -ErrorAction Stop
+                        Set-GPLink -Name $GPOName -Target $domainDN -Enforced Yes -ErrorAction Stop | Out-Null
                         $settingsApplied += "GPO Link: Enforced at domain root"
                         Write-SetupLog -Message "Enforced GPO link at domain root (overrides all lower-level GPOs)"
                     }
@@ -202,7 +202,7 @@ function Enable-WinRMGPO {
         Import-Module GroupPolicy -ErrorAction Stop
 
         $domainDN = Get-DomainDN
-        Set-GPLink -Name $GPOName -Target $domainDN -LinkEnabled Yes -ErrorAction Stop
+        Set-GPLink -Name $GPOName -Target $domainDN -LinkEnabled Yes -ErrorAction Stop | Out-Null
         
         $result.Success = $true
         Write-SetupLog -Message "Enabled WinRM GPO link"
@@ -235,7 +235,7 @@ function Disable-WinRMGPO {
         Import-Module GroupPolicy -ErrorAction Stop
 
         $domainDN = Get-DomainDN
-        Set-GPLink -Name $GPOName -Target $domainDN -LinkEnabled No -ErrorAction Stop
+        Set-GPLink -Name $GPOName -Target $domainDN -LinkEnabled No -ErrorAction Stop | Out-Null
         
         $result.Success = $true
         Write-SetupLog -Message "Disabled WinRM GPO link"
@@ -328,7 +328,7 @@ function Initialize-DisableWinRMGPO {
         # The enable GPO wrote Start=2 (Automatic) to HKLM\SYSTEM which tattoos.
         # This writes Start=3 (Manual) to undo it via GPO.
         $svcRegPath = 'HKLM\SYSTEM\CurrentControlSet\Services\WinRM'
-        Set-GPRegistryValue -Name $GPOName -Key $svcRegPath -ValueName 'Start' -Type DWord -Value 3 -ErrorAction SilentlyContinue
+        Set-GPRegistryValue -Name $GPOName -Key $svcRegPath -ValueName 'Start' -Type DWord -Value 3 -ErrorAction SilentlyContinue | Out-Null
         $settingsApplied += 'WinRM Service set to Manual (Start=3)'
         Write-SetupLog -Message "Set WinRM service to Manual start (reverses auto-start tattoo)"
         #endregion
@@ -336,10 +336,10 @@ function Initialize-DisableWinRMGPO {
         #region --- 2. Disable WinRM Listener (AllowAutoConfig = 0) ---
         # Explicitly disables the WinRM listener policy.
         $winrmPolicyPath = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\WinRM\Service'
-        Set-GPRegistryValue -Name $GPOName -Key $winrmPolicyPath -ValueName 'AllowAutoConfig' -Type DWord -Value 0 -ErrorAction SilentlyContinue
+        Set-GPRegistryValue -Name $GPOName -Key $winrmPolicyPath -ValueName 'AllowAutoConfig' -Type DWord -Value 0 -ErrorAction SilentlyContinue | Out-Null
         # Clear the IP filters
-        Set-GPRegistryValue -Name $GPOName -Key $winrmPolicyPath -ValueName 'IPv4Filter' -Type String -Value '' -ErrorAction SilentlyContinue
-        Set-GPRegistryValue -Name $GPOName -Key $winrmPolicyPath -ValueName 'IPv6Filter' -Type String -Value '' -ErrorAction SilentlyContinue
+        Set-GPRegistryValue -Name $GPOName -Key $winrmPolicyPath -ValueName 'IPv4Filter' -Type String -Value '' -ErrorAction SilentlyContinue | Out-Null
+        Set-GPRegistryValue -Name $GPOName -Key $winrmPolicyPath -ValueName 'IPv6Filter' -Type String -Value '' -ErrorAction SilentlyContinue | Out-Null
         $settingsApplied += 'WinRM AllowAutoConfig disabled (0), IP filters cleared'
         Write-SetupLog -Message "Disabled WinRM listener policy (AllowAutoConfig=0, filters cleared)"
         #endregion
@@ -347,7 +347,7 @@ function Initialize-DisableWinRMGPO {
         #region --- 3. Re-enable UAC Remote Filtering (LocalAccountTokenFilterPolicy = 0) ---
         # Reverses the UAC bypass. Remote local admin connections get filtered token again.
         $uacPolicyPath = 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
-        Set-GPRegistryValue -Name $GPOName -Key $uacPolicyPath -ValueName 'LocalAccountTokenFilterPolicy' -Type DWord -Value 0 -ErrorAction SilentlyContinue
+        Set-GPRegistryValue -Name $GPOName -Key $uacPolicyPath -ValueName 'LocalAccountTokenFilterPolicy' -Type DWord -Value 0 -ErrorAction SilentlyContinue | Out-Null
         $settingsApplied += 'LocalAccountTokenFilterPolicy = 0 (UAC remote filtering restored)'
         Write-SetupLog -Message "Set LocalAccountTokenFilterPolicy = 0 (re-enables UAC remote filtering)"
         #endregion
@@ -356,7 +356,7 @@ function Initialize-DisableWinRMGPO {
         # Instead of just removing the allow rule, actively block port 5985.
         $firewallRegPath = 'HKLM\SOFTWARE\Policies\Microsoft\WindowsFirewall\FirewallRules'
         $winrmBlockRule = 'v2.31|Action=Block|Active=TRUE|Dir=In|Protocol=6|LPort=5985|Name=Block WinRM HTTP (AppLocker Cleanup)|Desc=Block WinRM HTTP - tattoo removal by GA-AppLocker|'
-        Set-GPRegistryValue -Name $GPOName -Key $firewallRegPath -ValueName 'WinRM-HTTP-In' -Type String -Value $winrmBlockRule -ErrorAction SilentlyContinue
+        Set-GPRegistryValue -Name $GPOName -Key $firewallRegPath -ValueName 'WinRM-HTTP-In' -Type String -Value $winrmBlockRule -ErrorAction SilentlyContinue | Out-Null
         $settingsApplied += 'Firewall: Port 5985 (WinRM HTTP) Inbound BLOCK'
         Write-SetupLog -Message "Configured firewall rule: Block WinRM HTTP (port 5985) inbound"
         #endregion
@@ -367,7 +367,7 @@ function Initialize-DisableWinRMGPO {
             $domainDN = Get-DomainDN
             if ($domainDN) {
                 try {
-                    New-GPLink -Name $GPOName -Target $domainDN -ErrorAction SilentlyContinue
+                    New-GPLink -Name $GPOName -Target $domainDN -ErrorAction SilentlyContinue | Out-Null
                     Write-SetupLog -Message "Linked GPO to domain root: $domainDN"
                 }
                 catch {
@@ -378,7 +378,7 @@ function Initialize-DisableWinRMGPO {
 
                 if ($Enforced) {
                     try {
-                        Set-GPLink -Name $GPOName -Target $domainDN -Enforced Yes -ErrorAction Stop
+                        Set-GPLink -Name $GPOName -Target $domainDN -Enforced Yes -ErrorAction Stop | Out-Null
                         $settingsApplied += "GPO Link: Enforced at domain root"
                         Write-SetupLog -Message "Enforced GPO link at domain root"
                     }
@@ -401,7 +401,7 @@ function Initialize-DisableWinRMGPO {
             if ($enableGPO) {
                 $domDN = Get-DomainDN
                 if ($domDN) {
-                    Set-GPLink -Name 'AppLocker-EnableWinRM' -Target $domDN -LinkEnabled No -ErrorAction SilentlyContinue
+                    Set-GPLink -Name 'AppLocker-EnableWinRM' -Target $domDN -LinkEnabled No -ErrorAction SilentlyContinue | Out-Null
                     $settingsApplied += 'AppLocker-EnableWinRM link disabled'
                     Write-SetupLog -Message "Disabled AppLocker-EnableWinRM link to prevent conflict"
                 }
