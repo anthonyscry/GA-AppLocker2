@@ -58,13 +58,22 @@ function Get-SetupStatus {
                 }
                 catch { }
 
+                $winrmStateLabel = switch ($winrmGPO.GpoStatus.ToString()) {
+                    'AllSettingsEnabled'  { 'Enabled' }
+                    'AllSettingsDisabled' { 'Disabled' }
+                    'UserSettingsDisabled' { 'User Disabled' }
+                    'ComputerSettingsDisabled' { 'Computer Disabled' }
+                    default { $winrmGPO.GpoStatus.ToString() }
+                }
+
                 $status.WinRM = [PSCustomObject]@{
                     Exists    = $true
                     GPOName   = $winrmGPO.DisplayName
                     GPOId     = $winrmGPO.Id
                     Linked    = [bool]$link
                     Enabled   = if ($link) { $link.Enabled } else { $false }
-                    Status    = if ($link -and $link.Enabled) { 'Enabled' } elseif ($link) { 'Disabled' } else { 'Not Linked' }
+                    GpoState  = $winrmStateLabel
+                    Status    = if ($link -and $winrmStateLabel) { $winrmStateLabel } elseif ($link) { 'Configured' } else { 'Not Linked' }
                 }
             }
             else {
@@ -86,13 +95,22 @@ function Get-SetupStatus {
                 }
                 catch { }
 
+                $disableStateLabel = switch ($disableGPO.GpoStatus.ToString()) {
+                    'AllSettingsEnabled'  { 'Enabled' }
+                    'AllSettingsDisabled' { 'Disabled' }
+                    'UserSettingsDisabled' { 'User Disabled' }
+                    'ComputerSettingsDisabled' { 'Computer Disabled' }
+                    default { $disableGPO.GpoStatus.ToString() }
+                }
+
                 $status.DisableWinRM = [PSCustomObject]@{
                     Exists    = $true
                     GPOName   = $disableGPO.DisplayName
                     GPOId     = $disableGPO.Id
                     Linked    = [bool]$disableLink
                     Enabled   = if ($disableLink) { $disableLink.Enabled } else { $false }
-                    Status    = if ($disableLink -and $disableLink.Enabled) { 'Enabled' } elseif ($disableLink) { 'Disabled' } else { 'Not Linked' }
+                    GpoState  = $disableStateLabel
+                    Status    = if ($disableLink -and $disableStateLabel) { $disableStateLabel } elseif ($disableLink) { 'Configured' } else { 'Not Linked' }
                 }
             }
             else {

@@ -201,11 +201,32 @@ function Enable-WinRMGPO {
         }
         Import-Module GroupPolicy -ErrorAction Stop
 
+        $gpo = Get-GPO -Name $GPOName -ErrorAction SilentlyContinue
+        if (-not $gpo) {
+            throw "GPO '$GPOName' not found."
+        }
+
         $domainDN = Get-DomainDN
-        Set-GPLink -Name $GPOName -Target $domainDN -LinkEnabled Yes -ErrorAction Stop | Out-Null
-        
+        if ($domainDN) {
+            try {
+                New-GPLink -Name $GPOName -Target $domainDN -ErrorAction SilentlyContinue | Out-Null
+            }
+            catch {
+                if ($_.Exception.Message -notmatch 'already linked') {
+                    Write-SetupLog -Message "Warning linking GPO: $($_.Exception.Message)" -Level Warning
+                }
+            }
+            try {
+                Set-GPLink -Name $GPOName -Target $domainDN -LinkEnabled Yes -ErrorAction SilentlyContinue | Out-Null
+            }
+            catch { }
+        }
+
+        # Enable settings (keep link enabled)
+        $gpo.GpoStatus = [Microsoft.GroupPolicy.GpoStatus]::AllSettingsEnabled
+
         $result.Success = $true
-        Write-SetupLog -Message "Enabled WinRM GPO link"
+        Write-SetupLog -Message "Enabled WinRM GPO settings (link remains enabled)"
     }
     catch {
         $result.Error = $_.Exception.Message
@@ -234,11 +255,32 @@ function Disable-WinRMGPO {
         }
         Import-Module GroupPolicy -ErrorAction Stop
 
+        $gpo = Get-GPO -Name $GPOName -ErrorAction SilentlyContinue
+        if (-not $gpo) {
+            throw "GPO '$GPOName' not found."
+        }
+
         $domainDN = Get-DomainDN
-        Set-GPLink -Name $GPOName -Target $domainDN -LinkEnabled No -ErrorAction Stop | Out-Null
-        
+        if ($domainDN) {
+            try {
+                New-GPLink -Name $GPOName -Target $domainDN -ErrorAction SilentlyContinue | Out-Null
+            }
+            catch {
+                if ($_.Exception.Message -notmatch 'already linked') {
+                    Write-SetupLog -Message "Warning linking GPO: $($_.Exception.Message)" -Level Warning
+                }
+            }
+            try {
+                Set-GPLink -Name $GPOName -Target $domainDN -LinkEnabled Yes -ErrorAction SilentlyContinue | Out-Null
+            }
+            catch { }
+        }
+
+        # Disable settings (keep link enabled)
+        $gpo.GpoStatus = [Microsoft.GroupPolicy.GpoStatus]::AllSettingsDisabled
+
         $result.Success = $true
-        Write-SetupLog -Message "Disabled WinRM GPO link"
+        Write-SetupLog -Message "Disabled WinRM GPO settings (link remains enabled)"
     }
     catch {
         $result.Error = $_.Exception.Message
@@ -395,19 +437,16 @@ function Initialize-DisableWinRMGPO {
         }
         #endregion
 
-        # Disable the Enable GPO link if it exists (so both don't fight)
+        # Disable the Enable WinRM GPO settings if it exists (so both don't fight)
         try {
             $enableGPO = Get-GPO -Name 'AppLocker-EnableWinRM' -ErrorAction SilentlyContinue
             if ($enableGPO) {
-                $domDN = Get-DomainDN
-                if ($domDN) {
-                    Set-GPLink -Name 'AppLocker-EnableWinRM' -Target $domDN -LinkEnabled No -ErrorAction SilentlyContinue | Out-Null
-                    $settingsApplied += 'AppLocker-EnableWinRM link disabled'
-                    Write-SetupLog -Message "Disabled AppLocker-EnableWinRM link to prevent conflict"
-                }
+                $enableGPO.GpoStatus = [Microsoft.GroupPolicy.GpoStatus]::AllSettingsDisabled
+                $settingsApplied += 'AppLocker-EnableWinRM settings disabled'
+                Write-SetupLog -Message "Disabled AppLocker-EnableWinRM settings to prevent conflict"
             }
         } catch {
-            Write-SetupLog -Message "Could not disable EnableWinRM link: $($_.Exception.Message)" -Level Warning
+            Write-SetupLog -Message "Could not disable EnableWinRM settings: $($_.Exception.Message)" -Level Warning
         }
 
         $result.Success = $true

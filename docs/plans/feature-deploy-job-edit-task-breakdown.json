@@ -1,0 +1,68 @@
+[
+  {
+    "id": "T1-backend-update-deployment-job",
+    "title": "Add Update-DeploymentJob and exports",
+    "description": "Create Update-DeploymentJob for Pending jobs and export it from deployment/root manifests.",
+    "files": [
+      "GA-AppLocker/Modules/GA-AppLocker.Deployment/Functions/Update-DeploymentJob.ps1",
+      "GA-AppLocker/Modules/GA-AppLocker.Deployment/GA-AppLocker.Deployment.psd1",
+      "GA-AppLocker/Modules/GA-AppLocker.Deployment/GA-AppLocker.Deployment.psm1",
+      "GA-AppLocker/GA-AppLocker.psd1",
+      "GA-AppLocker/GA-AppLocker.psm1"
+    ],
+    "deps": [],
+    "tests": [
+      "Tests/Unit/Deployment.Tests.ps1"
+    ],
+    "risk_level": "medium"
+  },
+  {
+    "id": "T2-xaml-edit-tab-fields",
+    "title": "Add job edit fields to Deploy Edit tab",
+    "description": "Add Job ID (read-only), Schedule combo, and Target OUs textbox to Deploy Edit tab XAML.",
+    "files": [
+      "GA-AppLocker/GUI/MainWindow.xaml"
+    ],
+    "deps": [],
+    "tests": [
+      "Tests/Unit/V1229Session.Tests.ps1"
+    ],
+    "risk_level": "low"
+  },
+  {
+    "id": "T3-deploy-ps1-job-wiring",
+    "title": "Wire Deploy Edit tab to Update-DeploymentJob",
+    "description": "Populate job fields when a job is selected and save via Update-DeploymentJob; fallback to Update-Policy when no job selected.",
+    "files": [
+      "GA-AppLocker/GUI/Panels/Deploy.ps1"
+    ],
+    "deps": [
+      "T1-backend-update-deployment-job",
+      "T2-xaml-edit-tab-fields"
+    ],
+    "tests": [
+      "Tests/Unit/GUI.DeployPanel.Tests.ps1"
+    ],
+    "risk_level": "medium"
+  },
+  {
+    "id": "T4-tests-update",
+    "title": "Add/adjust tests for job edit flow",
+    "description": "Add Update-DeploymentJob unit tests and update Deploy panel/XAML regex tests for new edit fields.",
+    "files": [
+      "Tests/Unit/Deployment.Tests.ps1",
+      "Tests/Unit/GUI.DeployPanel.Tests.ps1",
+      "Tests/Unit/V1229Session.Tests.ps1"
+    ],
+    "deps": [
+      "T1-backend-update-deployment-job",
+      "T3-deploy-ps1-job-wiring"
+    ],
+    "tests": [
+      "Invoke-Pester -Path Tests/Unit/Deployment.Tests.ps1 -Output Detailed",
+      "Invoke-Pester -Path Tests/Unit/GUI.DeployPanel.Tests.ps1 -Output Detailed",
+      "Invoke-Pester -Path Tests/Unit/V1229Session.Tests.ps1 -Output Detailed"
+    ],
+    "risk_level": "medium"
+  }
+]

@@ -537,9 +537,13 @@ function script:Get-RuleTypeForArtifact {
         $Artifact.SignerCertificate
     }
     
+    # Defensive: CSV imports may pass IsSigned as string "True"/"False"
+    # PS 5.1: "False" is truthy — must explicitly check for boolean $true or string 'True'
+    $isSigned = ($Artifact.IsSigned -eq $true) -or ($Artifact.IsSigned -eq 'True')
+    
     switch ($Mode) {
         'Smart' {
-            if ($Artifact.IsSigned -and -not [string]::IsNullOrWhiteSpace($publisherString)) {
+            if ($isSigned -and -not [string]::IsNullOrWhiteSpace($publisherString)) {
                 # Check for GUID-only certificates - use Hash instead since they don't provide
                 # meaningful publisher identification and typically cover only one file
                 if (Test-GuidOnlyCertificate -CertSubject $publisherString) {

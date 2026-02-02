@@ -1976,7 +1976,7 @@ Width="1450"
                                               SelectionMode="Single"
                                               IsReadOnly="True">
                                         <DataGrid.Columns>
-                                            <DataGridTextColumn Header="Policy Name" Binding="{Binding Name}" Width="180"/>
+                                            <DataGridTextColumn Header="Policy Name" Binding="{Binding Name}" Width="150"/>
                                             <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*"/>
                                             <DataGridTextColumn Header="Rules" Binding="{Binding RuleCount}" Width="60">
                                                 <DataGridTextColumn.ElementStyle>
@@ -2372,7 +2372,7 @@ Width="1450"
                                           SelectionMode="Single"
                                           IsReadOnly="True">
                                     <DataGrid.Columns>
-                                        <DataGridTextColumn Header="Policy" Binding="{Binding PolicyName}" Width="*"/>
+                                        <DataGridTextColumn Header="Policy" Binding="{Binding PolicyName}" Width="180"/>
                                         <DataGridTextColumn Header="GPO" Binding="{Binding GPOName}" Width="100"/>
                                         <DataGridTemplateColumn Header="Status" Width="80" SortMemberPath="Status">
                                             <DataGridTemplateColumn.CellTemplate>

@@ -1049,7 +1049,7 @@ function global:Invoke-SaveDeployPolicyChanges {
         $txtTargetOUs = $Window.FindName('TxtDeployEditTargetOUs')
         $targetOUs = [System.Collections.Generic.List[string]]::new()
         if ($txtTargetOUs -and -not [string]::IsNullOrWhiteSpace($txtTargetOUs.Text)) {
-            $parts = $txtTargetOUs.Text -split '[,\r\n]+'
+            $parts = $txtTargetOUs.Text -split '[\r\n]+'
             foreach ($part in $parts) {
                 $trimmed = $part.Trim()
                 if (-not [string]::IsNullOrWhiteSpace($trimmed)) {

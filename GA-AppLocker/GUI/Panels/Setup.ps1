@@ -57,9 +57,9 @@ function Update-SetupStatus {
             $btnToggleEnable = $Window.FindName('BtnToggleEnableWinRM')
             if ($btnToggleEnable -and $status.Data.WinRM) {
                 if ($status.Data.WinRM.Status -eq 'Enabled') {
-                    $btnToggleEnable.Content = 'Disable Link'
+                    $btnToggleEnable.Content = 'Disable Settings'
                 } else {
-                    $btnToggleEnable.Content = 'Enable Link'
+                    $btnToggleEnable.Content = 'Enable Settings'
                 }
             }
 
@@ -78,9 +78,9 @@ function Update-SetupStatus {
             $btnToggleDisable = $Window.FindName('BtnToggleDisableWinRM')
             if ($btnToggleDisable -and $status.Data.DisableWinRM) {
                 if ($status.Data.DisableWinRM.Status -eq 'Enabled') {
-                    $btnToggleDisable.Content = 'Disable Link'
+                    $btnToggleDisable.Content = 'Disable Settings'
                 } else {
-                    $btnToggleDisable.Content = 'Enable Link'
+                    $btnToggleDisable.Content = 'Enable Settings'
                 }
             }
 
@@ -138,7 +138,7 @@ function global:Invoke-InitializeWinRM {
     param($Window)
 
     try {
-        $confirm = Show-AppLockerMessageBox "This will create two WinRM GPOs linked to the domain root:`n`n1. AppLocker-EnableWinRM - enables WinRM on all computers`n2. AppLocker-DisableWinRM - tattoo removal (link starts disabled)`n`nRequires Domain Admin permissions.`n`nContinue?" 'Initialize WinRM GPOs' 'YesNo' 'Warning'
+        $confirm = Show-AppLockerMessageBox "This will create two WinRM GPOs linked to the domain root:`n`n1. AppLocker-EnableWinRM - enables WinRM on all computers`n2. AppLocker-DisableWinRM - tattoo removal (settings start disabled)`n`nRequires Domain Admin permissions.`n`nContinue?" 'Initialize WinRM GPOs' 'YesNo' 'Warning'
 
         if ($confirm -ne 'Yes') { return }
 
@@ -147,20 +147,20 @@ function global:Invoke-InitializeWinRM {
         # Create Enable GPO (linked + enabled)
         $enableResult = Initialize-WinRMGPO
 
-        # Create Disable GPO (linked + enforced - but Initialize-DisableWinRMGPO also disables the Enable link)
+        # Create Disable GPO (linked + enforced - but Initialize-DisableWinRMGPO also disables Enable settings)
         $disableResult = Initialize-DisableWinRMGPO
 
-        # Fix link states: Enable GPO active, Disable GPO inactive (ready but not applied)
+        # Fix settings states: Enable GPO active, Disable GPO inactive (ready but not applied)
         try {
             Enable-WinRMGPO -GPOName 'AppLocker-EnableWinRM' -ErrorAction SilentlyContinue
             Disable-WinRMGPO -GPOName 'AppLocker-DisableWinRM' -ErrorAction SilentlyContinue
-        } catch { Write-Log -Level Warning -Message "WinRM GPO link state update failed: $($_.Exception.Message)" }
+        } catch { Write-Log -Level Warning -Message "WinRM GPO settings state update failed: $($_.Exception.Message)" }
 
         Hide-LoadingOverlay
 
         $summary = @()
         if ($enableResult.Success) { $summary += "EnableWinRM: Created" } else { $summary += "EnableWinRM: Failed - $($enableResult.Error)" }
-        if ($disableResult.Success) { $summary += "DisableWinRM: Created (link disabled)" } else { $summary += "DisableWinRM: Failed - $($disableResult.Error)" }
+        if ($disableResult.Success) { $summary += "DisableWinRM: Created (settings disabled)" } else { $summary += "DisableWinRM: Failed - $($disableResult.Error)" }
 
         if ($enableResult.Success -or $disableResult.Success) {
             Show-AppLockerMessageBox "WinRM GPOs initialized!`n`n$($summary -join "`n")" 'Success' 'OK' 'Information'
@@ -209,9 +209,9 @@ function global:Invoke-ToggleWinRMGPO {
         }
 
         if ($result.Success) {
-            $message = "$GPOName link $action."
+            $message = "$GPOName settings $action."
 
-            # Mutual exclusivity: when ENABLING one GPO, auto-disable the opposite
+            # Mutual exclusivity: keep one enabled when both exist
             if ($action -eq 'enabled') {
                 $oppositeGPO = $null
                 $oppositeProperty = $null
@@ -229,7 +229,29 @@ function global:Invoke-ToggleWinRMGPO {
                     if ($oppositeStatus -and $oppositeStatus.Exists -and $oppositeStatus.Status -eq 'Enabled') {
                         $disableOpposite = Disable-WinRMGPO -GPOName $oppositeGPO
                         if ($disableOpposite.Success) {
-                            $message += "`n$oppositeGPO link auto-disabled (mutually exclusive)."
+                            $message += "`n$oppositeGPO settings auto-disabled (mutually exclusive)."
+                        }
+                    }
+                }
+            }
+            elseif ($action -eq 'disabled') {
+                $oppositeGPO = $null
+                $oppositeProperty = $null
+                if ($GPOName -eq 'AppLocker-EnableWinRM') {
+                    $oppositeGPO = 'AppLocker-DisableWinRM'
+                    $oppositeProperty = 'DisableWinRM'
+                }
+                elseif ($GPOName -eq 'AppLocker-DisableWinRM') {
+                    $oppositeGPO = 'AppLocker-EnableWinRM'
+                    $oppositeProperty = 'WinRM'
+                }
+
+                if ($oppositeGPO) {
+                    $oppositeStatus = $status.Data.$oppositeProperty
+                    if ($oppositeStatus -and $oppositeStatus.Exists -and $oppositeStatus.Status -ne 'Enabled') {
+                        $enableOpposite = Enable-WinRMGPO -GPOName $oppositeGPO
+                        if ($enableOpposite.Success) {
+                            $message += "`n$oppositeGPO settings auto-enabled (mutually exclusive)."
                         }
                     }
                 }

@@ -2,6 +2,15 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.42] - 2026-02-01
+
+### Bug Fixes & Features
+
+- **Fix hash rules not created from CSV-imported artifacts** -- `Import-Csv` returns all values as strings, so `IsSigned = "False"` was truthy in PowerShell, making ALL artifacts appear signed. Added boolean coercion after CSV import + defensive check in `Get-RuleTypeForArtifact`
+- **Fix Deploy Edit tab OU splitting** -- Target OUs containing commas (e.g., `OU=Servers,DC=example,DC=com`) were incorrectly split on commas. Changed split regex from `[,\r\n]+` to `[\r\n]+` (newlines only)
+- **WinRM GPOs toggle settings instead of links** -- Enable/Disable WinRM GPO buttons now set `GpoStatus = AllSettingsEnabled/AllSettingsDisabled` instead of toggling link state. Both GPOs stay linked at all times; mutual exclusivity preserved (enabling one auto-disables the other)
+- **Policy/Deploy column width adjustments** -- Policy Name column narrowed from 180 to 150; Deployment Jobs Policy column set to fixed 180
+
 ## [1.2.41] - 2026-02-01
 
 ### Bug Fixes & Features

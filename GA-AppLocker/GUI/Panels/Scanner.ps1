@@ -842,7 +842,17 @@ function global:Invoke-ImportArtifacts {
                 $extension = [System.IO.Path]::GetExtension($filePath).ToLower()
                 
                 $artifacts = switch ($extension) {
-                    '.csv' { @(Import-Csv -Path $filePath) }
+                    '.csv' {
+                        $csvData = @(Import-Csv -Path $filePath)
+                        # CSV import returns ALL values as strings — coerce boolean fields
+                        # PS 5.1: "False" is truthy, must explicitly compare to 'True'
+                        foreach ($item in $csvData) {
+                            if ($null -ne $item.IsSigned) {
+                                $item.IsSigned = ($item.IsSigned -eq 'True')
+                            }
+                        }
+                        $csvData
+                    }
                     '.json' { @(Get-Content -Path $filePath -Raw | ConvertFrom-Json) }
                     default { throw "Unsupported file format: $extension" }
                 }
