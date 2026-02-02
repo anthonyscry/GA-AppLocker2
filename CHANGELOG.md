@@ -2,6 +2,20 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.44] - 2026-02-01
+
+### Bug Fixes
+
+- **CRITICAL: Fix RunspacePool scriptblock silently dropping ALL unsigned files from scan results** -- The parallel scanning code in `Get-LocalArtifacts.ps1` (used when file count > 100) had `Write-AppLockerLog` calls inside `catch` blocks within the RunspacePool scriptblock. Module functions are NOT available inside RunspacePool context, so calling `Write-AppLockerLog` threw a terminating `CommandNotFoundException` in PS 5.1. When this happened inside a `catch` block (e.g., catching the expected exception from `[X509Certificate]::CreateFromSignedFile()` on unsigned files), the error propagated up and silently skipped the entire artifact. Result: only signed files survived the parallel scan path -- all unsigned files were dropped with no error visible to the user.
+- **Root cause of missing hash rules explained** -- Since only signed files survived scanning, only publisher rules could be generated. Hash rules (which require unsigned files) were never created. This fix restores unsigned file collection, enabling proper hash rule generation.
+- **Fix:** Replaced `Write-AppLockerLog` calls inside RunspacePool `$processBlock` catch blocks with empty catches + explanatory comments. Sequential path and remote scan path were unaffected (they run in module scope where `Write-AppLockerLog` is available).
+
+### Stats
+
+- **Version:** 1.2.44
+- **Tests:** 1548/1548 passing (100%)
+- **Exported Commands:** ~194
+
 ## [1.2.43] - 2026-02-01
 
 ### Improvements

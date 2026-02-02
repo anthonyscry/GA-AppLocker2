@@ -240,14 +240,19 @@ function Get-LocalArtifacts {
                                 $stream.Dispose()
                             }
                         }
-                        catch { Write-AppLockerLog -Message "Failed to hash file '$filePath': $($_.Exception.Message)" -Level 'DEBUG' }
+                        catch {
+                            # Hash failure — rare (access denied, locked file)
+                            # NOTE: Write-AppLockerLog is NOT available inside RunspacePool scriptblocks
+                        }
                         
                         # Version info
                         $versionInfo = $null
                         try {
                             $versionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($filePath)
                         }
-                        catch { Write-AppLockerLog -Message "Failed to read version info for '$filePath': $($_.Exception.Message)" -Level 'DEBUG' }
+                        catch {
+                            # Version info unavailable — acceptable for some files
+                        }
                         
                         # Digital signature — .NET cert extraction (no CRL/OCSP)
                         $isSigned = $false
@@ -260,7 +265,9 @@ function Get-LocalArtifacts {
                                 $signerSubject = $cert.Subject
                                 $sigStatus = 'Valid'
                             }
-                        } catch { Write-AppLockerLog -Message "Failed to read certificate for '$filePath': $($_.Exception.Message)" -Level 'DEBUG' }
+                        } catch {
+                            # No embedded Authenticode certificate — file is unsigned (expected for most files)
+                        }
                         
                         # Artifact type mapping
                         $artType = switch ($file.Extension.ToLower()) {

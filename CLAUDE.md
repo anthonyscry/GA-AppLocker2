@@ -4,7 +4,7 @@
 
 GA-AppLocker is a PowerShell 5.1 WPF application for enterprise AppLocker policy management in air-gapped, classified, or highly secure environments. Complete workflow: AD Discovery → Artifact Scanning → Rule Generation → Policy Building → GPO Deployment.
 
-**Version:** 1.2.43 | **Tests:** 1548/1548 passing (100%) | **Exported Commands:** ~194
+**Version:** 1.2.44 | **Tests:** 1548/1548 passing (100%) | **Exported Commands:** ~194
 
 ## Quick Start
 
@@ -429,6 +429,7 @@ Invoke-Pester -Path '.\Tests\Unit\' -Output Detailed 2>&1 | Select-String '\[-\]
 
 | Version | Date | Key Changes |
 |---------|------|-------------|
+| 1.2.44 | Feb 1, 2026 | CRITICAL: Fix RunspacePool scriptblock silently dropping ALL unsigned files from scan results (Write-AppLockerLog undefined in runspace context threw terminating CommandNotFoundException inside catch blocks, causing unsigned file artifacts to be skipped entirely -- only signed files survived parallel scanning). Fix: removed module function calls from RunspacePool catch blocks. This also explains why hash rules were never generated from scans (only publisher rules appeared, since only signed files made it through). |
 | 1.2.43 | Feb 1, 2026 | Setup panel shows actual linked OU paths instead of hardcoded labels (Get-SetupStatus adds LinkedOUs via Get-GPOReport XML, Setup.ps1 populates TxtGPO_{Type}_OU TextBlocks), V1229Session.Tests.ps1 refactor (5 redundant regex tests removed, Get-PhaseCollectionTypes converted to behavioral calls via dot-sourced Policy.ps1, function-definition regex converted to Get-Command for Software.ps1 global functions) |
 | 1.2.42 | Feb 1, 2026 | Fix hash rules not created from CSV-imported artifacts (IsSigned string "False" truthy in PS 5.1, added boolean coercion + defensive check), fix Deploy Edit tab OU splitting (commas in DNs broke split regex, now newlines only), WinRM GPOs toggle settings instead of links (GpoStatus enable/disable, both stay linked, mutual exclusivity preserved), Policy/Deploy column width adjustments |
 | 1.2.41 | Feb 1, 2026 | Wire BtnClearCompletedJobs click handler (Clear button was unresponsive), GPO Link Control rewrite to use Get-SetupStatus (proven reliable) instead of direct Get-GPO calls (fixes "Not Created" false negatives), Deploy Edit tab save refreshes jobs DataGrid, Setup panel AD group badges turn green when groups exist (6 badges), Software Compare tab Export Comparison Results button (CSV with Source column), fix 7 tests for GPO Link rewrite |
