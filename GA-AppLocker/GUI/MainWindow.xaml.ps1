@@ -332,16 +332,24 @@ function global:Set-ActivePanel {
         try { Update-PoliciesDataGrid -Window $Window } catch { }
     }
 
-    # Auto-refresh Deploy panel on every navigation (policy combo + jobs list + GPO status)
+    # Auto-refresh Deploy panel on navigation (deferred so panel renders immediately)
     if ($PanelName -eq 'PanelDeploy') {
-        Refresh-DeployPolicyCombo -Window $Window
-        Update-DeploymentJobsDataGrid -Window $Window
-        try { global:Update-AppLockerGpoLinkStatus -Window $Window } catch { }
+        $Window.Dispatcher.BeginInvoke(
+            [System.Windows.Threading.DispatcherPriority]::Background,
+            [Action]{
+                Refresh-DeployPolicyCombo -Window $global:GA_MainWindow
+                Update-DeploymentJobsDataGrid -Window $global:GA_MainWindow
+                try { global:Update-AppLockerGpoLinkStatus -Window $global:GA_MainWindow } catch { }
+            }
+        )
     }
 
-    # Auto-refresh Setup panel GPO status on every navigation
+    # Auto-refresh Setup panel GPO status on navigation (deferred so panel renders immediately)
     if ($PanelName -eq 'PanelSetup') {
-        try { Update-SetupStatus -Window $Window } catch { }
+        $Window.Dispatcher.BeginInvoke(
+            [System.Windows.Threading.DispatcherPriority]::Background,
+            [Action]{ try { Update-SetupStatus -Window $global:GA_MainWindow } catch { } }
+        )
     }
 
     # Software panel: user enters machines manually (no auto-populate from AD Discovery)

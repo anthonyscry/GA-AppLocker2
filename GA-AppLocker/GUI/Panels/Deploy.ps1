@@ -153,7 +153,7 @@ function global:Refresh-DeployPolicyCombo {
             $item = [System.Windows.Controls.ComboBoxItem]::new()
             $item.Content = $displayText
             $item.Tag = $policy
-            $policyCombo.Items.Add($item) | Out-Null
+            [void]$policyCombo.Items.Add($item)
         }
 
         Write-Log -Message "Refresh-DeployPolicyCombo: Loaded $($deployable.Count) policies into dropdown"
