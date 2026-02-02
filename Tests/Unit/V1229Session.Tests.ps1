@@ -716,6 +716,11 @@ Describe 'Deploy Edit - Policy Dropdown' -Tag 'Unit', 'XAML', 'Deploy' {
         It 'Should have CboDeployEditPolicy in XAML' {
             $script:XamlContent | Should -Match 'x:Name="CboDeployEditPolicy"'
         }
+        It 'Should have job edit fields in XAML' {
+            $script:XamlContent | Should -Match 'x:Name="TxtDeployEditJobId"'
+            $script:XamlContent | Should -Match 'x:Name="CboDeployEditSchedule"'
+            $script:XamlContent | Should -Match 'x:Name="TxtDeployEditTargetOUs"'
+        }
     }
 
     Context 'Deploy.ps1 handles dual combos' {

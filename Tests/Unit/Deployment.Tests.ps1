@@ -44,6 +44,10 @@ Describe 'Deployment Module - Function Exports' -Tag 'Unit', 'Deployment' {
         Get-Command 'Get-AllDeploymentJobs' -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
     }
 
+    It 'Update-DeploymentJob should be exported' {
+        Get-Command 'Update-DeploymentJob' -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+    }
+
     It 'Start-Deployment should be exported' {
         Get-Command 'Start-Deployment' -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
     }
@@ -123,6 +127,63 @@ Describe 'New-DeploymentJob' -Tag 'Unit', 'Deployment' {
         $result = New-DeploymentJob -PolicyId ([guid]::NewGuid().ToString()) -GPOName 'Test-GPO'
         $result.Success | Should -Be $false
         $result.Error | Should -Not -BeNullOrEmpty
+    }
+}
+
+# ============================================================================
+# UPDATE-DEPLOYMENTJOB
+# ============================================================================
+
+Describe 'Update-DeploymentJob' -Tag 'Unit', 'Deployment' {
+
+    BeforeAll {
+        $uniqueName = "UnitTest_UpdateDeployPolicy_$([guid]::NewGuid().ToString('N'))"
+        $script:UpdatePolicy = New-Policy -Name $uniqueName -Phase 1 -Description 'Test policy for update job'
+        if ($script:UpdatePolicy.Success) {
+            $script:UpdateJob = New-DeploymentJob -PolicyId $script:UpdatePolicy.Data.PolicyId -GPOName 'AppLocker-Servers' -Schedule 'Manual'
+        }
+    }
+
+    It 'Should update pending job fields' {
+        if (-not $script:UpdateJob.Success) {
+            Set-ItResult -Skipped -Because 'Deployment job creation failed'
+            return
+        }
+
+        $result = Update-DeploymentJob -JobId $script:UpdateJob.Data.JobId -GPOName 'AppLocker-Workstations' -Schedule 'Immediate'
+        $result.Success | Should -Be $true
+        $result.Data.GPOName | Should -Be 'AppLocker-Workstations'
+        $result.Data.Schedule | Should -Be 'Immediate'
+    }
+
+    It 'Should update target OUs' {
+        if (-not $script:UpdateJob.Success) {
+            Set-ItResult -Skipped -Because 'Deployment job creation failed'
+            return
+        }
+
+        $targetOUs = @('OU=Servers,DC=example,DC=com', 'OU=Workstations,DC=example,DC=com')
+        $result = Update-DeploymentJob -JobId $script:UpdateJob.Data.JobId -TargetOUs $targetOUs
+        $result.Success | Should -Be $true
+        @($result.Data.TargetOUs).Count | Should -Be 2
+    }
+
+    It 'Should reject non-Pending job updates' {
+        if (-not $script:UpdateJob.Success) {
+            Set-ItResult -Skipped -Because 'Deployment job creation failed'
+            return
+        }
+
+        $dataPath = Get-AppLockerDataPath
+        $deploymentsPath = Join-Path $dataPath 'Deployments'
+        $jobFile = Join-Path $deploymentsPath "$($script:UpdateJob.Data.JobId).json"
+        $jobData = Get-Content -Path $jobFile -Raw | ConvertFrom-Json
+        $jobData.Status = 'Running'
+        $jobData | ConvertTo-Json -Depth 5 | Set-Content -Path $jobFile -Encoding UTF8
+
+        $result = Update-DeploymentJob -JobId $script:UpdateJob.Data.JobId -GPOName 'AppLocker-DC'
+        $result.Success | Should -Be $false
+        $result.Error | Should -Match 'Pending'
     }
 }
 
