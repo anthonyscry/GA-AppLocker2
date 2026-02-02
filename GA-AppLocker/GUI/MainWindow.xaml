@@ -2160,6 +2160,25 @@ Width="1450"
                                         <TextBlock Text="Select Policy:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
                                         <ComboBox x:Name="CboDeployEditPolicy" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,10"/>
 
+                                        <TextBlock Text="Job ID:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                        <TextBox x:Name="TxtDeployEditJobId"
+                                                 Style="{StaticResource TextBoxStyle}"
+                                                 IsReadOnly="True"
+                                                 Margin="0,0,0,10"/>
+
+                                        <TextBlock Text="Schedule:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                        <ComboBox x:Name="CboDeployEditSchedule" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,10">
+                                            <ComboBoxItem Content="Manual" IsSelected="True"/>
+                                            <ComboBoxItem Content="Immediate"/>
+                                            <ComboBoxItem Content="Scheduled"/>
+                                        </ComboBox>
+
+                                        <TextBlock Text="Target OUs (optional):" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                        <TextBox x:Name="TxtDeployEditTargetOUs"
+                                                 Style="{StaticResource TextBoxStyle}"
+                                                 Height="60" TextWrapping="Wrap" AcceptsReturn="True"
+                                                 VerticalContentAlignment="Top" Margin="0,0,0,10"/>
+
                                         <TextBlock Text="Policy Name:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
                                         <TextBox x:Name="TxtDeployEditPolicyName" 
                                                  Style="{StaticResource TextBoxStyle}" Margin="0,0,0,10"/>
