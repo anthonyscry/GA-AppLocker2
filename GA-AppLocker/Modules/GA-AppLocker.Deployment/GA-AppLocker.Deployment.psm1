@@ -73,6 +73,7 @@ Export-ModuleMember -Function @(
     'New-DeploymentJob',
     'Get-DeploymentJob',
     'Get-AllDeploymentJobs',
+    'Update-DeploymentJob',
     'Remove-DeploymentJob',
     'Start-Deployment',
     'Stop-Deployment',
