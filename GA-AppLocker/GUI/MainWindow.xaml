@@ -489,20 +489,20 @@ Width="1450"
 
                     <Separator x:Name="NavSeparator" Margin="15,20" Background="#3E3E42"/>
 
-                    <Button x:Name="NavSettings"
-                            Style="{StaticResource NavButtonStyle}"
-                            AutomationProperties.Name="Settings">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#x2699;" FontSize="16" Width="24"/>
-                            <TextBlock x:Name="NavSettingsText" Text="Settings" Margin="8,0,0,0"/>
-                        </StackPanel>
-                    </Button>
                     <Button x:Name="NavSoftware"
                             Style="{StaticResource NavButtonStyle}"
                             AutomationProperties.Name="Software Inventory">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="&#x1F4CB;" FontSize="16" Width="24"/>
                             <TextBlock x:Name="NavSoftwareText" Text="Software Inventory" Margin="8,0,0,0"/>
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="NavSettings"
+                            Style="{StaticResource NavButtonStyle}"
+                            AutomationProperties.Name="Settings">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#x2699;" FontSize="16" Width="24"/>
+                            <TextBlock x:Name="NavSettingsText" Text="Settings" Margin="8,0,0,0"/>
                         </StackPanel>
                     </Button>
                     <Button x:Name="NavSetup"
