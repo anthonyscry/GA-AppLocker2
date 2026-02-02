@@ -86,8 +86,8 @@ function Initialize-PolicyPanel {
             })
     }
 
-    # Initial load - use async to keep UI responsive
-    Update-PoliciesDataGrid -Window $Window -Async
+    # Don't load policies at init — they load on first navigation to Policy panel
+    # (Set-ActivePanel calls Update-PoliciesDataGrid when PanelPolicy is shown)
     
     # Initialize Compare tab dropdowns
     Initialize-PolicyCompareDropdowns -Window $Window
