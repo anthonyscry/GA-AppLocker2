@@ -2,6 +2,16 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.48] - 2026-02-02
+
+### Features
+
+- **Service Allow button** -- New `+ Service Allow` button on Rules panel creates 20 mandatory baseline allow-all path rules for the 4 principals that must never be blocked: SYSTEM (S-1-5-18), Local Service (S-1-5-19), Network Service (S-1-5-20), and BUILTIN\Administrators (S-1-5-32-544). Each gets allow-all path rules (`*`) across all 5 collection types (Exe, Dll, Msi, Script, Appx). All created with Status: Approved. Blocking any of these breaks Windows services, updates, and system management.
+
+### UI Changes
+
+- **Rules panel button reorder** -- Buttons now ordered: `+ Service Allow`, `+ Admin Allow`, `+ Deny Paths`, `+ Deny Browsers`, `- Dedupe`, `Delete`. Allow rules grouped first (green), deny rules second (red), utility last.
+
 ## [1.2.47] - 2026-02-01
 
 ### Performance

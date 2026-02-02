@@ -31,7 +31,7 @@ function Initialize-RulesPanel {
         'BtnLaunchRuleWizard', 'BtnCreateManualRule', 'BtnExportRulesXml', 'BtnExportRulesCsv',
         'BtnImportRulesXml', 'BtnRefreshRules', 'BtnApproveRule', 'BtnRejectRule', 'BtnReviewRule',
         'BtnDeleteRule', 'BtnViewRuleDetails', 'BtnViewRuleHistory', 'BtnAddRuleToPolicy',
-        'BtnAddAdminAllowRules', 'BtnRemoveDuplicateRules', 'BtnAddCommonDenyRules', 'BtnAddDenyBrowserRules',
+        'BtnAddServiceAllowRules', 'BtnAddAdminAllowRules', 'BtnRemoveDuplicateRules', 'BtnAddCommonDenyRules', 'BtnAddDenyBrowserRules',
         'BtnChangeAction', 'BtnChangeGroup'
     )
 
@@ -1429,6 +1429,79 @@ function global:Invoke-AddAdminAllowRules {
     }
 
     # Refresh rules grid and counters
+    Reset-RulesSelectionState -Window $Window
+    Update-RulesDataGrid -Window $Window
+    Update-DashboardStats -Window $Window
+    Update-WorkflowBreadcrumb -Window $Window
+}
+
+function global:Invoke-AddServiceAllowRules {
+    <#
+    .SYNOPSIS
+        Creates allow-all path rules for the 4 mandatory AppLocker baseline principals.
+    .DESCRIPTION
+        Creates 20 rules total: SYSTEM (S-1-5-18), Local Service (S-1-5-19),
+        Network Service (S-1-5-20), and BUILTIN\Administrators (S-1-5-32-544)
+        each get allow-all path rules across all 5 collection types (Exe, Dll, Msi, Script, Appx).
+        These are mandatory baseline rules - blocking any of these breaks Windows.
+    #>
+    param($Window)
+
+    $principals = @(
+        @{ Name = 'SYSTEM';          Sid = 'S-1-5-18' }
+        @{ Name = 'Local Service';   Sid = 'S-1-5-19' }
+        @{ Name = 'Network Service'; Sid = 'S-1-5-20' }
+        @{ Name = 'Administrators';  Sid = 'S-1-5-32-544' }
+    )
+    $collectionTypes = @('Exe', 'Dll', 'Msi', 'Script', 'Appx')
+
+    $confirm = Show-AppLockerMessageBox ("This will create Allow-All baseline rules for:" +
+        "`n`n  - SYSTEM (S-1-5-18)" +
+        "`n  - Local Service (S-1-5-19)" +
+        "`n  - Network Service (S-1-5-20)" +
+        "`n  - BUILTIN\Administrators (S-1-5-32-544)" +
+        "`n`nEach gets 5 rules (EXE, DLL, MSI, Script, Appx) = 20 rules total." +
+        "`nStatus: Approved | Action: Allow | Path: *" +
+        "`n`nThese are mandatory - blocking these principals breaks Windows." +
+        "`n`nDo you want to continue?") 'Create Service Allow Rules' 'YesNo' 'Question'
+
+    if ($confirm -ne 'Yes') { return }
+
+    Show-LoadingOverlay -Message 'Creating service allow rules...' -SubMessage '4 principals x 5 collection types'
+
+    try {
+        $created = 0
+        $skipped = 0
+
+        foreach ($principal in $principals) {
+            foreach ($ct in $collectionTypes) {
+                $result = New-PathRule -Path '*' -Action Allow -CollectionType $ct `
+                    -Name "(Default) Allow All $ct for $($principal.Name)" `
+                    -Description "Mandatory baseline: Allow all $ct execution for $($principal.Name)" `
+                    -UserOrGroupSid $principal.Sid -Status 'Approved' -Save
+
+                if ($result.Success) {
+                    $created++
+                } else {
+                    $skipped++
+                    Write-AppLockerLog -Message "Service allow rule skipped ($($principal.Name) $ct): $($result.Error)" -Level 'DEBUG'
+                }
+            }
+        }
+
+        if ($created -gt 0) {
+            Show-Toast -Message "Created $created service allow rules ($skipped skipped)." -Type 'Success'
+        } else {
+            Show-Toast -Message "No rules created ($skipped skipped - may already exist)." -Type 'Warning'
+        }
+    }
+    catch {
+        Show-Toast -Message "Error: $($_.Exception.Message)" -Type 'Error'
+    }
+    finally {
+        Hide-LoadingOverlay
+    }
+
     Reset-RulesSelectionState -Window $Window
     Update-RulesDataGrid -Window $Window
     Update-DashboardStats -Window $Window

@@ -1725,8 +1725,15 @@ Width="1450"
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         
-                                        <!-- Left: Bulk Operations -->
                                         <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                            <Button x:Name="BtnAddServiceAllowRules" Content="+ Service Allow" 
+                                                    Style="{StaticResource ButtonStyle}" MinWidth="90" Padding="8,4" Margin="0,0,4,0"
+                                                    Background="#2E7D32" Tag="AddServiceAllowRules" 
+                                                    ToolTip="Create allow-all rules for SYSTEM, Local Service, Network Service, and BUILTIN\Administrators across all 5 collection types (20 rules) — mandatory AppLocker baseline"/>
+                                            <Button x:Name="BtnAddAdminAllowRules" Content="+ Admin Allow" 
+                                                    Style="{StaticResource ButtonStyle}" MinWidth="70" Padding="8,4" Margin="0,0,4,0"
+                                                    Background="#2E7D32" Tag="AddAdminAllowRules" 
+                                                    ToolTip="Create allow-all rules for AppLocker-Admins AD group (EXE, DLL, MSI, Script)"/>
                                             <Button x:Name="BtnAddCommonDenyRules" Content="+ Deny Paths" 
                                                     Style="{StaticResource ButtonStyle}" MinWidth="75" Padding="8,4" Margin="0,0,4,0"
                                                     Background="#B71C1C" Tag="AddCommonDenyRules" 
@@ -1735,17 +1742,12 @@ Width="1450"
                                                     Style="{StaticResource ButtonStyle}" MinWidth="85" Padding="8,4" Margin="0,0,4,0"
                                                     Background="#B71C1C" Tag="AddDenyBrowserRules" 
                                                     ToolTip="Deny internet browsers (IE, Edge, Chrome, Firefox) for AppLocker-Admins"/>
-                                            <Button x:Name="BtnAddAdminAllowRules" Content="+ Admin Allow" 
-                                                    Style="{StaticResource ButtonStyle}" MinWidth="70" Padding="8,4" Margin="0,0,4,0"
-                                                    Background="#2E7D32" Tag="AddAdminAllowRules" 
-                                                    ToolTip="Create allow-all rules for AppLocker-Admins (EXE, DLL, MSI, Script)"/>
                                             <Button x:Name="BtnRemoveDuplicateRules" Content="- Dedupe" 
                                                     Style="{StaticResource ButtonStyle}" MinWidth="65" Padding="8,4" Margin="0,0,4,0"
                                                     Background="#5D4037" Tag="RemoveDuplicateRules" 
                                                     ToolTip="Remove duplicate rules"/>
                                         </StackPanel>
                                         
-                                        <!-- Right: Delete -->
                                         <Button x:Name="BtnDeleteRule" Grid.Column="1" Content="Delete" 
                                                 Style="{StaticResource ButtonStyle}" MinWidth="60" Padding="8,4"
                                                 Background="#5D0000" Tag="DeleteRule"/>

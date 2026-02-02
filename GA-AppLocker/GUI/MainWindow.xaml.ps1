@@ -180,6 +180,7 @@ function global:Invoke-ButtonAction {
         'ChangeRuleAction' { Invoke-ChangeSelectedRulesAction -Window $win }
         'ChangeRuleGroup' { Invoke-ChangeSelectedRulesGroup -Window $win }
         # Dashboard Quick Actions
+        'AddServiceAllowRules' { Invoke-AddServiceAllowRules -Window $win }
         'AddAdminAllowRules' { Invoke-AddAdminAllowRules -Window $win }
         'RemoveDuplicateRules' { Invoke-RemoveDuplicateRules -Window $win }
         # Settings panel
