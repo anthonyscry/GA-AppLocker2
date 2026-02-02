@@ -83,7 +83,7 @@ function Save-RulesBulk {
         foreach ($rule in $Rules) {
             try {
                 $rulePath = Join-Path $rulesPath "$($rule.Id).json"
-                $json = $rule | ConvertTo-Json -Depth 10 -Compress
+                $json = $rule | ConvertTo-Json -Depth 5 -Compress
                 [System.IO.File]::WriteAllText($rulePath, $json, [System.Text.Encoding]::UTF8)
                 $saved++
             }

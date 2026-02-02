@@ -249,57 +249,30 @@ function Remove-DuplicateRules {
             return $result
         }
 
-        # Actually remove duplicates
+        # Actually remove duplicates using Storage layer's bulk operation
+        # (handles file deletion + index update + cache clearing in one call)
         Write-RuleLog -Message "Removing $($toRemove.Count) duplicate rules..."
-        $removeCount = 0
-        $removedRules = [System.Collections.Generic.List[PSCustomObject]]::new()
-
+        
+        $removeIds = [System.Collections.Generic.List[string]]::new()
         foreach ($rule in $toRemove) {
-            $removeCount++
-            
-            if ($removeCount % 500 -eq 0) {
-                $pct = [math]::Round(($removeCount / $toRemove.Count) * 100)
-                Write-Progress -Activity "Removing duplicates" -Status "$removeCount of $($toRemove.Count) ($pct%)" -PercentComplete $pct
-            }
-
-            try {
-                # Try to get file path from rule or construct it
-                $filePath = if ($rule._FilePath) { 
-                    $rule._FilePath 
-                } elseif ($rule.FilePath) {
-                    $rule.FilePath
-                } else {
-                    $rulePath = Get-RuleStoragePath
-                    Join-Path $rulePath "$($rule.Id).json"
-                }
-                
-                if (Test-Path $filePath) {
-                    Remove-Item -Path $filePath -Force
-                    $result.RemovedCount++
-                    [void]$removedRules.Add([PSCustomObject]@{
-                        Id = $rule.Id
-                        Name = $rule.Name
-                        Type = $rule.RuleType
-                    })
-                }
-            }
-            catch {
-                Write-RuleLog -Level Warning -Message "Failed to remove duplicate rule $($rule.Id): $($_.Exception.Message)"
-            }
+            [void]$removeIds.Add($rule.Id)
         }
-
-        Write-Progress -Activity "Removing duplicates" -Completed
-        $result.RemovedRules = $removedRules.ToArray()
-
-        # Update the JSON index to reflect removed rules
-        if ($result.RemovedCount -gt 0) {
-            $removedIds = @($removedRules | ForEach-Object { $_.Id })
-            if (Get-Command -Name 'Remove-RulesFromIndex' -ErrorAction SilentlyContinue) {
-                $indexResult = Remove-RulesFromIndex -RuleIds $removedIds
-                if (-not $indexResult.Success) {
-                    Write-RuleLog -Level Warning -Message "Index sync warning: $($indexResult.Error)"
-                }
+        
+        $bulkResult = Remove-RulesBulk -RuleIds $removeIds.ToArray()
+        
+        if ($bulkResult.Success) {
+            $result.RemovedCount = $bulkResult.RemovedCount
+            $removedRules = [System.Collections.Generic.List[PSCustomObject]]::new()
+            foreach ($rule in $toRemove) {
+                [void]$removedRules.Add([PSCustomObject]@{
+                    Id = $rule.Id
+                    Name = $rule.Name
+                    Type = $rule.RuleType
+                })
             }
+            $result.RemovedRules = $removedRules.ToArray()
+        } else {
+            Write-RuleLog -Level Warning -Message "Bulk removal warning: $($bulkResult.Error)"
         }
 
         $result.Success = $true

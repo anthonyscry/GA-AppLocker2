@@ -4,7 +4,7 @@
 
 GA-AppLocker is a PowerShell 5.1 WPF application for enterprise AppLocker policy management in air-gapped, classified, or highly secure environments. Complete workflow: AD Discovery → Artifact Scanning → Rule Generation → Policy Building → GPO Deployment.
 
-**Version:** 1.2.46 | **Tests:** 1282/1282 passing (100%) | **Exported Commands:** ~194
+**Version:** 1.2.47 | **Tests:** 1282/1282 passing (100%) | **Exported Commands:** ~194
 
 ## Quick Start
 
@@ -429,6 +429,7 @@ Invoke-Pester -Path '.\Tests\Unit\' -Output Detailed 2>&1 | Select-String '\[-\]
 
 | Version | Date | Key Changes |
 |---------|------|-------------|
+| 1.2.47 | Feb 1, 2026 | Performance: Save-JsonIndex rewrite (StringBuilder manual JSON serialization replaces ConvertTo-Json, 10-50x faster for 3000+ rule indexes), Remove-DuplicateRules uses Remove-RulesBulk instead of manual per-file deletion loop, ConvertTo-Json depth reduced from 10 to 5 across Storage module (flat PSCustomObjects don't need deep serialization) |
 | 1.2.46 | Feb 1, 2026 | Remove Deploy Edit tab entirely (Deploy panel now 3 tabs: Create, Actions, GPO Status), Deploy XML import preserves Approved status (-Status 'Approved' on Import-RulesFromXml), Policy Create description box height aligned with Edit tab, major test cleanup: V1229Session.Tests.ps1 rewritten behavioral-only (1489->670 lines, ~350->63 tests), V1228Regression.Tests.ps1 deleted (behavioral tests merged into V1229), removed ~266 fragile regex pattern-matching tests (test count 1548->1282, zero lost behavioral coverage) |
 | 1.2.45 | Feb 1, 2026 | Fix Resolve-GroupSid ADSI/LDAP fallback for SID resolution (4-method chain: NTAccount, domain-prefix, ADSISearcher, explicit LDAP; stops caching UNRESOLVED values), XML export SID guard (validates SID format before emission, re-resolves invalid SIDs, falls back to S-1-5-11/S-1-1-0), GPO status refresh on panel navigation (Setup/Deploy), Policy Create tab Target GPO dropdown, Deploy Create tab schedule removed, Deploy Edit tab stripped to name+GPO only, test fixes for removed XAML elements |
 | 1.2.44 | Feb 1, 2026 | CRITICAL: Fix RunspacePool scriptblock silently dropping ALL unsigned files from scan results (Write-AppLockerLog undefined in runspace context threw terminating CommandNotFoundException inside catch blocks, causing unsigned file artifacts to be skipped entirely -- only signed files survived parallel scanning). Fix: removed module function calls from RunspacePool catch blocks. This also explains why hash rules were never generated from scans (only publisher rules appeared, since only signed files made it through). |

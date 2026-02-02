@@ -2,6 +2,14 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.47] - 2026-02-01
+
+### Performance
+
+- **Save-JsonIndex rewrite** -- Replaced `ConvertTo-Json -Depth 10 -Compress` with `StringBuilder`-based manual JSON serialization for the rules index. PS 5.1's `ConvertTo-Json` has O(n^2) internal string concatenation for large arrays -- extremely slow for 3000+ rule indexes. New implementation writes safe values (GUIDs, enums, ISO dates, SIDs, hex hashes) directly, and JSON-escapes only values that need it (Name, PublisherName, ProductName, Path, GroupVendor, FilePath). Uses `[System.IO.File]::WriteAllText()` instead of `Set-Content`. Estimated 10-50x faster for large indexes.
+- **Remove-DuplicateRules uses Remove-RulesBulk** -- Replaced manual per-file deletion loop (`Test-Path` + `Remove-Item` + `Get-RuleStoragePath` per iteration + separate `Remove-RulesFromIndex`) with single `Remove-RulesBulk` call. Collects all duplicate IDs into a `List[string]` and removes in one batch operation.
+- **ConvertTo-Json depth reduced** -- Changed `-Depth 10` to `-Depth 5` across Storage module (`Save-RulesBulk`, `Add-Rule`, `Update-RuleInStorage`). Rule objects are flat PSCustomObjects that don't need deep serialization.
+
 ## [1.2.46] - 2026-02-01
 
 ### UI Changes
