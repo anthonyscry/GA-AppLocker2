@@ -83,15 +83,6 @@ function Initialize-DeploymentPanel {
             })
     }
 
-    # Wire up Edit policy combo selection changed to load edit fields
-    $editPolicyCombo = $Window.FindName('CboDeployEditPolicy')
-    if ($editPolicyCombo) {
-        $editPolicyCombo.Add_SelectionChanged({
-                param($sender, $e)
-                Update-DeployPolicyEditTab -Window $global:GA_MainWindow -Source 'Edit'
-            })
-    }
-
     # Wire up edit GPO dropdown to show/hide custom textbox
     $editGpoCombo = $Window.FindName('CboDeployEditGPO')
     $editCustomGpoBox = $Window.FindName('TxtDeployEditCustomGPO')
@@ -158,16 +149,14 @@ function global:Refresh-DeployPolicyCombo {
     param($Window)
 
     $policyCombo = $Window.FindName('CboDeployPolicy')
-    $editPolicyCombo = $Window.FindName('CboDeployEditPolicy')
 
-    if (-not $policyCombo -and -not $editPolicyCombo) {
-        Write-Log -Message 'Refresh-DeployPolicyCombo: No policy combo controls found' -Level 'Warning'
+    if (-not $policyCombo) {
+        Write-Log -Message 'Refresh-DeployPolicyCombo: No policy combo control found' -Level 'Warning'
         return
     }
 
     try {
-        if ($policyCombo) { $policyCombo.Items.Clear() }
-        if ($editPolicyCombo) { $editPolicyCombo.Items.Clear() }
+        $policyCombo.Items.Clear()
 
         # Load Active and Draft policies (anything deployable)
         $result = Get-AllPolicies
@@ -187,22 +176,13 @@ function global:Refresh-DeployPolicyCombo {
         foreach ($policy in $deployable) {
             $displayText = "$($policy.Name) (Phase $($policy.Phase)) - $($policy.Status)"
 
-            if ($policyCombo) {
-                $item = [System.Windows.Controls.ComboBoxItem]::new()
-                $item.Content = $displayText
-                $item.Tag = $policy
-                $policyCombo.Items.Add($item) | Out-Null
-            }
-
-            if ($editPolicyCombo) {
-                $editItem = [System.Windows.Controls.ComboBoxItem]::new()
-                $editItem.Content = $displayText
-                $editItem.Tag = $policy
-                $editPolicyCombo.Items.Add($editItem) | Out-Null
-            }
+            $item = [System.Windows.Controls.ComboBoxItem]::new()
+            $item.Content = $displayText
+            $item.Tag = $policy
+            $policyCombo.Items.Add($item) | Out-Null
         }
 
-        Write-Log -Message "Refresh-DeployPolicyCombo: Loaded $($deployable.Count) policies into dropdown(s)"
+        Write-Log -Message "Refresh-DeployPolicyCombo: Loaded $($deployable.Count) policies into dropdown"
     }
     catch {
         Write-Log -Message "Refresh-DeployPolicyCombo: Exception - $($_.Exception.Message)" -Level 'Error'
@@ -389,7 +369,6 @@ function global:Invoke-CreateDeploymentJob {
     $policyCombo = $Window.FindName('CboDeployPolicy')
     $gpoCombo = $Window.FindName('CboDeployTargetGPO')
     $customGpoBox = $Window.FindName('TxtDeployCustomGPO')
-    $scheduleCombo = $Window.FindName('CboDeploySchedule')
 
     if (-not $policyCombo.SelectedItem) {
         Show-AppLockerMessageBox 'Please select a policy to deploy.' 'Missing Policy' 'OK' 'Warning'
@@ -413,16 +392,9 @@ function global:Invoke-CreateDeploymentJob {
         return
     }
 
-    $schedule = switch ($scheduleCombo.SelectedIndex) {
-        0 { 'Manual' }
-        1 { 'Immediate' }
-        2 { 'Scheduled' }
-        default { 'Manual' }
-    }
-
     try {
         $policy = $policyCombo.SelectedItem.Tag
-        $result = New-DeploymentJob -PolicyId $policy.PolicyId -GPOName $gpoName -Schedule $schedule
+        $result = New-DeploymentJob -PolicyId $policy.PolicyId -GPOName $gpoName -Schedule 'Manual'
 
         if ($result.Success) {
             # Reset custom GPO box if used
@@ -869,114 +841,38 @@ function global:Invoke-ImportDeployPolicyXml {
 function global:Update-DeployPolicyEditTab {
     <#
     .SYNOPSIS
-        Populates the Deploy Edit tab fields from the selected policy.
-        Accepts -Source 'Edit' to use the Edit tab's own dropdown, or 'Create' for the Create tab's.
+        Populates the Deploy Edit tab fields from the selected policy in the right-side DataGrid
+        or from the Create tab's policy dropdown.
     #>
     param(
         $Window,
         [string]$Source = 'Edit'
     )
 
-    # Determine which combo triggered the update
-    $comboName = if ($Source -eq 'Create') { 'CboDeployPolicy' } else { 'CboDeployEditPolicy' }
-    $policyCombo = $Window.FindName($comboName)
-
     $txtName = $Window.FindName('TxtDeployEditPolicyName')
-    $txtDesc = $Window.FindName('TxtDeployEditPolicyDesc')
     $cboGPO = $Window.FindName('CboDeployEditGPO')
     $txtCustomGPO = $Window.FindName('TxtDeployEditCustomGPO')
-    $txtJobId = $Window.FindName('TxtDeployEditJobId')
-    $cboSchedule = $Window.FindName('CboDeployEditSchedule')
-    $txtTargetOUs = $Window.FindName('TxtDeployEditTargetOUs')
-    $jobsGrid = $Window.FindName('DeploymentJobsDataGrid')
-    $selectedJob = if ($jobsGrid) { $jobsGrid.SelectedItem } else { $null }
 
-    if ($selectedJob) {
-        if ($txtJobId) { $txtJobId.Text = if ($selectedJob.JobId) { $selectedJob.JobId } else { '' } }
-        if ($cboSchedule) {
-            $scheduleValue = if ($selectedJob.Schedule) { $selectedJob.Schedule } else { 'Manual' }
-            $matchedSchedule = $false
-            for ($i = 0; $i -lt $cboSchedule.Items.Count; $i++) {
-                $item = $cboSchedule.Items[$i]
-                if ($item -and $item.Content -eq $scheduleValue) {
-                    $cboSchedule.SelectedIndex = $i
-                    $matchedSchedule = $true
-                    break
-                }
-            }
-            if (-not $matchedSchedule) {
-                $cboSchedule.SelectedIndex = 0
-            }
-        }
-        if ($txtTargetOUs) {
-            $targetList = @()
-            if ($selectedJob.TargetOUs) { $targetList = @($selectedJob.TargetOUs) }
-            $txtTargetOUs.Text = if ($targetList.Count -gt 0) { $targetList -join "`r`n" } else { '' }
-        }
-    }
-    else {
-        if ($txtJobId) { $txtJobId.Text = '' }
-        if ($cboSchedule) { $cboSchedule.SelectedIndex = 0 }
-        if ($txtTargetOUs) { $txtTargetOUs.Text = '' }
-    }
-
-    if ($policyCombo -and $selectedJob -and $selectedJob.PolicyId) {
-        for ($i = 0; $i -lt $policyCombo.Items.Count; $i++) {
-            $comboItem = $policyCombo.Items[$i]
-            if ($comboItem.Tag -and $comboItem.Tag.PolicyId -eq $selectedJob.PolicyId) {
-                if ($policyCombo.SelectedIndex -ne $i) {
-                    $policyCombo.SelectedIndex = $i
-                }
-                break
-            }
-        }
-    }
-
-    if (-not $policyCombo -or -not $policyCombo.SelectedItem) {
-        # No policy selected - clear fields
-        if ($txtName) { $txtName.Text = '' }
-        if ($txtDesc) { $txtDesc.Text = '' }
-        if ($cboGPO) { $cboGPO.SelectedIndex = 0 }
-        if ($txtCustomGPO) { $txtCustomGPO.Text = ''; $txtCustomGPO.Visibility = 'Collapsed' }
-        if (-not $selectedJob) { return }
-    }
-
+    # Get policy from the Create tab's dropdown (the only policy selector now)
+    $policyCombo = $Window.FindName('CboDeployPolicy')
     $policy = $null
-    if ($policyCombo -and $policyCombo.SelectedItem) {
+    if ($policyCombo -and $policyCombo.SelectedItem -and $policyCombo.SelectedItem.Tag) {
         $policy = $policyCombo.SelectedItem.Tag
     }
-    if (-not $policy -and -not $selectedJob) { return }
 
-    if ($policy) {
-        # Sync the other combo to match (so both tabs stay in sync)
-        $otherComboName = if ($Source -eq 'Create') { 'CboDeployEditPolicy' } else { 'CboDeployPolicy' }
-        $otherCombo = $Window.FindName($otherComboName)
-        if ($otherCombo -and $otherCombo.Items.Count -gt 0) {
-            # Find the matching policy by PolicyId in the other combo
-            for ($i = 0; $i -lt $otherCombo.Items.Count; $i++) {
-                $otherItem = $otherCombo.Items[$i]
-                if ($otherItem.Tag -and $otherItem.Tag.PolicyId -eq $policy.PolicyId) {
-                    if ($otherCombo.SelectedIndex -ne $i) {
-                        $otherCombo.SelectedIndex = $i
-                    }
-                    break
-                }
-            }
-        }
-
-        if ($txtName) { $txtName.Text = if ($policy.Name) { $policy.Name } else { '' } }
-        if ($txtDesc) { $txtDesc.Text = if ($policy.Description) { $policy.Description } else { '' } }
+    if (-not $policy) {
+        # No policy selected - clear fields
+        if ($txtName) { $txtName.Text = '' }
+        if ($cboGPO) { $cboGPO.SelectedIndex = 0 }
+        if ($txtCustomGPO) { $txtCustomGPO.Text = ''; $txtCustomGPO.Visibility = 'Collapsed' }
+        return
     }
+
+    if ($txtName) { $txtName.Text = if ($policy.Name) { $policy.Name } else { '' } }
 
     # Set Target GPO dropdown
     if ($cboGPO) {
-        $gpoValue = ''
-        if ($selectedJob -and $selectedJob.GPOName) {
-            $gpoValue = $selectedJob.GPOName
-        }
-        elseif ($policy -and $policy.TargetGPO) {
-            $gpoValue = $policy.TargetGPO
-        }
+        $gpoValue = if ($policy.TargetGPO) { $policy.TargetGPO } else { '' }
         $matched = $false
         for ($i = 0; $i -lt $cboGPO.Items.Count; $i++) {
             $item = $cboGPO.Items[$i]
@@ -1009,87 +905,15 @@ function global:Update-DeployPolicyEditTab {
 function global:Invoke-SaveDeployPolicyChanges {
     <#
     .SYNOPSIS
-        Saves policy name, description, and target GPO changes from the Deploy Edit tab.
+        Saves policy name and target GPO changes from the Deploy Edit tab.
     #>
     param($Window)
 
-    $jobsGrid = $Window.FindName('DeploymentJobsDataGrid')
-    $selectedJob = if ($jobsGrid) { $jobsGrid.SelectedItem } else { $null }
-
-    if ($selectedJob -and $selectedJob.JobId) {
-        $cboGPO = $Window.FindName('CboDeployEditGPO')
-        $txtCustomGPO = $Window.FindName('TxtDeployEditCustomGPO')
-        $selectedGpoItem = if ($cboGPO) { $cboGPO.SelectedItem } else { $null }
-        $targetGPO = if ($selectedGpoItem -and $selectedGpoItem.Tag -eq 'Custom') {
-            if ($txtCustomGPO) { $txtCustomGPO.Text.Trim() } else { '' }
-        }
-        elseif ($selectedGpoItem) {
-            [string]$selectedGpoItem.Tag
-        }
-        else {
-            ''
-        }
-
-        if ([string]::IsNullOrWhiteSpace($targetGPO)) {
-            Show-Toast -Message 'Target GPO cannot be empty for job edits.' -Type 'Warning'
-            return
-        }
-
-        $cboSchedule = $Window.FindName('CboDeployEditSchedule')
-        $scheduleValue = 'Manual'
-        if ($cboSchedule -and $cboSchedule.SelectedItem) {
-            $scheduleContent = [string]$cboSchedule.SelectedItem.Content
-            switch ($scheduleContent) {
-                'Immediate' { $scheduleValue = 'Immediate' }
-                'Scheduled' { $scheduleValue = 'Scheduled' }
-                default { $scheduleValue = 'Manual' }
-            }
-        }
-
-        $txtTargetOUs = $Window.FindName('TxtDeployEditTargetOUs')
-        $targetOUs = [System.Collections.Generic.List[string]]::new()
-        if ($txtTargetOUs -and -not [string]::IsNullOrWhiteSpace($txtTargetOUs.Text)) {
-            $parts = $txtTargetOUs.Text -split '[\r\n]+'
-            foreach ($part in $parts) {
-                $trimmed = $part.Trim()
-                if (-not [string]::IsNullOrWhiteSpace($trimmed)) {
-                    [void]$targetOUs.Add($trimmed)
-                }
-            }
-        }
-
-        try {
-            $result = Update-DeploymentJob -JobId $selectedJob.JobId -GPOName $targetGPO -Schedule $scheduleValue -TargetOUs @($targetOUs)
-
-            if ($result.Success) {
-                Show-Toast -Message "Job '$($selectedJob.JobId)' updated." -Type 'Success'
-                Update-DeploymentJobsDataGrid -Window $Window
-            }
-            else {
-                if ($result.Error -match "Only 'Pending' jobs") {
-                    Show-Toast -Message $result.Error -Type 'Warning'
-                }
-                else {
-                    Show-Toast -Message "Failed: $($result.Error)" -Type 'Error'
-                }
-            }
-        }
-        catch {
-            Show-Toast -Message "Error: $($_.Exception.Message)" -Type 'Error'
-        }
-
-        return
-    }
-
-    # Get the selected policy from the Edit tab combo (fall back to Create tab combo)
-    $editCombo = $Window.FindName('CboDeployEditPolicy')
-    $createCombo = $Window.FindName('CboDeployPolicy')
-    $policyCombo = if ($editCombo -and $editCombo.SelectedItem) { $editCombo } 
-                   elseif ($createCombo -and $createCombo.SelectedItem) { $createCombo }
-                   else { $null }
+    # Get the selected policy from the Create tab combo
+    $policyCombo = $Window.FindName('CboDeployPolicy')
 
     if (-not $policyCombo -or -not $policyCombo.SelectedItem) {
-        Show-Toast -Message 'Please select a policy to edit.' -Type 'Warning'
+        Show-Toast -Message 'Please select a policy first.' -Type 'Warning'
         return
     }
 
@@ -1107,9 +931,6 @@ function global:Invoke-SaveDeployPolicyChanges {
         return
     }
 
-    $txtDesc = $Window.FindName('TxtDeployEditPolicyDesc')
-    $editDesc = if ($txtDesc) { $txtDesc.Text.Trim() } else { '' }
-
     # Get target GPO from dropdown or custom textbox
     $cboGPO = $Window.FindName('CboDeployEditGPO')
     $txtCustomGPO = $Window.FindName('TxtDeployEditCustomGPO')
@@ -1125,7 +946,7 @@ function global:Invoke-SaveDeployPolicyChanges {
     }
 
     try {
-        $result = Update-Policy -Id $policy.PolicyId -Name $editName -Description $editDesc -TargetGPO $targetGPO
+        $result = Update-Policy -Id $policy.PolicyId -Name $editName -TargetGPO $targetGPO
 
         if ($result.Success) {
             Show-Toast -Message "Policy '$editName' updated." -Type 'Success'

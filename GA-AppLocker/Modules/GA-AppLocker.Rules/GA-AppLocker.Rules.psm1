@@ -241,7 +241,18 @@ function script:ConvertTo-AppLockerXmlRule {
         if ($trimmed -eq 'Allow' -or $trimmed -eq 'Deny') { $action = $trimmed }
     }
 
-    $userOrGroupSid = if (-not [string]::IsNullOrWhiteSpace($Rule.UserOrGroupSid)) { $Rule.UserOrGroupSid } else { 'S-1-1-0' }
+    # Validate SID format — UNRESOLVED: placeholders must never reach XML
+    $userOrGroupSid = 'S-1-1-0'  # Default: Everyone
+    if ($Rule.UserOrGroupSid -and $Rule.UserOrGroupSid -match '^S-1-\d+(-\d+)+$') {
+        $userOrGroupSid = $Rule.UserOrGroupSid
+    }
+    elseif ($Rule.UserOrGroupSid -and $Rule.UserOrGroupSid -notmatch '^S-1-') {
+        $groupName = $Rule.UserOrGroupSid -replace '^UNRESOLVED:', ''
+        $resolvedSid = Resolve-GroupSid -GroupName $groupName
+        if ($resolvedSid -and $resolvedSid -match '^S-1-') {
+            $userOrGroupSid = $resolvedSid
+        }
+    }
     $name = if (-not [string]::IsNullOrWhiteSpace($Rule.Name)) { [System.Security.SecurityElement]::Escape($Rule.Name) } else { 'Unnamed Rule' }
     $description = if ($Rule.Description) { [System.Security.SecurityElement]::Escape($Rule.Description) } else { '' }
     $id = $Rule.Id

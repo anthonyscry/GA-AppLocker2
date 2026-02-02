@@ -125,67 +125,45 @@ Describe 'Deploy Panel - XAML Filter Buttons' {
 }
 
 Describe 'Deploy Panel - Edit Tab Job Wiring' {
-    It 'Update-DeployPolicyEditTab populates job fields when a job is selected' {
-        $job = [PSCustomObject]@{
-            JobId     = 'job-123'
-            PolicyId  = 'policy-123'
-            GPOName   = 'AppLocker-Workstations'
-            Schedule  = 'Immediate'
-            TargetOUs = @('OU=Servers,DC=example,DC=com', 'OU=Workstations,DC=example,DC=com')
-        }
-        $policy = [PSCustomObject]@{
-            PolicyId    = 'policy-123'
-            Name        = 'Policy A'
-            Description = 'Desc'
-            TargetGPO   = 'AppLocker-Servers'
-        }
+    It 'Update-DeployPolicyEditTab populates name and GPO from selected policy' {
+        $policy = [PSCustomObject]@{ PolicyId = 'policy-abc'; Name = 'TestPolicy'; TargetGPO = 'AppLocker-Servers' }
 
-        $policyItem = New-MockComboBoxItem -Content 'Policy A' -Tag $policy
-        $policyCombo = New-MockComboBox -Items @($policyItem) -SelectedIndex 0
+        $policyItems = @(
+            (New-MockComboBoxItem -Content 'TestPolicy' -Tag $policy)
+        )
+        $policyCombo = New-MockComboBox -Items $policyItems -SelectedIndex 0
 
         $gpoItems = @(
             (New-MockComboBoxItem -Content '(None)' -Tag ''),
+            (New-MockComboBoxItem -Content 'AppLocker-DC' -Tag 'AppLocker-DC'),
             (New-MockComboBoxItem -Content 'AppLocker-Servers' -Tag 'AppLocker-Servers'),
             (New-MockComboBoxItem -Content 'AppLocker-Workstations' -Tag 'AppLocker-Workstations'),
             (New-MockComboBoxItem -Content 'Custom...' -Tag 'Custom')
         )
         $gpoCombo = New-MockComboBox -Items $gpoItems -SelectedIndex 0
 
-        $scheduleItems = @(
-            (New-MockComboBoxItem -Content 'Manual'),
-            (New-MockComboBoxItem -Content 'Immediate'),
-            (New-MockComboBoxItem -Content 'Scheduled')
-        )
-        $scheduleCombo = New-MockComboBox -Items $scheduleItems -SelectedIndex 0
-
         $elements = @{
-            'CboDeployEditPolicy'    = $policyCombo
+            'CboDeployPolicy'         = $policyCombo
             'TxtDeployEditPolicyName' = (New-MockTextBox)
-            'TxtDeployEditPolicyDesc' = (New-MockTextBox)
-            'CboDeployEditGPO'       = $gpoCombo
-            'TxtDeployEditCustomGPO' = (New-MockTextBox)
-            'TxtDeployEditJobId'     = (New-MockTextBox)
-            'CboDeployEditSchedule'  = $scheduleCombo
-            'TxtDeployEditTargetOUs' = (New-MockTextBox)
-            'DeploymentJobsDataGrid' = (New-MockDataGrid -Data @($job) -SelectedItem $job)
+            'CboDeployEditGPO'        = $gpoCombo
+            'TxtDeployEditCustomGPO'  = (New-MockTextBox)
         }
 
         $win = New-MockWpfWindow -Elements $elements
 
         Update-DeployPolicyEditTab -Window $win -Source 'Edit'
 
-        $elements['TxtDeployEditJobId'].Text | Should -Be 'job-123'
-        $elements['CboDeployEditSchedule'].SelectedIndex | Should -Be 1
-        $elements['TxtDeployEditTargetOUs'].Text | Should -Match 'OU=Servers,DC=example,DC=com'
-        $elements['TxtDeployEditTargetOUs'].Text | Should -Match 'OU=Workstations,DC=example,DC=com'
+        $elements['TxtDeployEditPolicyName'].Text | Should -Be 'TestPolicy'
         $elements['CboDeployEditGPO'].SelectedIndex | Should -Be 2
     }
 
-    It 'Invoke-SaveDeployPolicyChanges calls Update-DeploymentJob when job selected' {
-        $job = [PSCustomObject]@{
-            JobId    = 'job-999'
-            PolicyId = 'policy-999'
-        }
+    It 'Invoke-SaveDeployPolicyChanges calls Update-Policy with name and GPO' {
+        $policy = [PSCustomObject]@{ PolicyId = 'policy-999'; Name = 'OldName'; TargetGPO = '' }
+
+        $policyItems = @(
+            (New-MockComboBoxItem -Content 'OldName' -Tag $policy)
+        )
+        $policyCombo = New-MockComboBox -Items $policyItems -SelectedIndex 0
 
         $gpoItems = @(
             (New-MockComboBoxItem -Content '(None)' -Tag ''),
@@ -194,34 +172,23 @@ Describe 'Deploy Panel - Edit Tab Job Wiring' {
         )
         $gpoCombo = New-MockComboBox -Items $gpoItems -SelectedIndex 1
 
-        $scheduleItems = @(
-            (New-MockComboBoxItem -Content 'Manual'),
-            (New-MockComboBoxItem -Content 'Immediate'),
-            (New-MockComboBoxItem -Content 'Scheduled')
-        )
-        $scheduleCombo = New-MockComboBox -Items $scheduleItems -SelectedIndex 1
-
-        $targetOUsBox = New-MockTextBox -Text "OU=Servers,DC=example,DC=com`nOU=Workstations,DC=example,DC=com"
-
         $elements = @{
-            'CboDeployEditGPO'       = $gpoCombo
-            'TxtDeployEditCustomGPO' = (New-MockTextBox)
-            'CboDeployEditSchedule'  = $scheduleCombo
-            'TxtDeployEditTargetOUs' = $targetOUsBox
-            'DeploymentJobsDataGrid' = (New-MockDataGrid -Data @($job) -SelectedItem $job)
+            'CboDeployPolicy'         = $policyCombo
+            'TxtDeployEditPolicyName' = (New-MockTextBox -Text 'NewName')
+            'CboDeployEditGPO'        = $gpoCombo
+            'TxtDeployEditCustomGPO'  = (New-MockTextBox)
         }
 
         $win = New-MockWpfWindow -Elements $elements
 
-        Mock Update-DeploymentJob { @{ Success = $true } }
         Mock Update-Policy { @{ Success = $true } }
+        Mock Refresh-DeployPolicyCombo { }
         Mock Update-DeploymentJobsDataGrid { }
 
         Invoke-SaveDeployPolicyChanges -Window $win
 
-        Assert-MockCalled Update-DeploymentJob -Times 1 -ParameterFilter {
-            $JobId -eq 'job-999' -and $GPOName -eq 'AppLocker-Servers' -and $Schedule -eq 'Immediate' -and $TargetOUs.Count -eq 2
+        Should -Invoke Update-Policy -Times 1 -ParameterFilter {
+            $Id -eq 'policy-999' -and $Name -eq 'NewName' -and $TargetGPO -eq 'AppLocker-Servers'
         }
-        Assert-MockCalled Update-Policy -Times 0
     }
 }

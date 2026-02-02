@@ -38,8 +38,14 @@ function Update-SetupStatus {
     try {
         # Use try-catch - Get-Command fails in WPF context
         $status = $null
-        try { $status = Get-SetupStatus } catch { return }
-        if (-not $status) { return }
+        try { $status = Get-SetupStatus } catch {
+            try { Write-AppLockerLog -Message "Update-SetupStatus: Get-SetupStatus failed: $($_.Exception.Message)" -Level 'ERROR' } catch { }
+            return
+        }
+        if (-not $status) {
+            try { Write-AppLockerLog -Message "Update-SetupStatus: Get-SetupStatus returned null" -Level 'WARNING' } catch { }
+            return
+        }
 
         if ($status.Success -and $status.Data) {
             # Update EnableWinRM GPO status

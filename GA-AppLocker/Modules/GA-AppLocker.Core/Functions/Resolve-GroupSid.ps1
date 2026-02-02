@@ -4,11 +4,11 @@
 
 .DESCRIPTION
     Attempts to resolve a group name to a Security Identifier (SID) using
-    .NET NTAccount translation. If the machine is not domain-joined or the
-    group doesn't exist, returns a placeholder SID pattern.
+    multiple methods in order: well-known SIDs, .NET NTAccount translation,
+    domain-prefixed NTAccount, and ADSI/LDAP query fallback.
 
     This function is designed for air-gapped environments where AD modules
-    may not be available. It uses pure .NET calls (no ActiveDirectory module).
+    may not be available. It uses pure .NET and ADSI calls (no ActiveDirectory module).
 
 .PARAMETER GroupName
     The name of the group to resolve (e.g., 'AppLocker-Users').
@@ -44,6 +44,11 @@ function Resolve-GroupSid {
         $GroupName = $GroupName.Substring(8)
     }
 
+    # If it already looks like a SID, return as-is
+    if ($GroupName -match '^S-1-\d+(-\d+)+$') {
+        return $GroupName
+    }
+
     # Well-known SIDs - return immediately without lookup
     $wellKnown = @{
         'Everyone'            = 'S-1-1-0'
@@ -56,15 +61,21 @@ function Resolve-GroupSid {
         return $wellKnown[$GroupName]
     }
 
-    # Cache for resolved/failed groups (avoid repeated lookups and warning spam)
+    # Cache for resolved groups (avoid repeated lookups and warning spam)
+    # NOTE: Only cache SUCCESSFUL resolutions. UNRESOLVED values are NOT cached
+    # so retries can succeed if domain connectivity is restored.
     if (-not $script:ResolvedGroupCache) {
         $script:ResolvedGroupCache = @{}
     }
     if ($script:ResolvedGroupCache.ContainsKey($GroupName)) {
-        return $script:ResolvedGroupCache[$GroupName]
+        $cached = $script:ResolvedGroupCache[$GroupName]
+        # Only return cached value if it's a valid SID (not UNRESOLVED)
+        if ($cached -match '^S-1-') {
+            return $cached
+        }
     }
 
-    # Try .NET NTAccount translation (works for domain and local groups)
+    # Method 1: .NET NTAccount translation (works for domain and local groups)
     try {
         $ntAccount = [System.Security.Principal.NTAccount]::new($GroupName)
         $sid = $ntAccount.Translate([System.Security.Principal.SecurityIdentifier])
@@ -78,10 +89,10 @@ function Resolve-GroupSid {
         }
     }
     catch {
-        # NTAccount translation failed - group may not exist or not domain-joined
+        # NTAccount translation failed - group may not exist locally
     }
 
-    # Try with domain prefix (DOMAIN\GroupName)
+    # Method 2: Try with domain prefix (DOMAIN\GroupName)
     try {
         $domain = $env:USERDOMAIN
         if ($domain -and $domain -ne $env:COMPUTERNAME) {
@@ -101,18 +112,64 @@ function Resolve-GroupSid {
         # Also failed with domain prefix
     }
 
+    # Method 3: ADSI/LDAP query fallback (works in air-gapped environments without AD module)
+    try {
+        $searcher = [ADSISearcher]"(&(objectClass=group)(name=$GroupName))"
+        $searcher.PropertiesToLoad.AddRange(@('objectSid', 'name'))
+        $result = $searcher.FindOne()
+        if ($result) {
+            $sidBytes = $result.Properties['objectsid'][0]
+            if ($sidBytes) {
+                $sidObj = [System.Security.Principal.SecurityIdentifier]::new($sidBytes, 0)
+                $sidValue = $sidObj.Value
+                try {
+                    Write-AppLockerLog -Message "Resolved group '$GroupName' to SID via ADSI: $sidValue" -Level 'INFO'
+                } catch { }
+                $script:ResolvedGroupCache[$GroupName] = $sidValue
+                return $sidValue
+            }
+        }
+    }
+    catch {
+        # ADSI query failed - machine may not be domain-joined or LDAP unreachable
+    }
+
+    # Method 4: Try ADSI with explicit domain root
+    try {
+        $rootDSE = [ADSI]'LDAP://RootDSE'
+        $defaultNC = $rootDSE.defaultNamingContext
+        if ($defaultNC) {
+            $searcher2 = [ADSISearcher]::new([ADSI]"LDAP://$defaultNC", "(&(objectClass=group)(name=$GroupName))")
+            $searcher2.PropertiesToLoad.AddRange(@('objectSid', 'name'))
+            $result2 = $searcher2.FindOne()
+            if ($result2) {
+                $sidBytes2 = $result2.Properties['objectsid'][0]
+                if ($sidBytes2) {
+                    $sidObj2 = [System.Security.Principal.SecurityIdentifier]::new($sidBytes2, 0)
+                    $sidValue2 = $sidObj2.Value
+                    try {
+                        Write-AppLockerLog -Message "Resolved group '$GroupName' to SID via explicit LDAP: $sidValue2" -Level 'INFO'
+                    } catch { }
+                    $script:ResolvedGroupCache[$GroupName] = $sidValue2
+                    return $sidValue2
+                }
+            }
+        }
+    }
+    catch {
+        # Explicit LDAP also failed
+    }
+
     # Log warning only once per group name
     try {
-        Write-AppLockerLog -Message "Could not resolve group '$GroupName' - using UNRESOLVED placeholder (group may not exist or machine not domain-joined)" -Level 'WARNING'
+        Write-AppLockerLog -Message "Could not resolve group '$GroupName' - using UNRESOLVED placeholder (all 4 methods failed: NTAccount, domain-prefix, ADSI, explicit LDAP)" -Level 'WARNING'
     } catch { }
 
     # Fallback: return placeholder or null
+    # NOTE: Do NOT cache UNRESOLVED values so retries can succeed later
     if ($FallbackToPlaceholder) {
-        $fallback = "UNRESOLVED:$GroupName"
-        $script:ResolvedGroupCache[$GroupName] = $fallback
-        return $fallback
+        return "UNRESOLVED:$GroupName"
     }
 
-    $script:ResolvedGroupCache[$GroupName] = $null
     return $null
 }

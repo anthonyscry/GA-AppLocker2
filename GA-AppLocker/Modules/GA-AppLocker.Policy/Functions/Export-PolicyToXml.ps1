@@ -277,7 +277,20 @@ function Build-PolicyRuleCollectionXml {
         $name = [System.Security.SecurityElement]::Escape($rule.Name)
         $description = if ($rule.Description) { [System.Security.SecurityElement]::Escape($rule.Description) } else { '' }
         $id = $rule.Id  # Canonical: Id (not RuleId)
-        $userSid = if ($rule.UserOrGroupSid) { $rule.UserOrGroupSid } else { 'S-1-5-11' }  # Authenticated Users
+        # Validate SID format — UNRESOLVED: placeholders must never reach XML
+        $userSid = 'S-1-5-11'  # Default: Authenticated Users
+        if ($rule.UserOrGroupSid -and $rule.UserOrGroupSid -match '^S-1-\d+(-\d+)+$') {
+            $userSid = $rule.UserOrGroupSid
+        }
+        elseif ($rule.UserOrGroupSid -and $rule.UserOrGroupSid -notmatch '^S-1-') {
+            # Invalid SID (e.g., UNRESOLVED:AppLocker-Users) — try to resolve now
+            $groupName = $rule.UserOrGroupSid -replace '^UNRESOLVED:', ''
+            $resolvedSid = Resolve-GroupSid -GroupName $groupName
+            if ($resolvedSid -and $resolvedSid -match '^S-1-') {
+                $userSid = $resolvedSid
+            }
+            # else: falls through to S-1-5-11 default (Authenticated Users)
+        }
 
         switch ($rule.RuleType) {
             'Publisher' {

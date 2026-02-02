@@ -41,13 +41,31 @@ function Initialize-PolicyPanel {
         }
     }
 
-    # Wire up GPO dropdown to show/hide custom textbox
+    # Wire up Edit tab GPO dropdown to show/hide custom textbox
     $gpoCombo = $Window.FindName('CboEditTargetGPO')
     if ($gpoCombo) {
         $gpoCombo.Add_SelectionChanged({
                 param($sender, $e)
                 $selectedItem = $sender.SelectedItem
                 $customBox = $global:GA_MainWindow.FindName('TxtEditCustomGPO')
+                if ($customBox) {
+                    if ($selectedItem -and $selectedItem.Tag -eq 'Custom') {
+                        $customBox.Visibility = 'Visible'
+                    }
+                    else {
+                        $customBox.Visibility = 'Collapsed'
+                    }
+                }
+            })
+    }
+
+    # Wire up Create tab GPO dropdown to show/hide custom textbox
+    $createGpoCombo = $Window.FindName('CboPolicyTargetGPO')
+    if ($createGpoCombo) {
+        $createGpoCombo.Add_SelectionChanged({
+                param($sender, $e)
+                $selectedItem = $sender.SelectedItem
+                $customBox = $global:GA_MainWindow.FindName('TxtPolicyCustomGPO')
                 if ($customBox) {
                     if ($selectedItem -and $selectedItem.Tag -eq 'Custom') {
                         $customBox.Visibility = 'Visible'
@@ -467,13 +485,33 @@ function global:Invoke-CreatePolicy {
         }
     }
 
+    # Get target GPO from Create tab dropdown
+    $cboTargetGPO = $Window.FindName('CboPolicyTargetGPO')
+    $txtCustomGPO = $Window.FindName('TxtPolicyCustomGPO')
+    $targetGPO = ''
+    if ($cboTargetGPO -and $cboTargetGPO.SelectedItem) {
+        $selectedGpoItem = $cboTargetGPO.SelectedItem
+        if ($selectedGpoItem.Tag -eq 'Custom') {
+            $targetGPO = if ($txtCustomGPO) { $txtCustomGPO.Text.Trim() } else { '' }
+        }
+        else {
+            $targetGPO = [string]$selectedGpoItem.Tag
+        }
+    }
+
     try {
         $result = New-Policy -Name $name -Description $description -EnforcementMode $enforcement -Phase $phase
         
         if ($result.Success) {
+            # Set target GPO on the newly created policy
+            if (-not [string]::IsNullOrWhiteSpace($targetGPO) -and $result.Data -and $result.Data.PolicyId) {
+                try { $null = Update-Policy -Id $result.Data.PolicyId -TargetGPO $targetGPO } catch { }
+            }
+
             if ($txtName) { $txtName.Text = '' }
             if ($txtDesc) { $txtDesc.Text = '' }
             if ($phaseCombo) { $phaseCombo.SelectedIndex = 0 } # Reset to Phase 1
+            if ($cboTargetGPO) { $cboTargetGPO.SelectedIndex = 0 } # Reset to (None)
             
             Update-PoliciesDataGrid -Window $Window
             Update-WorkflowBreadcrumb -Window $Window

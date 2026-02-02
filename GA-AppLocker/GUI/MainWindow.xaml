@@ -1849,6 +1849,20 @@ Width="1450"
                                                 <ComboBoxItem Content="Phase 5: All + DLL (Full)" Tag="5"/>
                                             </ComboBox>
 
+                                            <TextBlock Text="Target GPO:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
+                                            <ComboBox x:Name="CboPolicyTargetGPO" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,5">
+                                                <ComboBoxItem Content="(None)" Tag="" IsSelected="True"/>
+                                                <ComboBoxItem Content="AppLocker-DC" Tag="AppLocker-DC"/>
+                                                <ComboBoxItem Content="AppLocker-Servers" Tag="AppLocker-Servers"/>
+                                                <ComboBoxItem Content="AppLocker-Workstations" Tag="AppLocker-Workstations"/>
+                                                <ComboBoxItem Content="Custom GPO..." Tag="Custom"/>
+                                            </ComboBox>
+                                            <TextBox x:Name="TxtPolicyCustomGPO" 
+                                                     Style="{StaticResource TextBoxStyle}" 
+                                                     Visibility="Collapsed"
+                                                     Tag="Enter custom GPO name..."
+                                                     Margin="0,0,0,15"/>
+
                                             <Button x:Name="BtnCreatePolicy" 
                                                     Content="Create Policy"
                                                     Style="{StaticResource PrimaryButtonStyle}"
@@ -2134,14 +2148,7 @@ Width="1450"
                                                      Style="{StaticResource TextBoxStyle}" 
                                                      Visibility="Collapsed"
                                                      Tag="Enter custom GPO name..."
-                                                     Margin="0,0,0,10"/>
-
-                                            <TextBlock Text="Schedule:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                            <ComboBox x:Name="CboDeploySchedule" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,15">
-                                                <ComboBoxItem Content="Manual (Deploy Now)" IsSelected="True"/>
-                                                <ComboBoxItem Content="Immediate"/>
-                                                <ComboBoxItem Content="Daily at 3 AM"/>
-                                            </ComboBox>
+                                                     Margin="0,0,0,15"/>
 
                                             <Button x:Name="BtnStartDeployment" 
                                                     Content="Create Deployment Job"
@@ -2157,37 +2164,9 @@ Width="1450"
                                     <StackPanel Margin="15">
                                         <TextBlock Text="EDIT SELECTED POLICY" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
 
-                                        <TextBlock Text="Select Policy:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <ComboBox x:Name="CboDeployEditPolicy" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,10"/>
-
-                                        <TextBlock Text="Job ID:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <TextBox x:Name="TxtDeployEditJobId"
-                                                 Style="{StaticResource TextBoxStyle}"
-                                                 IsReadOnly="True"
-                                                 Margin="0,0,0,10"/>
-
-                                        <TextBlock Text="Schedule:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <ComboBox x:Name="CboDeployEditSchedule" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,10">
-                                            <ComboBoxItem Content="Manual" IsSelected="True"/>
-                                            <ComboBoxItem Content="Immediate"/>
-                                            <ComboBoxItem Content="Scheduled"/>
-                                        </ComboBox>
-
-                                        <TextBlock Text="Target OUs (optional):" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <TextBox x:Name="TxtDeployEditTargetOUs"
-                                                 Style="{StaticResource TextBoxStyle}"
-                                                 Height="60" TextWrapping="Wrap" AcceptsReturn="True"
-                                                 VerticalContentAlignment="Top" Margin="0,0,0,10"/>
-
                                         <TextBlock Text="Policy Name:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
                                         <TextBox x:Name="TxtDeployEditPolicyName" 
                                                  Style="{StaticResource TextBoxStyle}" Margin="0,0,0,10"/>
-
-                                        <TextBlock Text="Description:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
-                                        <TextBox x:Name="TxtDeployEditPolicyDesc" 
-                                                 Style="{StaticResource TextBoxStyle}"
-                                                 Height="50" TextWrapping="Wrap" AcceptsReturn="True"
-                                                 VerticalContentAlignment="Top" Margin="0,0,0,10"/>
 
                                         <TextBlock Text="Target GPO:" Foreground="{StaticResource ForegroundBrush}" Margin="0,0,0,5"/>
                                         <ComboBox x:Name="CboDeployEditGPO" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,5">
@@ -2201,7 +2180,7 @@ Width="1450"
                                                  Style="{StaticResource TextBoxStyle}" 
                                                  Visibility="Collapsed"
                                                  Tag="Enter custom GPO name..."
-                                                 Margin="0,0,0,10"/>
+                                                 Margin="0,0,0,15"/>
 
                                         <Button x:Name="BtnSaveDeployPolicyChanges" Content="Save Changes" 
                                                 Style="{StaticResource PrimaryButtonStyle}"

@@ -713,22 +713,20 @@ Describe 'Deploy Panel - Tab Order' -Tag 'Unit', 'XAML', 'Deploy' {
 # DEPLOY EDIT POLICY DROPDOWN
 # ============================================================================
 
-Describe 'Deploy Edit - Policy Dropdown' -Tag 'Unit', 'XAML', 'Deploy' {
+Describe 'Deploy Edit - Simplified Edit Tab' -Tag 'Unit', 'XAML', 'Deploy' {
 
-    Context 'CboDeployEditPolicy exists' {
-        It 'Should have CboDeployEditPolicy in XAML' {
-            $script:XamlContent | Should -Match 'x:Name="CboDeployEditPolicy"'
+    Context 'Edit tab has name and GPO fields' {
+        It 'Should have TxtDeployEditPolicyName in XAML' {
+            $script:XamlContent | Should -Match 'x:Name="TxtDeployEditPolicyName"'
         }
-        It 'Should have job edit fields in XAML' {
-            $script:XamlContent | Should -Match 'x:Name="TxtDeployEditJobId"'
-            $script:XamlContent | Should -Match 'x:Name="CboDeployEditSchedule"'
-            $script:XamlContent | Should -Match 'x:Name="TxtDeployEditTargetOUs"'
+        It 'Should have CboDeployEditGPO in XAML' {
+            $script:XamlContent | Should -Match 'x:Name="CboDeployEditGPO"'
         }
     }
 
-    Context 'Deploy.ps1 handles dual combos' {
-        It 'Refresh-DeployPolicyCombo populates both combos' {
-            $script:DeployPs1 | Should -Match 'CboDeployEditPolicy'
+    Context 'Deploy.ps1 edit tab wiring' {
+        It 'Refresh-DeployPolicyCombo populates CboDeployPolicy' {
+            $script:DeployPs1 | Should -Match 'CboDeployPolicy'
         }
         It 'Update-DeployPolicyEditTab has Source parameter' {
             $script:DeployPs1 | Should -Match '\$Source'

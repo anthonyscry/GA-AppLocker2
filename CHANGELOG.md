@@ -2,6 +2,31 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.45] - 2026-02-01
+
+### Bug Fixes
+
+- **Fix Resolve-GroupSid ADSI/LDAP fallback for SID resolution** -- Added Method 3 (ADSISearcher query for objectSid) and Method 4 (explicit LDAP via RootDSE defaultNamingContext). Now uses 4-method chain: NTAccount bare, NTAccount domain-prefixed, ADSISearcher, explicit LDAP. Early return if input already looks like a SID. Stopped caching UNRESOLVED values so retries can succeed when domain connectivity is restored. Cache validation ensures cached values match `^S-1-` pattern.
+- **XML export SID guard** -- Both `Export-PolicyToXml.ps1` and `GA-AppLocker.Rules.psm1` now validate SIDs match `^S-1-\d+(-\d+)+$` before emitting to XML. Invalid SIDs (e.g., `UNRESOLVED:AppLocker-Users`) trigger re-resolution via `Resolve-GroupSid`. Falls back to `S-1-5-11` (Authenticated Users) or `S-1-1-0` (Everyone) if resolution fails.
+- **GPO status refresh on panel navigation** -- Setup panel calls `Update-SetupStatus` and Deploy panel calls `Update-AppLockerGpoLinkStatus` when navigated to, so GPO status is always current. Added error logging in `Update-SetupStatus` catch blocks (was silently returning). `Get-SetupStatus` uses `-ErrorAction Stop` for GroupPolicy module import with logging.
+
+### UI Changes
+
+- **Policy Create tab: Target GPO dropdown** -- Added `CboPolicyTargetGPO` ComboBox (None, AppLocker-DC, AppLocker-Servers, AppLocker-Workstations, Custom GPO...) with `TxtPolicyCustomGPO` TextBox. GPO is set via `Update-Policy` after policy creation.
+- **Deploy Create tab: Schedule removed** -- Removed `CboDeploySchedule` ComboBox. Deployment jobs now always created with Schedule = 'Manual'.
+- **Deploy Edit tab: Stripped to name+GPO only** -- Removed `CboDeployEditPolicy`, `TxtDeployEditJobId`, `CboDeployEditSchedule`, `TxtDeployEditTargetOUs`, `TxtDeployEditPolicyDesc`. Edit tab now reads policy from `CboDeployPolicy` (Create tab). Only editable fields: policy name and target GPO.
+
+### Test Fixes
+
+- Fixed GUI.DeployPanel.Tests.ps1 (removed orphaned old test code for deleted XAML elements)
+- Updated V1229Session.Tests.ps1 Deploy Edit tests for simplified edit tab (removed references to `CboDeployEditPolicy`, `TxtDeployEditJobId`, `CboDeployEditSchedule`, `TxtDeployEditTargetOUs`)
+
+### Stats
+
+- **Version:** 1.2.45
+- **Tests:** 1548/1548 passing (100%)
+- **Exported Commands:** ~194
+
 ## [1.2.44] - 2026-02-01
 
 ### Bug Fixes

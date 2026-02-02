@@ -45,7 +45,15 @@ function Get-SetupStatus {
 
         # Check WinRM GPO
         if ($hasGP) {
-            Import-Module GroupPolicy -ErrorAction SilentlyContinue
+            try {
+                Import-Module GroupPolicy -ErrorAction Stop
+            }
+            catch {
+                Write-SetupLog -Message "Failed to import GroupPolicy module: $($_.Exception.Message)" -Level WARNING
+                $hasGP = $false
+            }
+        }
+        if ($hasGP) {
             $winrmGPO = Get-GPO -Name $script:DefaultGPONames.WinRM -ErrorAction SilentlyContinue
             
             if ($winrmGPO) {

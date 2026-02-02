@@ -331,10 +331,16 @@ function global:Set-ActivePanel {
         try { Update-PoliciesDataGrid -Window $Window } catch { }
     }
 
-    # Auto-refresh Deploy panel on every navigation (policy combo + jobs list)
+    # Auto-refresh Deploy panel on every navigation (policy combo + jobs list + GPO status)
     if ($PanelName -eq 'PanelDeploy') {
         Refresh-DeployPolicyCombo -Window $Window
         Update-DeploymentJobsDataGrid -Window $Window
+        try { global:Update-AppLockerGpoLinkStatus -Window $Window } catch { }
+    }
+
+    # Auto-refresh Setup panel GPO status on every navigation
+    if ($PanelName -eq 'PanelSetup') {
+        try { Update-SetupStatus -Window $Window } catch { }
     }
 
     # Auto-populate Software remote machines from AD Discovery (online + WinRM)
