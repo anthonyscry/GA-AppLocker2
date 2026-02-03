@@ -139,6 +139,12 @@ All data stored locally in `%LOCALAPPDATA%\GA-AppLocker\`:
 # and permanently excluded via Tests/.gitignore. Behavioral tests only test current functionality.
 ```
 
+## Version History
+
+| Version | Date | Key Changes |
+|---------|------|-------------|
+| 1.2.53 | Feb 2, 2026 | Testing strategy update: Archived 1313 obsolete legacy tests (wrong module paths, v1.2.46-era code) to Tests\Legacy_Archived\ and added modern behavioral test suite in Tests\Behavioral\ (6/6 tests passing). Legacy tests permanently excluded via Tests/.gitignore. |
+
 Legacy automation (opt-in):
 
 ```powershell
