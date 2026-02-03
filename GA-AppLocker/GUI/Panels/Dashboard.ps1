@@ -76,6 +76,15 @@ function global:Update-DashboardGpoToggles {
     $toggleGpoServers = $win.FindName('BtnDashToggleGpoServers')
     $toggleGpoWks = $win.FindName('BtnDashToggleGpoWks')
 
+    # DIAGNOSTIC: Check each disable condition individually
+    $statusNull = ($null -eq $status)
+    $statusNotSuccess = if ($status) { -not $status.Success } else { $true }
+    $dataNull = if ($status) { ($null -eq $status.Data) } else { $true }
+    $noGP = -not $hasGP
+    try {
+        Write-AppLockerLog -Message "UpdateGpoToggles DIAGNOSTIC: statusNull=$statusNull, statusNotSuccess=$statusNotSuccess, dataNull=$dataNull, noGP=$noGP" -Level DEBUG -NoConsole
+    } catch { }
+
     if (-not $status -or -not $status.Success -or -not $status.Data -or -not $hasGP) {
         if ($toggleEnable) { $toggleEnable.IsEnabled = $false; $toggleEnable.IsChecked = $false }
         if ($toggleGpoDC) { $toggleGpoDC.IsEnabled = $false; $toggleGpoDC.IsChecked = $false }
@@ -129,6 +138,17 @@ function global:Invoke-DashboardGpoRefresh {
     # aren't available in runspace context, causing silent failures
     try {
         $status = Get-SetupStatus
+        
+        # DIAGNOSTIC: Log Get-SetupStatus result for debugging GPO toggle issues
+        $hasGP = Get-Module -ListAvailable -Name GroupPolicy
+        $statusSuccess = if ($status) { $status.Success } else { $false }
+        $statusDataNull = ($null -eq $status.Data)
+        $winrmExists = if ($status.Data -and $status.Data.WinRM) { $status.Data.WinRM.Exists } else { "N/A" }
+        $gpoCount = if ($status.Data -and $status.Data.AppLockerGPOs) { $status.Data.AppLockerGPOs.Count } else { 0 }
+        try { 
+            Write-AppLockerLog -Message "DashboardGpoRefresh DIAGNOSTIC: Success=$statusSuccess, DataIsNull=$statusDataNull, hasGP=$([bool]$hasGP), WinRMExists=$winrmExists, GPOCount=$gpoCount" -Level INFO -NoConsole 
+        } catch { }
+        
         Update-DashboardGpoToggles -Window $win -Status $status
     }
     catch {

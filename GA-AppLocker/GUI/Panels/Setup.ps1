@@ -392,8 +392,14 @@ function global:Invoke-InitializeAll {
         if ($result.Success) {
             Show-AppLockerMessageBox "Full initialization complete!`n`nEnable WinRM GPO: $(if ($result.Data.WinRM.Success) { 'Success' } else { 'Failed' })`nDisable WinRM GPO: $(if ($result.Data.DisableWinRM.Success) { 'Success' } else { 'Failed' })`nAppLocker GPOs: $(if ($result.Data.AppLockerGPOs.Success) { 'Success' } else { 'Failed' })`nAD Structure: $(if ($result.Data.ADStructure.Success) { 'Success' } else { 'Failed' })" 'Initialization Complete' 'OK' 'Information'
             Update-SetupStatus -Window $Window
-            # Refresh Dashboard GPO toggles so they turn green
-            try { Invoke-DashboardGpoRefresh -Window $Window } catch { }
+            # Refresh Dashboard GPO toggles so they turn green (use global main window, not Setup panel window)
+            try { 
+                if ($global:GA_MainWindow) {
+                    Invoke-DashboardGpoRefresh -Window $global:GA_MainWindow 
+                }
+            } catch { 
+                try { Write-AppLockerLog -Message "Failed to refresh Dashboard GPO toggles after init: $($_.Exception.Message)" -Level WARNING -NoConsole } catch { }
+            }
         }
         else {
             Show-AppLockerMessageBox "Failed: $($result.Error)" 'Error' 'OK' 'Error'
