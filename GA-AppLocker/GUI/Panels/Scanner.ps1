@@ -299,11 +299,8 @@ function global:Invoke-StartArtifactScan {
     if ($scanLocal) {
         $isElevated = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
         if (-not $isElevated) {
-            $result = Show-AppLockerMessageBox "Local scans require Administrator privileges to access system directories (Program Files, Windows).`n`nPlease restart the application as Administrator for full system scanning.`n`nContinue anyway? (Only user-accessible paths will be scanned)" "Elevation Required" "YesNo" "Warning"
-            if ($result -eq 'No') {
-                return
-            }
-            Write-Log -Level Warning -Message "Local scan started without elevation - system directories may be inaccessible"
+            Show-AppLockerMessageBox "Local scans require Administrator privileges to access system directories (Program Files, Windows).`n`nPlease close the application and restart as Administrator.`n`nAlternatively, use Remote Scan to scan machines via WinRM (which uses elevated credentials)." "Elevation Required" "OK" "Error"
+            return
         }
     }
 

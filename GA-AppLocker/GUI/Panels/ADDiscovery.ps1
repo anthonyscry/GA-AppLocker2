@@ -628,7 +628,7 @@ function global:Get-CheckedMachines {
     }
 
     try { Write-AppLockerLog -Message "Get-CheckedMachines: Returning $($selected.Count) valid machines" -Level INFO -NoConsole } catch { }
-    return @($selected)
+    return $selected.ToArray()
 }
 
 function global:Invoke-ConnectivityTest {

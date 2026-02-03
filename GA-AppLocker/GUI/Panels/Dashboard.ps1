@@ -60,8 +60,8 @@ function global:Update-DashboardGpoToggles {
     $win = if ($Window) { $Window } else { $global:GA_MainWindow }
     if (-not $win) { return }
 
-    # Simplified parameter handling - avoid intermediate null assignment that causes scope issues
-    if ($null -eq $Status) {
+    # Simplified parameter handling - use -not operator for reliable PSCustomObject null check
+    if (-not $Status) {
         try { $status = Get-SetupStatus } catch { $status = $null }
     }
     else {

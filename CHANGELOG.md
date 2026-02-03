@@ -2,6 +2,77 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.58] - 2026-02-03
+
+### Fixed
+- **Bug 1: Test Connectivity now correctly tests only selected machines**
+  - Fixed `Get-CheckedMachines` return value being lost in pipeline
+  - Changed `return @($selected)` to `return $selected.ToArray()`
+  - PowerShell 5.1 doesn't properly enumerate `List<T>` wrapped in `@()`
+  - File: `GA-AppLocker\GUI\Panels\ADDiscovery.ps1` line 631
+
+- **Bug 2: Dashboard GPO toggles now enable after initialization**
+  - Fixed null comparison that always evaluated to true with PSCustomObjects
+  - Changed `if ($null -eq $Status)` to `if (-not $Status)`
+  - File: `GA-AppLocker\GUI\Panels\Dashboard.ps1` line 64
+
+- **Bug 3: Local scan now blocks when not elevated (clearer UX)**
+  - Changed confusing "Continue anyway?" warning to hard block with clear instructions
+  - Prevents "Access Denied" errors after user clicks "Continue"
+  - Suggests using Remote Scan as alternative
+  - File: `GA-AppLocker\GUI\Panels\Scanner.ps1` lines 298-308
+
+### Added
+- **Run-Dashboard-ForceFresh.ps1** - Aggressive module cache clearing script
+  - Use this if you see old version numbers in logs (e.g., v1.2.55 when v1.2.58 is installed)
+  - Clears PowerShell module analysis cache
+  - Verifies version match before starting
+  - Warns if version mismatch detected
+
+### Changed
+- Improved error messages for elevation requirements
+- Enhanced diagnostic logging for connectivity testing
+
+---
+
+## [1.2.57] - 2026-02-03
+
+### Notes
+- This version had correct fixes in code but users experienced module caching issues
+- PowerShell served v1.2.55 from cache despite v1.2.57 being on disk
+- v1.2.58 includes `Run-Dashboard-ForceFresh.ps1` to prevent this issue
+- Superseded by v1.2.58
+
+---
+
+## [1.2.56] - 2026-02-03
+
+### Fixed
+- Test Connectivity selection bug (attempted fix - superseded by v1.2.58)
+- Dashboard GPO toggles bug (attempted fix - superseded by v1.2.58)
+- Scanner elevation check (attempted fix - superseded by v1.2.58)
+
+---
+
+## [1.2.55] - 2026-02-03
+
+### Fixed
+- Test Connectivity ignores machine selection
+- Connectivity test performance improvements
+- Update-SetupStatus startup errors
+- Dashboard layout fixes
+- GPO toggle initialization
+
+---
+
+## [1.2.54] - 2026-02-03
+
+### Fixed
+- Dashboard GPO toggles stay grey after setup
+- Test Connectivity UI freeze
+
+---
+
 ## [1.2.53] - 2026-02-02
 
 ### UI/UX
