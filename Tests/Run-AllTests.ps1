@@ -40,7 +40,8 @@ param(
     [string[]]$ExcludeTag,
     [switch]$Coverage,
     [string]$OutputPath,
-    [switch]$Quick
+    [switch]$Quick,
+    [switch]$Legacy
 )
 
 $ErrorActionPreference = 'Stop'
@@ -65,7 +66,7 @@ if (-not $pester -or $pester.Version -lt [version]'5.0.0') {
 
 # Paths
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$testsPath = $PSScriptRoot
+$testsPath = Join-Path $PSScriptRoot 'Behavioral'
 $modulePath = Join-Path $projectRoot 'GA-AppLocker'
 
 Write-Host "Project Root: $projectRoot" -ForegroundColor Gray
@@ -89,8 +90,14 @@ if ($ExcludeTag) {
 }
 
 if ($Quick) {
-    $config.Filter.Tag = @('Unit')
-    Write-Host "Quick Mode: Running Unit tests only" -ForegroundColor Yellow
+    $config.Filter.Tag = @('Behavioral','Core')
+    Write-Host "Quick Mode: Running Behavioral Core tests only" -ForegroundColor Yellow
+}
+
+if ($Legacy) {
+    $legacyPath = Join-Path $PSScriptRoot 'Legacy'
+    $config.Run.Path = @($testsPath, $legacyPath)
+    Write-Host "Legacy Mode: Running Behavioral + Legacy tests" -ForegroundColor Yellow
 }
 
 if ($Coverage) {
@@ -185,9 +192,9 @@ if ($pesterResult.FailedCount -gt 0) {
 Write-Host ""
 
 # ============================================================
-# PHASE 3: Legacy Test Suite (if not Quick mode)
+# PHASE 3: Legacy Test Suite (optional)
 # ============================================================
-if (-not $Quick) {
+if ($Legacy) {
     Write-Host "=" * 60 -ForegroundColor Cyan
     Write-Host "  PHASE 3: Legacy Test Suite (Test-AllModules.ps1)" -ForegroundColor Cyan
     Write-Host "=" * 60 -ForegroundColor Cyan

@@ -151,7 +151,15 @@ function ConvertFrom-Artifact {
                     if (-not $extension) {
                         $extension = [System.IO.Path]::GetExtension($art.FileName)
                     }
-                    $collectionType = Get-CollectionType -Extension $extension
+                    # Fallback collection type logic (matches Scanning module)
+                    $collectionType = switch -Regex ($extension) {
+                        '(?i)\.exe' { 'Exe' }
+                        '(?i)\.dll' { 'Dll' }
+                        '(?i)\.msi|\.msp' { 'Msi' }
+                        '(?i)\.ps1|\.bat|\.cmd|\.vbs|\.js|\.wsf' { 'Script' }
+                        '(?i)\.appx|\.msix' { 'Appx' }
+                        default { 'Exe' }
+                    }
                 }
 
                 switch ($ruleType) {
