@@ -551,15 +551,35 @@ function global:Get-CheckedMachines {
     #>
     param($Window)
 
-    $dataGrid = $Window.FindName('MachineDataGrid')
-    if (-not $dataGrid -or $dataGrid.SelectedItems.Count -eq 0) { return @() }
+    $win = if ($Window) { $Window } else { $global:GA_MainWindow }
+    if (-not $win) {
+        try { Write-AppLockerLog -Message "Get-CheckedMachines: No window available" -Level DEBUG -NoConsole } catch { }
+        return @()
+    }
 
-    $selected = @($dataGrid.SelectedItems | Where-Object {
-        $_ -ne $null -and
-        $_.PSObject -ne $null -and
-        $_.PSObject.Properties.Name -contains 'Hostname'
-    })
-    return $selected
+    $dataGrid = $win.FindName('MachineDataGrid')
+    if (-not $dataGrid) {
+        try { Write-AppLockerLog -Message "Get-CheckedMachines: MachineDataGrid not found" -Level DEBUG -NoConsole } catch { }
+        return @()
+    }
+
+    if ($null -eq $dataGrid.SelectedItems -or $dataGrid.SelectedItems.Count -eq 0) {
+        try { Write-AppLockerLog -Message "Get-CheckedMachines: No items selected (SelectedItems.Count=0)" -Level DEBUG -NoConsole } catch { }
+        return @()
+    }
+
+    try { Write-AppLockerLog -Message "Get-CheckedMachines: Found $($dataGrid.SelectedItems.Count) selected items" -Level DEBUG -NoConsole } catch { }
+
+    $selected = [System.Collections.Generic.List[PSCustomObject]]::new()
+    foreach ($item in $dataGrid.SelectedItems) {
+        if ($null -eq $item) { continue }
+        if ($null -eq $item.PSObject) { continue }
+        if ($item.PSObject.Properties.Name -notcontains 'Hostname') { continue }
+        [void]$selected.Add($item)
+    }
+
+    try { Write-AppLockerLog -Message "Get-CheckedMachines: Returning $($selected.Count) valid machines" -Level DEBUG -NoConsole } catch { }
+    return @($selected)
 }
 
 function global:Invoke-ConnectivityTest {
@@ -568,22 +588,28 @@ function global:Invoke-ConnectivityTest {
         [switch]$Async
     )
 
-    if ($script:DiscoveredMachines.Count -eq 0) {
+    $win = if ($Window) { $Window } else { $global:GA_MainWindow }
+
+    if ($null -eq $script:DiscoveredMachines -or $script:DiscoveredMachines.Count -eq 0) {
         Show-AppLockerMessageBox 'No machines discovered. Click "Refresh Domain" first.' 'No Machines' 'OK' 'Information'
         return
     }
 
-    $machineCount = $Window.FindName('DiscoveryMachineCount')
+    $machineCount = $win.FindName('DiscoveryMachineCount')
     if ($machineCount) { $machineCount.Text = 'Testing connectivity...' }
 
-    # Use checked machines if any are checked; otherwise fall back to all discovered machines
-    $checkedMachines = Get-CheckedMachines -Window $Window
+    # Use selected machines if any are selected; otherwise fall back to all discovered machines
+    $checkedMachines = Get-CheckedMachines -Window $win
+    try { Write-AppLockerLog -Message "Invoke-ConnectivityTest: Get-CheckedMachines returned $($checkedMachines.Count) machines" -Level DEBUG -NoConsole } catch { }
+
     if ($checkedMachines.Count -gt 0) {
         $machines = $checkedMachines
-        if ($machineCount) { $machineCount.Text = "Testing $($machines.Count) checked machines..." }
+        if ($machineCount) { $machineCount.Text = "Testing $($machines.Count) selected machines..." }
+        try { Write-AppLockerLog -Message "Invoke-ConnectivityTest: Testing $($machines.Count) SELECTED machines" -Level INFO -NoConsole } catch { }
     }
     else {
         $machines = $script:DiscoveredMachines
+        try { Write-AppLockerLog -Message "Invoke-ConnectivityTest: No selection, testing ALL $($machines.Count) discovered machines" -Level INFO -NoConsole } catch { }
     }
 
     $onComplete = {
@@ -602,17 +628,17 @@ function global:Invoke-ConnectivityTest {
                 }
             }
 
-            Update-MachineDataGrid -Window $Window -Machines $script:DiscoveredMachines
-            Update-WorkflowBreadcrumb -Window $Window
+            Update-MachineDataGrid -Window $win -Machines $script:DiscoveredMachines
+            Update-WorkflowBreadcrumb -Window $win
 
             $summary = $Result.Summary
             if ($machineCount) {
                 $machineCount.Text = "$($summary.OnlineCount)/$($summary.TotalMachines) online, $($summary.WinRMAvailable) WinRM"
             }
             Show-Toast -Message "Connectivity complete. WinRM available: $($summary.WinRMAvailable). Return to Scanner to select targets." -Type 'Info'
-            try { global:Update-WinRMAvailableCount -Window $Window } catch { }
+            try { global:Update-WinRMAvailableCount -Window $win } catch { }
         }
-    }
+    }.GetNewClosure()
 
     $onError = {
         param($ErrorMessage)
@@ -622,39 +648,40 @@ function global:Invoke-ConnectivityTest {
         try { Write-Log -Level Warning -Message "Connectivity test failed: $ErrorMessage" } catch { }
     }
 
-    if (Get-Command -Name 'Invoke-AsyncOperation' -ErrorAction SilentlyContinue) {
+    try {
         Invoke-AsyncOperation -ScriptBlock {
             param($Machines)
             Test-MachineConnectivity -Machines $Machines
-        } -Arguments @{ Machines = $machines } -LoadingMessage 'Testing connectivity...' -LoadingSubMessage "Checking $($machines.Count) machines" -OnComplete {
+        } -Arguments @{ Machines = $machines } -LoadingMessage 'Testing connectivity...' -LoadingSubMessage "Checking $($machines.Count) machines" -TimeoutSeconds 600 -OnComplete {
             param($Result)
             & $onComplete -Result $Result
         } -OnError {
             param($ErrorMessage)
             & $onError -ErrorMessage $ErrorMessage
         }
+        return
     }
-    else {
-        try {
-            if (Get-Command -Name 'Show-LoadingOverlay' -ErrorAction SilentlyContinue) {
-                Show-LoadingOverlay -Message 'Testing connectivity...' -SubMessage "Checking $($machines.Count) machines"
-            }
+    catch { }
 
-            $testResult = Test-MachineConnectivity -Machines $machines
-
-            if (Get-Command -Name 'Hide-LoadingOverlay' -ErrorAction SilentlyContinue) {
-                Hide-LoadingOverlay
-            }
-
-            & $onComplete -Result $testResult
+    try {
+        if (Get-Command -Name 'Show-LoadingOverlay' -ErrorAction SilentlyContinue) {
+            Show-LoadingOverlay -Message 'Testing connectivity...' -SubMessage "Checking $($machines.Count) machines"
         }
-        catch {
-            if (Get-Command -Name 'Hide-LoadingOverlay' -ErrorAction SilentlyContinue) {
-                Hide-LoadingOverlay
-            }
-            if ($machineCount) {
-                $machineCount.Text = "Error: $($_.Exception.Message)"
-            }
+
+        $testResult = Test-MachineConnectivity -Machines $machines
+
+        if (Get-Command -Name 'Hide-LoadingOverlay' -ErrorAction SilentlyContinue) {
+            Hide-LoadingOverlay
+        }
+
+        & $onComplete -Result $testResult
+    }
+    catch {
+        if (Get-Command -Name 'Hide-LoadingOverlay' -ErrorAction SilentlyContinue) {
+            Hide-LoadingOverlay
+        }
+        if ($machineCount) {
+            $machineCount.Text = "Error: $($_.Exception.Message)"
         }
     }
 }

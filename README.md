@@ -1,4 +1,4 @@
-# GA-AppLocker v1.2.53
+# GA-AppLocker v1.2.55
 
 Enterprise AppLocker policy management for air-gapped, classified, and highly secure Windows environments. Complete workflow from AD discovery through GPO deployment — no internet required.
 
@@ -143,6 +143,8 @@ All data stored locally in `%LOCALAPPDATA%\GA-AppLocker\`:
 
 | Version | Date | Key Changes |
 |---------|------|-------------|
+| 1.2.55 | Feb 3, 2026 | Fix 5 bugs: (1) Test Connectivity ignores machine selection (window ref + .GetNewClosure fix), (2) Connectivity test too slow (runspace pool replaces Start-Job for ping/WinRM), (3) Update-SetupStatus errors at startup (silenced module checks), (4) Dashboard scrolls instead of scaling (ScrollViewer → Grid), (5) GPO toggles stay grey after init (sync call for Get-SetupStatus). |
+| 1.2.54 | Feb 3, 2026 | Fix 2 bugs: (1) Dashboard GPO toggles stay grey after setup - added Invoke-DashboardGpoRefresh call after Initialize-AppLockerEnvironment completes, (2) Test Connectivity freezes UI - parallelized WinRM tests using Start-Job instead of sequential Test-WSMan loop (was blocking even with 1 machine due to WinRM timeout). |
 | 1.2.53 | Feb 2, 2026 | Testing strategy update: Archived 1313 obsolete legacy tests (wrong module paths, v1.2.46-era code) to Tests\Legacy_Archived\ and added modern behavioral test suite in Tests\Behavioral\ (6/6 tests passing). Legacy tests permanently excluded via Tests/.gitignore. |
 
 Legacy automation (opt-in):

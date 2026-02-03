@@ -124,19 +124,16 @@ function global:Invoke-DashboardGpoRefresh {
     $win = if ($Window) { $Window } else { $global:GA_MainWindow }
     if (-not $win) { return }
 
-    Invoke-AsyncOperation -ScriptBlock {
-        Get-SetupStatus
-    } -NoLoadingOverlay -OnComplete {
-        param($Result)
-        Invoke-UIUpdate {
-            Update-DashboardGpoToggles -Window $win -Status $Result
-        }
-    } -OnError {
-        param($ErrorMessage)
-        Invoke-UIUpdate {
-            Update-DashboardGpoToggles -Window $win -Status $null
-        }
-        try { Write-Log -Level Warning -Message "Dashboard GPO status refresh failed: $ErrorMessage" } catch { }
+    # Call Get-SetupStatus synchronously on UI thread (fast operation, ~100-500ms)
+    # Async runspace approach failed because module-scoped variables ($script:DefaultGPONames)
+    # aren't available in runspace context, causing silent failures
+    try {
+        $status = Get-SetupStatus
+        Update-DashboardGpoToggles -Window $win -Status $status
+    }
+    catch {
+        Update-DashboardGpoToggles -Window $win -Status $null
+        try { Write-AppLockerLog -Level Warning -Message "Dashboard GPO status refresh failed: $($_.Exception.Message)" -NoConsole } catch { }
     }
 }
 

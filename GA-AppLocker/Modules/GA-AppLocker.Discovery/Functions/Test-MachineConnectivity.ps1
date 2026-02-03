@@ -81,62 +81,65 @@ function Test-PingConnectivity {
         }
     }
     else {
-        # Parallel: launch pings as background jobs in throttled batches
-        $jobs = [System.Collections.Generic.List[object]]::new()
-
+        # Parallel: use runspace pool (much faster than Start-Job due to lower overhead)
+        $runspacePool = [RunspaceFactory]::CreateRunspacePool(1, [Math]::Min($ThrottleLimit, $Hostnames.Count))
+        $runspacePool.Open()
+        
+        $runspaces = [System.Collections.Generic.List[PSCustomObject]]::new()
+        
         foreach ($hostname in $Hostnames) {
-            # Throttle: wait for a slot if at capacity
-            while ($jobs.Count -ge $ThrottleLimit) {
-                $completed = @($jobs | Where-Object { $_.State -ne 'Running' })
-                if ($completed.Count -gt 0) {
-                    foreach ($job in $completed) {
-                        $jobResult = Receive-Job -Job $job -ErrorAction SilentlyContinue
-                        $pingResults[$job.Name] = ($jobResult -eq $true)
-                        Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
-                        [void]$jobs.Remove($job)
-                    }
-                }
-                else {
-                    Start-Sleep -Milliseconds 50
-                }
-            }
-
-            $job = Start-Job -Name $hostname -ScriptBlock {
+            $powershell = [PowerShell]::Create()
+            $powershell.RunspacePool = $runspacePool
+            
+            [void]$powershell.AddScript({
                 param($h, $t)
                 try {
                     $ping = Get-WmiObject -Class Win32_PingStatus -Filter "Address='$h' AND Timeout=$t" -ErrorAction Stop
-                    return ($null -ne $ping -and $ping.StatusCode -eq 0)
+                    return @{ Hostname = $h; Success = ($null -ne $ping -and $ping.StatusCode -eq 0) }
                 }
                 catch {
-                    return $false
+                    return @{ Hostname = $h; Success = $false }
                 }
-            } -ArgumentList $hostname, $TimeoutMs
-            [void]$jobs.Add($job)
+            }).AddArgument($hostname).AddArgument($TimeoutMs)
+            
+            $handle = $powershell.BeginInvoke()
+            [void]$runspaces.Add([PSCustomObject]@{
+                PowerShell = $powershell
+                Handle     = $handle
+                Hostname   = $hostname
+            })
         }
-
-        # Wait for remaining jobs with overall timeout
-        $overallTimeout = [datetime]::Now.AddSeconds($TimeoutSeconds + 10)
-        while ($jobs.Count -gt 0 -and [datetime]::Now -lt $overallTimeout) {
-            $completed = @($jobs | Where-Object { $_.State -ne 'Running' })
-            if ($completed.Count -gt 0) {
-                foreach ($job in $completed) {
-                    $jobResult = Receive-Job -Job $job -ErrorAction SilentlyContinue
-                    $pingResults[$job.Name] = ($jobResult -eq $true)
-                    Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
-                    [void]$jobs.Remove($job)
+        
+        # Wait for all runspaces with overall timeout
+        $deadline = [datetime]::Now.AddSeconds($TimeoutSeconds + 10)
+        
+        foreach ($rs in $runspaces) {
+            try {
+                $remainingMs = [Math]::Max(100, ($deadline - [datetime]::Now).TotalMilliseconds)
+                if ($rs.Handle.AsyncWaitHandle.WaitOne([int]$remainingMs)) {
+                    $rsResult = $rs.PowerShell.EndInvoke($rs.Handle)
+                    if ($rsResult -and $rsResult.Hostname) {
+                        $pingResults[$rsResult.Hostname] = $rsResult.Success
+                    }
+                    else {
+                        $pingResults[$rs.Hostname] = $false
+                    }
+                }
+                else {
+                    # Timed out
+                    $pingResults[$rs.Hostname] = $false
                 }
             }
-            else {
-                Start-Sleep -Milliseconds 100
+            catch {
+                $pingResults[$rs.Hostname] = $false
+            }
+            finally {
+                $rs.PowerShell.Dispose()
             }
         }
-
-        # Force-stop any timed-out jobs
-        foreach ($job in $jobs) {
-            $pingResults[$job.Name] = $false
-            Stop-Job -Job $job -ErrorAction SilentlyContinue
-            Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
-        }
+        
+        $runspacePool.Close()
+        $runspacePool.Dispose()
     }
 
     return $pingResults
@@ -214,13 +217,21 @@ function Test-MachineConnectivity {
             [void]$testedMachines.Add($machine)
         }
         
-        # Parallel WinRM test for online machines using jobs (prevents UI freeze)
+        # Parallel WinRM test for online machines using runspace pool (faster than Start-Job)
         if ($TestWinRM -and $onlineMachines.Count -gt 0) {
             $winrmResults = @{}
-            $jobs = [System.Collections.ArrayList]::new()
+            
+            # Use runspace pool for much lower overhead than Start-Job
+            $runspacePool = [RunspaceFactory]::CreateRunspacePool(1, [Math]::Min($ThrottleLimit, $onlineMachines.Count))
+            $runspacePool.Open()
+            
+            $runspaces = [System.Collections.Generic.List[PSCustomObject]]::new()
             
             foreach ($machine in $onlineMachines) {
-                $job = Start-Job -ScriptBlock {
+                $powershell = [PowerShell]::Create()
+                $powershell.RunspacePool = $runspacePool
+                
+                [void]$powershell.AddScript({
                     param($Hostname)
                     try {
                         $null = Test-WSMan -ComputerName $Hostname -ErrorAction Stop
@@ -229,28 +240,44 @@ function Test-MachineConnectivity {
                     catch {
                         return @{ Hostname = $Hostname; Available = $false }
                     }
-                } -ArgumentList $machine.Hostname
-                [void]$jobs.Add($job)
+                }).AddArgument($machine.Hostname)
+                
+                $handle = $powershell.BeginInvoke()
+                [void]$runspaces.Add([PSCustomObject]@{
+                    PowerShell = $powershell
+                    Handle     = $handle
+                    Hostname   = $machine.Hostname
+                })
             }
             
-            # Wait for all jobs with timeout (5 seconds per machine max)
-            $jobTimeout = [Math]::Max(10, $onlineMachines.Count * 5)
-            $null = $jobs | Wait-Job -Timeout $jobTimeout
+            # Wait for all runspaces with timeout (3 seconds per machine, min 15 sec total)
+            $totalTimeout = [Math]::Max(15, $onlineMachines.Count * 3)
+            $deadline = [datetime]::Now.AddSeconds($totalTimeout)
             
-            foreach ($job in $jobs) {
+            foreach ($rs in $runspaces) {
                 try {
-                    if ($job.State -eq 'Completed') {
-                        $jobResult = Receive-Job -Job $job -ErrorAction SilentlyContinue
-                        if ($jobResult -and $jobResult.Hostname) {
-                            $winrmResults[$jobResult.Hostname] = $jobResult.Available
+                    $remainingMs = [Math]::Max(100, ($deadline - [datetime]::Now).TotalMilliseconds)
+                    if ($rs.Handle.AsyncWaitHandle.WaitOne([int]$remainingMs)) {
+                        $rsResult = $rs.PowerShell.EndInvoke($rs.Handle)
+                        if ($rsResult -and $rsResult.Hostname) {
+                            $winrmResults[$rsResult.Hostname] = $rsResult.Available
                         }
                     }
+                    else {
+                        # Timed out - mark as unavailable
+                        $winrmResults[$rs.Hostname] = $false
+                    }
                 }
-                catch { }
+                catch {
+                    $winrmResults[$rs.Hostname] = $false
+                }
                 finally {
-                    Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+                    $rs.PowerShell.Dispose()
                 }
             }
+            
+            $runspacePool.Close()
+            $runspacePool.Dispose()
             
             # Apply WinRM results
             foreach ($machine in $testedMachines) {

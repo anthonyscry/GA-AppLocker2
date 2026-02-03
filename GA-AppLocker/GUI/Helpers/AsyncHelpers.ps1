@@ -54,6 +54,9 @@ function Invoke-AsyncOperation {
         [scriptblock]$OnError,
 
         [Parameter()]
+        [int]$TimeoutSeconds = 60,
+
+        [Parameter()]
         [switch]$NoLoadingOverlay
     )
 
@@ -175,7 +178,7 @@ function Invoke-AsyncOperation {
         OnError = $OnError
         NoLoadingOverlay = $NoLoadingOverlay
         StartTime = [DateTime]::UtcNow
-        TimeoutSeconds = 60
+        TimeoutSeconds = $TimeoutSeconds
     }
 
     $timer.Add_Tick({

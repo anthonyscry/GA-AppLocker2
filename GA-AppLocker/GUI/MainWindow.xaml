@@ -643,10 +643,9 @@ Width="1450"
         <!-- Main Content Area -->
         <Border Grid.Column="1" Background="{StaticResource BackgroundBrush}" Padding="30">
             <Grid x:Name="ContentArea">
-                <!-- Dashboard Panel (Default) -->
-                <ScrollViewer x:Name="PanelDashboard" Visibility="Visible" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                    <Grid>
-                        <Grid.RowDefinitions>
+                <!-- Dashboard Panel (Default) - Auto-scales to window, no scrolling -->
+                <Grid x:Name="PanelDashboard" Visibility="Visible">
+                    <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
@@ -977,8 +976,7 @@ Width="1450"
                             </Border>
                         </StackPanel>
                     </Grid>
-                    </Grid>
-                </ScrollViewer>
+                </Grid>
 
                 <!-- AD Discovery Panel -->
                 <Grid x:Name="PanelDiscovery" Visibility="Collapsed">

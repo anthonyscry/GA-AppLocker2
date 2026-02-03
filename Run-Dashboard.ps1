@@ -2,6 +2,7 @@
 # Copy and paste this entire block into PowerShell to run the dashboard
 # Log file: %LOCALAPPDATA%\GA-AppLocker\Logs\GA-AppLocker_YYYY-MM-DD.log
 # Troubleshooting scripts: .\Troubleshooting\
+# Usage: .\Run-Dashboard.ps1
 
 Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
 

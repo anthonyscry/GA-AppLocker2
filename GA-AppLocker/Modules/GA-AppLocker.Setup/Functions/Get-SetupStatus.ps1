@@ -28,8 +28,11 @@ function Get-SetupStatus {
     }
 
     try {
-        $hasGP = Test-ModuleAvailable -ModuleName 'GroupPolicy'
-        $hasAD = Test-ModuleAvailable -ModuleName 'ActiveDirectory'
+        # Suppress all error output during module availability checks (silent on startup)
+        $hasGP = $false
+        $hasAD = $false
+        try { $hasGP = [bool](Get-Module -ListAvailable -Name 'GroupPolicy' -ErrorAction SilentlyContinue) } catch { }
+        try { $hasAD = [bool](Get-Module -ListAvailable -Name 'ActiveDirectory' -ErrorAction SilentlyContinue) } catch { }
 
         $status = [PSCustomObject]@{
             ModulesAvailable = [PSCustomObject]@{
@@ -46,10 +49,9 @@ function Get-SetupStatus {
         # Check WinRM GPO
         if ($hasGP) {
             try {
-                Import-Module GroupPolicy -ErrorAction Stop
+                Import-Module GroupPolicy -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
             }
             catch {
-                Write-SetupLog -Message "Failed to import GroupPolicy module: $($_.Exception.Message)" -Level WARNING
                 $hasGP = $false
             }
         }

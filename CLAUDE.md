@@ -4,7 +4,7 @@
 
 GA-AppLocker is a PowerShell 5.1 WPF application for enterprise AppLocker policy management in air-gapped, classified, or highly secure environments. Complete workflow: AD Discovery → Artifact Scanning → Rule Generation → Policy Building → GPO Deployment.
 
-**Version:** 1.2.54 | **Tests:** not run (not requested) | **Exported Commands:** ~195
+**Version:** 1.2.55 | **Tests:** not run (not requested) | **Exported Commands:** ~195
 
 ## Quick Start
 
