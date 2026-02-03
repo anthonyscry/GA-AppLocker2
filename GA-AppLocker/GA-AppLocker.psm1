@@ -39,7 +39,6 @@ $script:APP_TITLE = 'GA-AppLocker Dashboard'
 Add-Type -AssemblyName PresentationFramework
 Add-Type -AssemblyName PresentationCore
 Add-Type -AssemblyName WindowsBase
-Add-Type -AssemblyName System.Windows.Forms  # For RDP session detection
 #endregion
 
 #region ===== NESTED MODULES =====
@@ -161,16 +160,6 @@ function Start-AppLockerDashboard {
 
         Write-AppLockerLog -Message 'Main window loaded successfully'
 
-        # Force software rendering ALWAYS (hardware acceleration fails on DCs/RDP)
-        # This fixes the "must resize to refresh" issue on Domain Controllers
-        try {
-            [System.Windows.Media.RenderOptions]::ProcessRenderMode = [System.Windows.Interop.RenderMode]::SoftwareOnly
-            Write-AppLockerLog -Message "Software rendering FORCED (unconditional)"
-        }
-        catch {
-            Write-AppLockerLog -Level WARNING -Message "Failed to set software rendering: $($_.Exception.Message)"
-        }
-
         # Initialize window (wire up navigation, panels, etc.)
         # Initialize-MainWindow is defined in MainWindow.xaml.ps1, dot-sourced above.
         try {
@@ -229,7 +218,6 @@ function Start-AppLockerDashboard {
         })
 
         # Add loaded event to force layout pass (fixes white screen on startup)
-        # RDP sessions need multiple render passes due to channel latency
         $window.add_Loaded({
             try {
                 Write-AppLockerLog -Message 'Window Loaded event fired'
@@ -247,42 +235,6 @@ function Start-AppLockerDashboard {
                         $global:GA_MainWindow.UpdateLayout()
                     }
                 )
-            } catch { }
-            
-            # RDP fix: programmatic resize hack (simulates manual resize that fixes rendering)
-            # This is the nuclear option - actually resize the window which forces full re-layout
-            try {
-                $rdpTimer = [System.Windows.Threading.DispatcherTimer]::new()
-                $rdpTimer.Interval = [TimeSpan]::FromMilliseconds(300)
-                $rdpTimer.Add_Tick({
-                    param($s, $e)
-                    $s.Stop()
-                    try {
-                        # Store original size
-                        $w = $global:GA_MainWindow.Width
-                        $h = $global:GA_MainWindow.Height
-                        # Resize by 1px (triggers full layout recalc)
-                        $global:GA_MainWindow.Width = $w + 1
-                        $global:GA_MainWindow.Height = $h + 1
-                        $global:GA_MainWindow.UpdateLayout()
-                        # Restore original size
-                        $global:GA_MainWindow.Width = $w
-                        $global:GA_MainWindow.Height = $h
-                        $global:GA_MainWindow.UpdateLayout()
-                    } catch { }
-                })
-                $rdpTimer.Start()
-            } catch { }
-        })
-
-        # ContentRendered event - second resize hack as backup
-        $window.add_ContentRendered({
-            try {
-                $w = $global:GA_MainWindow.Width
-                $global:GA_MainWindow.Width = $w + 1
-                $global:GA_MainWindow.UpdateLayout()
-                $global:GA_MainWindow.Width = $w
-                $global:GA_MainWindow.UpdateLayout()
             } catch { }
         })
 

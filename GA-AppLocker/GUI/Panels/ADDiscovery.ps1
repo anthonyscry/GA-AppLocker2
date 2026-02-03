@@ -614,26 +614,47 @@ function global:Invoke-ConnectivityTest {
         }
     }
 
-    # Run connectivity test synchronously - async runspaces have module import issues
-    try {
-        if (Get-Command -Name 'Show-LoadingOverlay' -ErrorAction SilentlyContinue) {
-            Show-LoadingOverlay -Message 'Testing connectivity...' -SubMessage "Checking $($machines.Count) machines"
-        }
-
-        $testResult = Test-MachineConnectivity -Machines $machines
-
-        if (Get-Command -Name 'Hide-LoadingOverlay' -ErrorAction SilentlyContinue) {
-            Hide-LoadingOverlay
-        }
-
-        & $onComplete -Result $testResult
-    }
-    catch {
-        if (Get-Command -Name 'Hide-LoadingOverlay' -ErrorAction SilentlyContinue) {
-            Hide-LoadingOverlay
-        }
+    $onError = {
+        param($ErrorMessage)
         if ($machineCount) {
-            $machineCount.Text = "Error: $($_.Exception.Message)"
+            $machineCount.Text = "Error: $ErrorMessage"
+        }
+        try { Write-Log -Level Warning -Message "Connectivity test failed: $ErrorMessage" } catch { }
+    }
+
+    if (Get-Command -Name 'Invoke-AsyncOperation' -ErrorAction SilentlyContinue) {
+        Invoke-AsyncOperation -ScriptBlock {
+            param($Machines)
+            Test-MachineConnectivity -Machines $Machines
+        } -Arguments @{ Machines = $machines } -LoadingMessage 'Testing connectivity...' -LoadingSubMessage "Checking $($machines.Count) machines" -OnComplete {
+            param($Result)
+            & $onComplete -Result $Result
+        } -OnError {
+            param($ErrorMessage)
+            & $onError -ErrorMessage $ErrorMessage
+        }
+    }
+    else {
+        try {
+            if (Get-Command -Name 'Show-LoadingOverlay' -ErrorAction SilentlyContinue) {
+                Show-LoadingOverlay -Message 'Testing connectivity...' -SubMessage "Checking $($machines.Count) machines"
+            }
+
+            $testResult = Test-MachineConnectivity -Machines $machines
+
+            if (Get-Command -Name 'Hide-LoadingOverlay' -ErrorAction SilentlyContinue) {
+                Hide-LoadingOverlay
+            }
+
+            & $onComplete -Result $testResult
+        }
+        catch {
+            if (Get-Command -Name 'Hide-LoadingOverlay' -ErrorAction SilentlyContinue) {
+                Hide-LoadingOverlay
+            }
+            if ($machineCount) {
+                $machineCount.Text = "Error: $($_.Exception.Message)"
+            }
         }
     }
 }

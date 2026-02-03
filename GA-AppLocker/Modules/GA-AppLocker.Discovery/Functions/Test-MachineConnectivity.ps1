@@ -196,31 +196,70 @@ function Test-MachineConnectivity {
             -ThrottleLimit $ThrottleLimit
         #endregion
 
-        #region --- Apply Ping Results + WinRM Test ---
+        #region --- Apply Ping Results + WinRM Test (Parallel) ---
         $testedMachines = [System.Collections.ArrayList]::new()
-
+        
+        # First pass: apply ping results and identify online machines
+        $onlineMachines = [System.Collections.ArrayList]::new()
         foreach ($machine in $Machines) {
             $isOnline = if ($pingResults.ContainsKey($machine.Hostname)) { $pingResults[$machine.Hostname] } else { $false }
-            # Use Add-Member -Force instead of direct assignment — property may not exist
-            # on machine objects from all code paths (AD module, LDAP, DataGrid wrappers)
             $machine | Add-Member -NotePropertyName 'IsOnline' -NotePropertyValue $isOnline -Force
-            if ($isOnline) { $onlineCount++ }
-
-            if ($TestWinRM -and $isOnline) {
-                try {
-                    $null = Test-WSMan -ComputerName $machine.Hostname -ErrorAction Stop
-                    $machine | Add-Member -NotePropertyName 'WinRMStatus' -NotePropertyValue 'Available' -Force
-                    $winrmCount++
-                }
-                catch {
-                    $machine | Add-Member -NotePropertyName 'WinRMStatus' -NotePropertyValue 'Unavailable' -Force
-                }
+            if ($isOnline) { 
+                $onlineCount++
+                if ($TestWinRM) { [void]$onlineMachines.Add($machine) }
             }
-            elseif (-not $isOnline) {
+            else {
                 $machine | Add-Member -NotePropertyName 'WinRMStatus' -NotePropertyValue 'Offline' -Force
             }
-
             [void]$testedMachines.Add($machine)
+        }
+        
+        # Parallel WinRM test for online machines using jobs (prevents UI freeze)
+        if ($TestWinRM -and $onlineMachines.Count -gt 0) {
+            $winrmResults = @{}
+            $jobs = [System.Collections.ArrayList]::new()
+            
+            foreach ($machine in $onlineMachines) {
+                $job = Start-Job -ScriptBlock {
+                    param($Hostname)
+                    try {
+                        $null = Test-WSMan -ComputerName $Hostname -ErrorAction Stop
+                        return @{ Hostname = $Hostname; Available = $true }
+                    }
+                    catch {
+                        return @{ Hostname = $Hostname; Available = $false }
+                    }
+                } -ArgumentList $machine.Hostname
+                [void]$jobs.Add($job)
+            }
+            
+            # Wait for all jobs with timeout (5 seconds per machine max)
+            $jobTimeout = [Math]::Max(10, $onlineMachines.Count * 5)
+            $null = $jobs | Wait-Job -Timeout $jobTimeout
+            
+            foreach ($job in $jobs) {
+                try {
+                    if ($job.State -eq 'Completed') {
+                        $jobResult = Receive-Job -Job $job -ErrorAction SilentlyContinue
+                        if ($jobResult -and $jobResult.Hostname) {
+                            $winrmResults[$jobResult.Hostname] = $jobResult.Available
+                        }
+                    }
+                }
+                catch { }
+                finally {
+                    Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+                }
+            }
+            
+            # Apply WinRM results
+            foreach ($machine in $testedMachines) {
+                if ($machine.IsOnline) {
+                    $available = if ($winrmResults.ContainsKey($machine.Hostname)) { $winrmResults[$machine.Hostname] } else { $false }
+                    $machine | Add-Member -NotePropertyName 'WinRMStatus' -NotePropertyValue $(if ($available) { 'Available' } else { 'Unavailable' }) -Force
+                    if ($available) { $winrmCount++ }
+                }
+            }
         }
         #endregion
 

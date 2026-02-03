@@ -65,6 +65,15 @@ function script:Write-SetupLog {
         Write-AppLockerLog -Message $Message -Level $Level -NoConsole
     }
 }
+
+function global:Write-SetupLog {
+    param([string]$Message, [string]$Level = 'Info')
+    try {
+        if (Get-Command -Name 'Write-AppLockerLog' -ErrorAction SilentlyContinue) {
+            Write-AppLockerLog -Message $Message -Level $Level -NoConsole
+        }
+    } catch { }
+}
 #endregion
 
 #region ===== HELPER FUNCTIONS =====
