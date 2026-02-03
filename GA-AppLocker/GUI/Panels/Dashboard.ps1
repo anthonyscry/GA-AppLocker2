@@ -45,13 +45,8 @@ function Initialize-DashboardPanel {
         }
     }
 
-    # Load dashboard data (defer to allow initial render)
-    try {
-        $Window.Dispatcher.BeginInvoke(
-            [System.Windows.Threading.DispatcherPriority]::Background,
-            [Action]{ Update-DashboardStats -Window $global:GA_MainWindow }
-        )
-    } catch { Update-DashboardStats -Window $Window }
+    # Load dashboard data (async to avoid blocking UI thread on low-perf systems)
+    try { Update-DashboardStats -Window $Window -Async } catch { Update-DashboardStats -Window $Window }
     try { Update-ModuleStatus -Window $Window } catch { }
     try { Invoke-DashboardGpoRefresh -Window $Window } catch { }
 }
@@ -145,8 +140,188 @@ function global:Invoke-DashboardGpoRefresh {
     }
 }
 
-function global:Update-DashboardStats {
+function global:Invoke-DashboardStatsRefresh {
     param($Window)
+
+    $win = if ($Window) { $Window } else { $global:GA_MainWindow }
+    if (-not $win) { return }
+
+    $machineCount = if ($script:DiscoveredMachines) { $script:DiscoveredMachines.Count } else { 0 }
+    $currentArtifacts = if ($script:CurrentScanArtifacts) { $script:CurrentScanArtifacts.Count } else { 0 }
+    $cachedArtifacts = if ($script:CachedTotalArtifacts) { $script:CachedTotalArtifacts } else { $null }
+
+    Invoke-AsyncOperation -ScriptBlock {
+        param($MachineCount, $CurrentArtifacts, $CachedArtifacts)
+
+        $stats = [PSCustomObject]@{
+            MachineCount = $MachineCount
+            ArtifactCount = if ($CachedArtifacts) { $CachedArtifacts } else { $CurrentArtifacts }
+            RuleCounts = $null
+            PendingRules = @()
+            PolicyCount = 0
+            RecentScans = @()
+        }
+
+        try {
+            $countsResult = Get-RuleCounts
+            if ($countsResult.Success) {
+                $stats.RuleCounts = $countsResult
+            }
+        } catch { }
+
+        if ($stats.RuleCounts) {
+            try {
+                $pendingItems = [System.Collections.Generic.List[PSCustomObject]]::new()
+                $pendingData = Get-RulesFromDatabase -Status 'Pending' -Take 10
+                if ($pendingData) {
+                    foreach ($rule in @($pendingData)) {
+                        [void]$pendingItems.Add([PSCustomObject]@{
+                            Type = $rule.RuleType
+                            Name = $rule.Name
+                        })
+                    }
+                }
+                $stats.PendingRules = @($pendingItems)
+            } catch { }
+        }
+
+        try {
+            $stats.PolicyCount = Get-PolicyCount
+        } catch { }
+
+        try {
+            $scansResult = Get-ScanResults
+            if ($scansResult.Success -and $scansResult.Data) {
+                $scanData = @($scansResult.Data)
+                $stats.RecentScans = @($scanData | Select-Object -First 5 | ForEach-Object {
+                    $dateDisplay = ''
+                    if ($_.Date) {
+                        try {
+                            $dateValue = $_.Date
+                            if ($dateValue -is [PSCustomObject] -and $dateValue.DateTime) {
+                                $dateDisplay = ([datetime]$dateValue.DateTime).ToString('MM/dd HH:mm')
+                            }
+                            elseif ($dateValue -is [datetime]) {
+                                $dateDisplay = $dateValue.ToString('MM/dd HH:mm')
+                            }
+                            elseif ($dateValue -is [string]) {
+                                $dateDisplay = ([datetime]$dateValue).ToString('MM/dd HH:mm')
+                            }
+                        } catch { }
+                    }
+                    [PSCustomObject]@{
+                        Name  = $_.ScanName
+                        Date  = $dateDisplay
+                        Count = "$($_.Artifacts) items"
+                    }
+                })
+            }
+        } catch { }
+
+        return $stats
+    } -Arguments @{
+        MachineCount = $machineCount
+        CurrentArtifacts = $currentArtifacts
+        CachedArtifacts = $cachedArtifacts
+    } -NoLoadingOverlay -OnComplete {
+        param($Result)
+        Invoke-UIUpdate {
+            Apply-DashboardStats -Window $win -Stats $Result
+        }
+    } -OnError {
+        param($ErrorMessage)
+        try { Write-Log -Level Warning -Message "Dashboard stats refresh failed: $ErrorMessage" } catch { }
+    }
+}
+
+function global:Apply-DashboardStats {
+    param(
+        $Window,
+        $Stats
+    )
+
+    if (-not $Stats) { return }
+
+    $statMachines = $Window.FindName('StatMachines')
+    if ($statMachines) { $statMachines.Text = $Stats.MachineCount.ToString() }
+
+    $statArtifacts = $Window.FindName('StatArtifacts')
+    if ($statArtifacts) { $statArtifacts.Text = $Stats.ArtifactCount.ToString() }
+
+    if ($Stats.RuleCounts) {
+        $statRules = $Window.FindName('StatRules')
+        $statPending = $Window.FindName('StatPending')
+        $statApproved = $Window.FindName('StatApproved')
+        $statRejected = $Window.FindName('StatRejected')
+
+        if ($statRules) { $statRules.Text = $Stats.RuleCounts.Total.ToString() }
+
+        if ($statPending) {
+            $pendingCount = if ($Stats.RuleCounts.ByStatus['Pending']) { $Stats.RuleCounts.ByStatus['Pending'] } else { 0 }
+            $statPending.Text = $pendingCount.ToString()
+        }
+        if ($statApproved) {
+            $approvedCount = if ($Stats.RuleCounts.ByStatus['Approved']) { $Stats.RuleCounts.ByStatus['Approved'] } else { 0 }
+            $statApproved.Text = $approvedCount.ToString()
+        }
+        if ($statRejected) {
+            $rejectedCount = if ($Stats.RuleCounts.ByStatus['Rejected']) { $Stats.RuleCounts.ByStatus['Rejected'] } else { 0 }
+            $statRejected.Text = $rejectedCount.ToString()
+        }
+
+        $pendingList = $Window.FindName('DashPendingRules')
+        if ($pendingList -and $Stats.PendingRules) {
+            $items = [System.Collections.ObjectModel.ObservableCollection[object]]::new()
+            foreach ($rule in @($Stats.PendingRules)) {
+                [void]$items.Add([PSCustomObject]@{
+                    Type = $rule.Type
+                    Name = $rule.Name
+                })
+            }
+            $pendingList.ItemsSource = $items
+        }
+    }
+
+    $statPolicies = $Window.FindName('StatPolicies')
+    if ($statPolicies) { $statPolicies.Text = $Stats.PolicyCount.ToString() }
+
+    $scansList = $Window.FindName('DashRecentScans')
+    if ($scansList -and $Stats.RecentScans) {
+        $scansList.ItemsSource = $Stats.RecentScans
+    }
+
+    Update-DashboardCharts -Window $Window -CountsResult $Stats.RuleCounts
+    try { Request-UiRender -Window $Window } catch { }
+}
+
+function global:Update-DashboardStats {
+    [CmdletBinding()]
+    param(
+        $Window,
+        [switch]$Async
+    )
+
+    $win = if ($Window) { $Window } else { $global:GA_MainWindow }
+    if (-not $win) { return }
+
+    if ($Async -or $win.Dispatcher.CheckAccess()) {
+        try {
+            Invoke-DashboardStatsRefresh -Window $win
+            return
+        } catch { }
+    }
+
+    if (-not $win.Dispatcher.CheckAccess()) {
+        try {
+            $win.Dispatcher.BeginInvoke(
+                [System.Windows.Threading.DispatcherPriority]::Background,
+                [Action]{ Invoke-DashboardStatsRefresh -Window $win }
+            ) | Out-Null
+            return
+        } catch { }
+    }
+
+    $Window = $win
 
     # Update stats from actual data
     try {
@@ -268,6 +443,8 @@ function global:Update-DashboardStats {
                 $scansList.ItemsSource = $recentScans
             }
         }
+
+        try { Request-UiRender -Window $Window } catch { }
     }
     catch {
         Write-Log -Level Warning -Message "Failed to update dashboard stats: $($_.Exception.Message)"
@@ -283,10 +460,16 @@ function Update-DashboardCharts {
         Uses Get-RuleCounts for fast O(n) counting from index instead of
         Get-AllRules which loads full payloads from disk (slow with many rules).
     #>
-    param($Window)
+    param(
+        $Window,
+        $CountsResult
+    )
     
     try {
-        $countsResult = Get-RuleCounts
+        $countsResult = $CountsResult
+        if (-not $countsResult) {
+            $countsResult = Get-RuleCounts
+        }
         if (-not $countsResult.Success) { return }
         
         $totalRules = $countsResult.Total

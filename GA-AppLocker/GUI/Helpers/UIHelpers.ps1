@@ -80,4 +80,22 @@ function global:Update-LoadingText {
     if ($txtSub -and $SubMessage) { $txtSub.Text = $SubMessage }
 }
 
+function global:Request-UiRender {
+    param($Window)
+
+    $win = if ($Window) { $Window } else { $global:GA_MainWindow }
+    if (-not $win) { return }
+
+    try {
+        $win.Dispatcher.BeginInvoke(
+            [System.Windows.Threading.DispatcherPriority]::Render,
+            [Action]{
+                $win.InvalidateVisual()
+                $win.UpdateLayout()
+            }
+        ) | Out-Null
+    }
+    catch { }
+}
+
 #endregion
