@@ -714,13 +714,19 @@ function global:Invoke-ConnectivityTest {
                 }
             }
 
-            Update-MachineDataGrid -Window $win -Machines $script:DiscoveredMachines
-            
-            # Force DataGrid visual refresh
-            $dataGrid = $win.FindName('MachineDataGrid')
-            if ($dataGrid) {
-                $dataGrid.Items.Refresh()
-            }
+            # Update DataGrid on UI thread using Dispatcher
+            $win.Dispatcher.Invoke([action]{
+                Update-MachineDataGrid -Window $win -Machines $script:DiscoveredMachines
+                
+                # Force DataGrid visual refresh
+                $dataGrid = $win.FindName('MachineDataGrid')
+                if ($dataGrid) {
+                    # Update ItemsSource to force rebind
+                    $dataGrid.ItemsSource = $null
+                    $dataGrid.ItemsSource = $script:DiscoveredMachines
+                    $dataGrid.Items.Refresh()
+                }
+            })
             
             Update-WorkflowBreadcrumb -Window $win
 

@@ -104,11 +104,21 @@ function Invoke-AsyncOperation {
                 try {
                     Import-Module $ModulePath -Force -ErrorAction Stop
                     $moduleLoaded = $true
+                    # Log success for diagnostics
+                    Write-Host "[AsyncHelpers] Module imported successfully in runspace: $ModulePath"
                 }
                 catch {
-                    # Module import failed - continue but note the error
-                    $moduleError = $_.Exception.Message
+                    # Module import failed - FATAL ERROR, cannot proceed
+                    $errorMsg = "FATAL: Module import failed in runspace: $($_.Exception.Message)"
+                    Write-Host "[AsyncHelpers] $errorMsg" -ForegroundColor Red
+                    throw $errorMsg
                 }
+            }
+            elseif (-not $ModulePath) {
+                throw "FATAL: Module path not provided to runspace"
+            }
+            else {
+                throw "FATAL: Module not found at path: $ModulePath"
             }
             
             # Execute the script block with arguments

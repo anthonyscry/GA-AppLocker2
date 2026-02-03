@@ -70,6 +70,13 @@ function Get-LocalArtifacts {
     try {
         Write-ScanLog -Message "Starting local artifact scan on $env:COMPUTERNAME"
         
+        # Diagnostic logging for runspace context
+        $isElevated = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+        Write-ScanLog -Message "Elevation status: $isElevated"
+        Write-ScanLog -Message "Paths parameter: $($Paths -join ', ')"
+        Write-ScanLog -Message "Extensions parameter: $($Extensions -join ', ')"
+        Write-ScanLog -Message "SkipDllScanning: $SkipDllScanning, SkipWshScanning: $SkipWshScanning, SkipShellScanning: $SkipShellScanning"
+        
         # Defensive: If $Paths is null (can happen in runspace contexts where
         # Get-DefaultScanPaths is not resolved when parameter defaults evaluate),
         # fall back to hardcoded defaults.
