@@ -115,6 +115,32 @@ function Update-Policy {
 
         $policy | ConvertTo-Json -Depth 5 | Set-Content -Path $policyFile -Encoding UTF8
 
+        # Update policy index
+        try {
+            Initialize-PolicyIndex
+            $indexEntry = [PSCustomObject]@{
+                PolicyId        = $policy.PolicyId
+                Name            = $policy.Name
+                Description     = $policy.Description
+                EnforcementMode = $policy.EnforcementMode
+                Phase           = $policy.Phase
+                Status          = $policy.Status
+                RuleIds         = @($policy.RuleIds)
+                TargetOUs       = if ($policy.TargetOUs) { @($policy.TargetOUs) } else { @() }
+                TargetGPO       = $policy.TargetGPO
+                CreatedAt       = $policy.CreatedAt
+                ModifiedAt      = $policy.ModifiedAt
+                Version         = $policy.Version
+                FilePath        = $policyFile
+            }
+            $null = Add-PolicyIndexEntry -Entry $indexEntry -SkipSave
+            Save-PolicyIndex
+        }
+        catch {
+            # Index update failure should not block policy update
+            Write-PolicyLog -Message "Failed to update policy index for '$($policy.Name)': $($_.Exception.Message)" -Level 'WARNING'
+        }
+
         return @{
             Success = $true
             Data    = $policy
