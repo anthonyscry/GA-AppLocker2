@@ -96,7 +96,25 @@ function Update-DeploymentJob {
         }
 
         # Save updated job back to disk
+        # Version checking before write
+        $existingVersion = $job.Version
         Write-DeploymentJobFile -Path $jobFile -Job $job
+
+        # Verify version didn't change during write (race condition detection)
+        try {
+            $verifyJob = Get-Content -Path $jobFile -Raw | ConvertFrom-Json
+            $expectedVersion = $existingVersion + 1
+            if ($verifyJob.Version -ne $expectedVersion) {
+                Write-AppLockerLog -Message "Race condition detected in Update-DeploymentJob: Job version inconsistent. Expected $expectedVersion, got $($verifyJob.Version)." -Level 'WARNING'
+                return @{
+                    Success = $false
+                    Error = "Concurrent deployment modification detected. Job file modified during update."
+                }
+            }
+        }
+        catch {
+            Write-AppLockerLog -Message "Failed to verify job version after update: $($_.Exception.Message)" -Level 'DEBUG'
+        }
 
         # Log the change
         $changedFields = @()

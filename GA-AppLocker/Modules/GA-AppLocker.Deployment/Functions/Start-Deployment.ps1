@@ -42,7 +42,44 @@ function Start-Deployment {
         $job.StartedAt = (Get-Date).ToString('o')
         $job.Progress = 10
         $job.Message = 'Starting deployment...'
+
+        # Read existing job if exists for version checking
+        $existingVersion = $null
+        if (Test-Path $jobFile) {
+            try {
+                $existingJob = Get-Content -Path $jobFile -Raw | ConvertFrom-Json
+                $existingVersion = $existingJob.Version
+            }
+            catch {
+                Write-AppLockerLog -Message "Failed to read existing job file for version check: $($_.Exception.Message)" -Level 'DEBUG'
+            }
+        }
+
         Write-DeploymentJobFile -Path $jobFile -Job $job
+
+        # Verify version didn't change during write (race condition detection)
+        if ($null -ne $existingVersion) {
+            try {
+                $verifyJob = Get-Content -Path $jobFile -Raw | ConvertFrom-Json
+                $expectedVersion = $existingVersion + 1
+                if ($verifyJob.Version -ne $expectedVersion) {
+                    Write-AppLockerLog -Message "Race condition detected: Job version inconsistent. Expected $expectedVersion, got $($verifyJob.Version). Retrying..." -Level 'WARNING'
+                    # Version mismatch - another process modified the job
+                    $result = @{
+                        Success = $false
+                        Error = "Concurrent deployment detected. Job file modified during operation."
+                    }
+                    $job.Status = 'Failed'
+                    $job.Message = $result.Error
+                    $job.CompletedAt = (Get-Date).ToString('o')
+                    Write-DeploymentJobFile -Path $jobFile -Job $job
+                    return $result
+                }
+            }
+            catch {
+                Write-AppLockerLog -Message "Failed to verify job version after write: $($_.Exception.Message)" -Level 'DEBUG'
+            }
+        }
 
         # Step 1: Export policy to temp XML
         $job.Progress = 20
