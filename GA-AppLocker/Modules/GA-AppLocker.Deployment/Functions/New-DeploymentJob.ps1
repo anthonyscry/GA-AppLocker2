@@ -75,7 +75,7 @@ function New-DeploymentJob {
         }
 
         $jobFile = Join-Path $deploymentsPath "$jobId.json"
-        $job | ConvertTo-Json -Depth 5 | Set-Content -Path $jobFile -Encoding UTF8
+        Write-DeploymentJobFile -Path $jobFile -Job $job
 
         return @{
             Success = $true
@@ -277,3 +277,4 @@ function Get-AllDeploymentJobs {
         }
     }
 }
+

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     LDAP helper functions for AD Discovery without RSAT.
 .DESCRIPTION
@@ -27,7 +27,7 @@ function Resolve-LdapServer {
         [int]$Port = 0
     )
 
-    # 1. Explicit parameter — highest priority
+    # 1. Explicit parameter â€” highest priority
     if ($Server) {
         $resolvedPort = if ($Port -gt 0) { $Port } else { 389 }
         return [PSCustomObject]@{ Server = $Server; Port = $resolvedPort; Source = 'Parameter' }
@@ -51,7 +51,7 @@ function Resolve-LdapServer {
         return [PSCustomObject]@{ Server = $env:USERDNSDOMAIN; Port = $resolvedPort; Source = 'Environment' }
     }
 
-    # 4. No server found — return null (DO NOT default to 'localhost')
+    # 4. No server found â€” return null (DO NOT default to 'localhost')
     Write-AppLockerLog -Level Warning -Message "No LDAP server configured. Use Set-LdapConfiguration to set a server, or join the machine to a domain." -NoConsole
     return $null
 }
@@ -102,6 +102,7 @@ function Get-LdapConnection {
             $netCred = $Credential.GetNetworkCredential()
             if ([string]::IsNullOrWhiteSpace($netCred.UserName)) {
                 Write-AppLockerLog -Level Error -Message "LDAP connection failed: Credential has empty username."
+                $connection.Dispose()
                 return $null
             }
             # Check RequireSSL config for Basic auth without SSL
@@ -110,9 +111,10 @@ function Get-LdapConnection {
                 try {
                     $config = Get-AppLockerConfig
                     if ($config.RequireSSL -eq $true) { $requireSSL = $true }
-                } catch { }
+                } catch { Write-AppLockerLog -Message "Empty catch in LDAP-Functions.ps1" -Level 'Debug' -NoConsole }
                 if ($requireSSL) {
                     Write-AppLockerLog -Level Error -Message "LDAP: RequireSSL is enabled in config but SSL is not active. Refusing Basic auth without SSL."
+                    $connection.Dispose()
                     return $null
                 }
                 Write-AppLockerLog -Level Warning -Message "LDAP: Using Basic authentication without SSL. Credentials transmitted base64-encoded. Consider enabling SSL (-UseSSL) for production deployments."
@@ -404,7 +406,7 @@ function Get-ComputersByOUViaLdap {
                         if ($fileTime -gt 0) {
                             $lastLogon = [DateTime]::FromFileTime($fileTime)
                         }
-                    } catch { }
+                    } catch { Write-AppLockerLog -Message "Empty catch in LDAP-Functions.ps1" -Level 'Debug' -NoConsole }
                 }
                 
                 $computer = [PSCustomObject]@{

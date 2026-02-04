@@ -44,17 +44,17 @@ function Add-RuleToPolicy {
             $policy | Add-Member -NotePropertyName 'RuleIds' -NotePropertyValue @() -Force
         }
 
-        $currentRules = @($policy.RuleIds)
+        $currentRules = [System.Collections.Generic.List[string]]::new($policy.RuleIds)
         $addedCount = 0
 
         foreach ($id in $RuleId) {
-            if ($id -notin $currentRules) {
-                $currentRules += $id
+            if (-not $currentRules.Contains($id)) {
+                [void]$currentRules.Add($id)
                 $addedCount++
             }
         }
 
-        $policy.RuleIds = $currentRules
+        $policy.RuleIds = @($currentRules)
         $policy.ModifiedAt = (Get-Date).ToString('o')
         $currentVersion = if ($policy.Version) { [int]$policy.Version } else { 0 }
         $policy.Version = $currentVersion + 1

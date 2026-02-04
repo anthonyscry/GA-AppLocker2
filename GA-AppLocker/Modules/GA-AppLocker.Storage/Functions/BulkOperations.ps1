@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Bulk storage operations for high-performance rule management.
 
@@ -215,7 +215,16 @@ function Add-RulesToIndex {
 
         # Batch append to index array (single allocation instead of per-rule +=)
         if ($newEntries.Count -gt 0) {
-            $script:JsonIndex.Rules = @($script:JsonIndex.Rules) + $newEntries.ToArray()
+        # Convert to List if needed
+if ($script:JsonIndex.Rules -isnot [System.Collections.Generic.List[PSCustomObject]]) {
+            $rulesList = [System.Collections.Generic.List[PSCustomObject]]::new()
+            foreach ($r in @($script:JsonIndex.Rules)) {
+                [void]$rulesList.Add($r)
+            }
+            $script:JsonIndex.Rules = $rulesList
+        }
+        # O(1) amortized append
+        [void]$script:JsonIndex.Rules.AddRange($newEntries)
         }
         
         if ($skipped -gt 0) {
@@ -291,7 +300,7 @@ function Remove-RulesBulk {
                 Clear-AppLockerCache -Pattern 'GlobalSearch_*' | Out-Null
                 Clear-AppLockerCache -Pattern 'RuleCounts*' | Out-Null
                 Clear-AppLockerCache -Pattern 'RuleQuery*' | Out-Null
-            } catch { }
+            } catch { Write-AppLockerLog -Message "Empty catch in BulkOperations.ps1" -Level 'Debug' -NoConsole }
             Write-StorageLog -Message "Bulk deleted $($result.RemovedCount) rules"
         }
     }

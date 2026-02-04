@@ -71,15 +71,16 @@ function New-PolicySnapshot {
         $policy = $policyResult.Data
 
         # Get all rules for this policy
-        $rules = @()
+        $rules = [System.Collections.Generic.List[PSCustomObject]]::new()
         if ($policy.RuleIds) {
             foreach ($ruleId in $policy.RuleIds) {
                 $ruleResult = Get-Rule -Id $ruleId
                 if ($ruleResult.Success) {
-                    $rules += $ruleResult.Data
+                    [void]$rules.Add($ruleResult.Data)
                 }
             }
         }
+        $snapshot.Rules = @($rules)
 
         # Create snapshot directory
         $dataPath = Get-AppLockerDataPath

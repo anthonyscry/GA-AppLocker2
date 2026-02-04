@@ -91,22 +91,30 @@ function Write-AuditLog {
         [System.IO.File]::AppendAllText($auditPath, $jsonLine)
 
         # Periodic truncation: enforce 10K entry cap every 100 writes
-        # Check line count only occasionally to avoid perf hit on every write
-        $lineCount = 0
-        try {
-            $reader = [System.IO.File]::OpenText($auditPath)
-            try {
-                while ($null -ne $reader.ReadLine()) { $lineCount++ }
-            }
-            finally { $reader.Close() }
+        # Increment write counter
+        if (-not $script:AuditWriteCounter) {
+            $script:AuditWriteCounter = 0
         }
-        catch { $lineCount = 0 }
+        $script:AuditWriteCounter++
 
-        if ($lineCount -gt 10000) {
-            # Read all lines, keep last 10000, rewrite
-            $allLines = [System.IO.File]::ReadAllLines($auditPath)
-            $keepLines = $allLines[($allLines.Count - 10000)..($allLines.Count - 1)]
-            [System.IO.File]::WriteAllLines($auditPath, $keepLines)
+        # Check line count only every 100 writes to avoid perf hit
+        if ($script:AuditWriteCounter % 100 -eq 0) {
+            $lineCount = 0
+            try {
+                $reader = [System.IO.File]::OpenText($auditPath)
+                try {
+                    while ($null -ne $reader.ReadLine()) { $lineCount++ }
+                }
+                finally { $reader.Close() }
+            }
+            catch { $lineCount = 0 }
+
+            if ($lineCount -gt 10000) {
+                # Read all lines, keep last 10000, rewrite
+                $allLines = [System.IO.File]::ReadAllLines($auditPath)
+                $keepLines = $allLines[($allLines.Count - 10000)..($allLines.Count - 1)]
+                [System.IO.File]::WriteAllLines($auditPath, $keepLines)
+            }
         }
 
         return @{
@@ -200,7 +208,11 @@ function Get-AuditLog {
             $parsed = [System.Collections.Generic.List[PSCustomObject]]::new()
             foreach ($line in $lines) {
                 if (-not [string]::IsNullOrWhiteSpace($line)) {
-                    try { [void]$parsed.Add(($line | ConvertFrom-Json)) } catch { Write-AppLockerLog -Message "Failed to parse audit log line: $($_.Exception.Message)" -Level 'DEBUG' }
+                    try { [void]$parsed.Add(($line | ConvertFrom-Json)) } catch {
+                        # Sanitize error message to prevent log injection
+                        $errorMsg = $_.Exception.Message -replace '[^\w\s\.\-:]', ''
+                        Write-AppLockerLog -Message "Failed to parse audit log line: $errorMsg" -Level 'DEBUG'
+                    }
                 }
             }
             $auditLog = $parsed.ToArray()

@@ -42,12 +42,48 @@ function script:Write-DeployLog {
 function script:Get-DeploymentStoragePath {
     $dataPath = Get-AppLockerDataPath
     $deployPath = Join-Path $dataPath 'Deployments'
-    
+
     if (-not (Test-Path $deployPath)) {
         New-Item -Path $deployPath -ItemType Directory -Force | Out-Null
     }
-    
+
     return $deployPath
+}
+
+function script:Write-DeploymentJobFile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+
+        [Parameter(Mandatory = $true)]
+        [PSCustomObject]$Job
+    )
+
+    $json = $Job | ConvertTo-Json -Depth 5
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
+
+    $stream = $null
+    $attempt = 0
+    while (-not $stream -and $attempt -lt 5) {
+        try {
+            $stream = [System.IO.File]::Open($Path, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+        }
+        catch {
+            Start-Sleep -Milliseconds 100
+            $attempt++
+        }
+    }
+
+    if (-not $stream) {
+        throw "Unable to acquire file lock for deployment job file: $Path"
+    }
+
+    try {
+        $stream.Write($bytes, 0, $bytes.Length)
+    }
+    finally {
+        $stream.Close()
+    }
 }
 #endregion
 

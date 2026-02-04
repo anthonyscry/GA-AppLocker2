@@ -96,7 +96,7 @@ function Update-DeploymentJob {
         }
 
         # Save updated job back to disk
-        $job | ConvertTo-Json -Depth 5 | Set-Content -Path $jobFile -Encoding UTF8
+        Write-DeploymentJobFile -Path $jobFile -Job $job
 
         # Log the change
         $changedFields = @()
@@ -120,3 +120,4 @@ function Update-DeploymentJob {
         }
     }
 }
+

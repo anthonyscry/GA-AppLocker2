@@ -68,22 +68,22 @@ function Export-PolicyToXml {
         }
         $policy = $policyResult.Data
 
-        # Get all rules for this policy
+         # Get all rules for this policy
         $dataPath = Get-AppLockerDataPath
         $rulesPath = Join-Path $dataPath 'Rules'
-        $rules = @()
+        $rules = [System.Collections.Generic.List[PSCustomObject]]::new()
 
         foreach ($ruleId in $policy.RuleIds) {
             $ruleFile = Join-Path $rulesPath "$ruleId.json"
             if (Test-Path $ruleFile) {
                 $rule = Get-Content -Path $ruleFile -Raw | ConvertFrom-Json
-                
+
                 # Skip rejected unless explicitly included
                 if ($rule.Status -eq 'Rejected' -and -not $IncludeRejected) {
                     continue
                 }
-                
-                $rules += $rule
+
+                [void]$rules.Add($rule)
             }
         }
 
@@ -93,6 +93,8 @@ function Export-PolicyToXml {
                 Error   = 'No valid rules to export'
             }
         }
+
+        $rulesArray = @($rules)
 
         # Determine effective phase (override or from policy)
         $effectivePhase = if ($PSBoundParameters.ContainsKey('PhaseOverride')) {

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     JSON-based rule storage for GA-AppLocker.
 
@@ -447,30 +447,26 @@ function Get-AllRules {
         return $result
     }
     
-    try {
-        $filtered = @($rules)
-        
-        if ($Status) {
-            $filtered = @($filtered | Where-Object { $_.Status -eq $Status })
+     try {
+        # Single-pass O(n) filtering with List<T>
+        $filtered = [System.Collections.Generic.List[PSCustomObject]]::new()
+
+        foreach ($rule in $rules) {
+            $match = $true
+            if ($Status -and $rule.Status -ne $Status) { $match = $false }
+            if ($RuleType -and $rule.RuleType -ne $RuleType) { $match = $false }
+            if ($CollectionType -and $rule.CollectionType -ne $CollectionType) { $match = $false }
+            if ($GroupVendor -and $rule.GroupVendor -notlike "*$GroupVendor*") { $match = $false }
+            if ($SearchText) {
+                $textMatch = $rule.Name -like "*$SearchText*" -or
+                             $rule.PublisherName -like "*$SearchText*" -or
+                             $rule.Path -like "*$SearchText*" -or
+                             $rule.Hash -like "*$SearchText*"
+                if (-not $textMatch) { $match = $false }
+            }
+            if ($match) { [void]$filtered.Add($rule) }
         }
-        if ($RuleType) {
-            $filtered = @($filtered | Where-Object { $_.RuleType -eq $RuleType })
-        }
-        if ($CollectionType) {
-            $filtered = @($filtered | Where-Object { $_.CollectionType -eq $CollectionType })
-        }
-        if ($GroupVendor) {
-            $filtered = @($filtered | Where-Object { $_.GroupVendor -like "*$GroupVendor*" })
-        }
-        if ($SearchText) {
-            $filtered = @($filtered | Where-Object {
-                $_.Name -like "*$SearchText*" -or
-                $_.PublisherName -like "*$SearchText*" -or
-                $_.Path -like "*$SearchText*" -or
-                $_.Hash -like "*$SearchText*"
-            })
-        }
-        
+
         $result.Total = $filtered.Count
         
         if (-not $CountOnly) {
@@ -631,7 +627,52 @@ function Update-Rule {
         $indexEntry.GroupVendor = if ($UpdatedRule.GroupVendor) { $UpdatedRule.GroupVendor } else { $indexEntry.GroupVendor }
         if ($UpdatedRule.Action) { $indexEntry.Action = $UpdatedRule.Action }
         if ($UpdatedRule.UserOrGroupSid) { $indexEntry.UserOrGroupSid = $UpdatedRule.UserOrGroupSid }
-        
+
+        # Add HashIndex update if hash changed
+        if ($UpdatedRule.Hash -and $UpdatedRule.Hash -ne $indexEntry.Hash) {
+            $oldHash = $indexEntry.Hash.ToUpper()
+            if ($oldHash -and $script:HashIndex.ContainsKey($oldHash)) {
+                $script:HashIndex.Remove($oldHash)
+            }
+            $newHash = $UpdatedRule.Hash.ToUpper()
+            $script:HashIndex[$newHash] = $ruleId
+            $indexEntry.Hash = $UpdatedRule.Hash
+        }
+
+        # Add PublisherIndex update if publisher/product changed
+        $oldPubKey = if ($indexEntry.PublisherName) {
+            "$($indexEntry.PublisherName)|$($indexEntry.ProductName)".ToLower()
+        } else { $null }
+        $newPubKey = if ($UpdatedRule.PublisherName) {
+            "$($UpdatedRule.PublisherName)|$($UpdatedRule.ProductName)".ToLower()
+        } else { $null }
+
+        if ($oldPubKey -ne $newPubKey) {
+            if ($oldPubKey -and $script:PublisherIndex.ContainsKey($oldPubKey)) {
+                $script:PublisherIndex.Remove($oldPubKey)
+            }
+            if ($newPubKey) {
+                $script:PublisherIndex[$newPubKey] = $ruleId
+            }
+
+            # Update PublisherOnlyIndex
+            $oldPubOnlyKey = if ($indexEntry.PublisherName) {
+                $indexEntry.PublisherName.ToLower()
+            } else { $null }
+            $newPubOnlyKey = if ($UpdatedRule.PublisherName) {
+                $UpdatedRule.PublisherName.ToLower()
+            } else { $null }
+
+            if ($oldPubOnlyKey -ne $newPubOnlyKey) {
+                if ($oldPubOnlyKey -and $script:PublisherOnlyIndex.ContainsKey($oldPubOnlyKey)) {
+                    $script:PublisherOnlyIndex.Remove($oldPubOnlyKey)
+                }
+                if ($newPubOnlyKey) {
+                    $script:PublisherOnlyIndex[$newPubOnlyKey] = $ruleId
+                }
+            }
+        }
+
         Save-JsonIndex
         
         $result.Success = $true
@@ -1156,6 +1197,7 @@ function Remove-OrphanedRuleFiles {
                 }
                 catch {
                     # Skip files we can't access
+                    Write-AppLockerLog -Message "Empty catch in RuleStorage.ps1" -Level 'Debug' -NoConsole
                 }
             }
             

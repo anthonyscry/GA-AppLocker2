@@ -81,15 +81,15 @@ function Backup-AppLockerData {
         $indexPath = Join-Path $dataPath 'rules-index.json'
         if (Test-Path $indexPath) {
             Copy-Item $indexPath (Join-Path $tempDir 'rules-index.json') -Force
-            $backupManifest.Contents += @{ Type = 'RulesIndex'; File = 'rules-index.json'; Size = (Get-Item $indexPath).Length }
+            [void]$backupManifest.Contents.Add(@{ Type = 'RulesIndex'; File = 'rules-index.json'; Size = (Get-Item $indexPath).Length })
         }
-        
+
         $rulesPath = Join-Path $dataPath 'Rules'
         if (Test-Path $rulesPath) {
             $rulesDir = Join-Path $tempDir 'Rules'
             Copy-Item $rulesPath $rulesDir -Recurse -Force
             $ruleFiles = Get-ChildItem $rulesPath -Filter '*.json' -File -ErrorAction SilentlyContinue
-            $backupManifest.Contents += @{ Type = 'Rules'; Folder = 'Rules'; FileCount = $ruleFiles.Count }
+            [void]$backupManifest.Contents.Add(@{ Type = 'Rules'; Folder = 'Rules'; FileCount = $ruleFiles.Count })
         }
 
         # Backup Policies

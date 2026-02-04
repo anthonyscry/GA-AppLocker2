@@ -42,12 +42,12 @@ function Start-Deployment {
         $job.StartedAt = (Get-Date).ToString('o')
         $job.Progress = 10
         $job.Message = 'Starting deployment...'
-        $job | ConvertTo-Json -Depth 5 | Set-Content -Path $jobFile -Encoding UTF8
+        Write-DeploymentJobFile -Path $jobFile -Job $job
 
         # Step 1: Export policy to temp XML
         $job.Progress = 20
         $job.Message = 'Exporting policy to XML...'
-        $job | ConvertTo-Json -Depth 5 | Set-Content -Path $jobFile -Encoding UTF8
+        Write-DeploymentJobFile -Path $jobFile -Job $job
 
         $tempPath = Join-Path $env:TEMP "AppLocker_$($job.PolicyId).xml"
         $exportResult = Export-PolicyToXml -PolicyId $job.PolicyId -OutputPath $tempPath
@@ -56,7 +56,7 @@ function Start-Deployment {
             $job.Status = 'Failed'
             $job.Message = "Export failed: $($exportResult.Error)"
             $job.ErrorDetails = $exportResult.Error
-            $job | ConvertTo-Json -Depth 5 | Set-Content -Path $jobFile -Encoding UTF8
+            Write-DeploymentJobFile -Path $jobFile -Job $job
             return @{
                 Success = $false
                 Error   = $exportResult.Error
@@ -66,7 +66,7 @@ function Start-Deployment {
         # Step 2: Check if GPO exists
         $job.Progress = 40
         $job.Message = 'Checking GPO...'
-        $job | ConvertTo-Json -Depth 5 | Set-Content -Path $jobFile -Encoding UTF8
+        Write-DeploymentJobFile -Path $jobFile -Job $job
 
         $gpoExists = Test-GPOExists -GPOName $job.GPOName
 
@@ -78,7 +78,7 @@ function Start-Deployment {
                 $job.Message = "Manual deployment required: $($gpoExists.Error)"
                 $job.ErrorDetails = $gpoExists.Error
                 $job.XmlExportPath = $tempPath
-                $job | ConvertTo-Json -Depth 5 | Set-Content -Path $jobFile -Encoding UTF8
+                Write-DeploymentJobFile -Path $jobFile -Job $job
                 return @{
                     Success        = $false
                     Error          = $gpoExists.Error
@@ -89,7 +89,7 @@ function Start-Deployment {
             $job.Status = 'Failed'
             $job.Message = "GPO check failed: $($gpoExists.Error)"
             $job.ErrorDetails = $gpoExists.Error
-            $job | ConvertTo-Json -Depth 5 | Set-Content -Path $jobFile -Encoding UTF8
+            Write-DeploymentJobFile -Path $jobFile -Job $job
             return @{
                 Success = $false
                 Error   = $gpoExists.Error
@@ -102,7 +102,7 @@ function Start-Deployment {
             $job.Progress = 100
             $job.Message = "WhatIf: Would deploy to GPO '$($job.GPOName)'"
             $job.CompletedAt = (Get-Date).ToString('o')
-            $job | ConvertTo-Json -Depth 5 | Set-Content -Path $jobFile -Encoding UTF8
+            Write-DeploymentJobFile -Path $jobFile -Job $job
             
             return @{
                 Success = $true
@@ -115,14 +115,14 @@ function Start-Deployment {
         if (-not $gpoExists.Data) {
             $job.Progress = 50
             $job.Message = 'Creating GPO...'
-            $job | ConvertTo-Json -Depth 5 | Set-Content -Path $jobFile -Encoding UTF8
+            Write-DeploymentJobFile -Path $jobFile -Job $job
 
             $createResult = New-AppLockerGPO -GPOName $job.GPOName
             if (-not $createResult.Success) {
                 $job.Status = 'Failed'
                 $job.Message = "GPO creation failed: $($createResult.Error)"
                 $job.ErrorDetails = $createResult.Error
-                $job | ConvertTo-Json -Depth 5 | Set-Content -Path $jobFile -Encoding UTF8
+                Write-DeploymentJobFile -Path $jobFile -Job $job
                 return @{
                     Success = $false
                     Error   = $createResult.Error
@@ -133,7 +133,7 @@ function Start-Deployment {
         # Step 4: Import policy to GPO
         $job.Progress = 70
         $job.Message = 'Importing policy to GPO...'
-        $job | ConvertTo-Json -Depth 5 | Set-Content -Path $jobFile -Encoding UTF8
+        Write-DeploymentJobFile -Path $jobFile -Job $job
 
         $importResult = Import-PolicyToGPO -GPOName $job.GPOName -XmlPath $tempPath
 
@@ -145,7 +145,7 @@ function Start-Deployment {
                 $job.Message = "Policy exported. Manual import required via GPMC."
                 $job.ErrorDetails = $importResult.Error
                 $job.XmlExportPath = $tempPath
-                $job | ConvertTo-Json -Depth 5 | Set-Content -Path $jobFile -Encoding UTF8
+                Write-DeploymentJobFile -Path $jobFile -Job $job
                 
                 # Don't delete temp file since user needs it
                 Add-DeploymentHistory -JobId $JobId -Action 'ManualRequired' -Details "Policy exported to: $tempPath"
@@ -162,7 +162,7 @@ function Start-Deployment {
             $job.Status = 'Failed'
             $job.Message = "Import failed: $($importResult.Error)"
             $job.ErrorDetails = $importResult.Error
-            $job | ConvertTo-Json -Depth 5 | Set-Content -Path $jobFile -Encoding UTF8
+            Write-DeploymentJobFile -Path $jobFile -Job $job
             return @{
                 Success = $false
                 Error   = $importResult.Error
@@ -173,10 +173,16 @@ function Start-Deployment {
         if ($job.TargetOUs -and $job.TargetOUs.Count -gt 0) {
             $job.Progress = 85
             $job.Message = 'Linking GPO to OUs...'
-            $job | ConvertTo-Json -Depth 5 | Set-Content -Path $jobFile -Encoding UTF8
+            Write-DeploymentJobFile -Path $jobFile -Job $job
 
             # Check if ActiveDirectory module is available for linking
-            if (Get-Module -ListAvailable -Name GroupPolicy) {
+            if (Get-Module -ListAvailable -Name ActiveDirectory) {
+                try {
+                    Import-Module ActiveDirectory -ErrorAction Stop | Out-Null
+                }
+                catch {
+                    Write-AppLockerLog -Level Warning -Message "GPO linking skipped - ActiveDirectory module could not be imported. Manual linking required for $($job.TargetOUs.Count) OUs."
+                }
                 foreach ($ouDN in $job.TargetOUs) {
                     try {
                         New-GPLink -Name $job.GPOName -Target $ouDN -ErrorAction Stop | Out-Null
@@ -188,7 +194,7 @@ function Start-Deployment {
                 }
             }
             else {
-                Write-AppLockerLog -Level Warning -Message "GPO linking skipped - GroupPolicy module not available. Manual linking required for $($job.TargetOUs.Count) OUs."
+                Write-AppLockerLog -Level Warning -Message "GPO linking skipped - ActiveDirectory module not available. Manual linking required for $($job.TargetOUs.Count) OUs."
             }
         }
 
@@ -202,10 +208,13 @@ function Start-Deployment {
         $job.Progress = 100
         $job.Message = "Successfully deployed to GPO '$($job.GPOName)'"
         $job.CompletedAt = (Get-Date).ToString('o')
-        $job | ConvertTo-Json -Depth 5 | Set-Content -Path $jobFile -Encoding UTF8
+        Write-DeploymentJobFile -Path $jobFile -Job $job
 
         # Update policy status
-        Set-PolicyStatus -PolicyId $job.PolicyId -Status 'Deployed' | Out-Null
+        $statusResult = Set-PolicyStatus -PolicyId $job.PolicyId -Status 'Deployed'
+        if (-not $statusResult.Success) {
+            Write-AppLockerLog -Level Warning -Message "Failed to set policy status: $($statusResult.Error)"
+        }
 
         # Log to history
         Add-DeploymentHistory -JobId $JobId -Action 'Deployed' -Details "Deployed to GPO '$($job.GPOName)'"
@@ -228,7 +237,7 @@ function Start-Deployment {
                 $job.Status = 'Failed'
                 $job.Message = "Deployment failed: $($_.Exception.Message)"
                 $job.ErrorDetails = $_.Exception.Message
-                $job | ConvertTo-Json -Depth 5 | Set-Content -Path $jobFile -Encoding UTF8
+                Write-DeploymentJobFile -Path $jobFile -Job $job
             }
         }
         catch { 
@@ -288,7 +297,7 @@ function Stop-Deployment {
         $job.Status = 'Cancelled'
         $job.Message = 'Deployment cancelled by user'
         $job.CompletedAt = (Get-Date).ToString('o')
-        $job | ConvertTo-Json -Depth 5 | Set-Content -Path $jobFile -Encoding UTF8
+        Write-DeploymentJobFile -Path $jobFile -Job $job
 
         return @{
             Success = $true
@@ -375,3 +384,4 @@ function Add-DeploymentHistory {
         Write-AppLockerLog -Level Warning -Message "Failed to log deployment history: $($_.Exception.Message)"
     }
 }
+

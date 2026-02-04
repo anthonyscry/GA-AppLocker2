@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Resolves an AD group name to its SID, with graceful fallback.
 
@@ -79,7 +79,7 @@ function Resolve-GroupSid {
     try {
         $ntAccount = [System.Security.Principal.NTAccount]::new($GroupName)
         $sid = $ntAccount.Translate([System.Security.Principal.SecurityIdentifier])
-        
+
         if ($sid) {
             try {
                 Write-AppLockerLog -Message "Resolved group '$GroupName' to SID: $($sid.Value)" -Level 'INFO'
@@ -90,6 +90,7 @@ function Resolve-GroupSid {
     }
     catch {
         # NTAccount translation failed - group may not exist locally
+        Write-AppLockerLog -Message "Empty catch in Resolve-GroupSid.ps1" -Level 'Debug' -NoConsole
     }
 
     # Method 2: Try with domain prefix (DOMAIN\GroupName)
@@ -110,6 +111,7 @@ function Resolve-GroupSid {
     }
     catch {
         # Also failed with domain prefix
+        Write-AppLockerLog -Message "Empty catch in Resolve-GroupSid.ps1" -Level 'Debug' -NoConsole
     }
 
     # Method 3: ADSI/LDAP query fallback (works in air-gapped environments without AD module)
@@ -132,6 +134,7 @@ function Resolve-GroupSid {
     }
     catch {
         # ADSI query failed - machine may not be domain-joined or LDAP unreachable
+        Write-AppLockerLog -Message "Empty catch in Resolve-GroupSid.ps1" -Level 'Debug' -NoConsole
     }
 
     # Method 4: Try ADSI with explicit domain root
@@ -158,6 +161,7 @@ function Resolve-GroupSid {
     }
     catch {
         # Explicit LDAP also failed
+        Write-AppLockerLog -Message "Empty catch in Resolve-GroupSid.ps1" -Level 'Debug' -NoConsole
     }
 
     # Log warning only once per group name

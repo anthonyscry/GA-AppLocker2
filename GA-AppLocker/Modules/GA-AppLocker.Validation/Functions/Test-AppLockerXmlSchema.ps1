@@ -52,7 +52,12 @@ function Test-AppLockerXmlSchema {
 
     try {
         # Load XML
-        [xml]$policy = if ($XmlPath) { Get-Content $XmlPath -Raw } else { $XmlContent }
+        $xmlRaw = if ($XmlPath) { Get-Content $XmlPath -Raw } else { $XmlContent }
+        if ($xmlRaw -match '<!DOCTYPE|<!ENTITY|SYSTEM\s+"file') {
+            [void]$result.Errors.Add("XML contains potentially malicious DTD declarations")
+            return $result
+        }
+        [xml]$policy = $xmlRaw
 
         # 1. Validate root element
         if ($policy.DocumentElement.LocalName -ne 'AppLockerPolicy') {

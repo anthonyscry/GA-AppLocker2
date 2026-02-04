@@ -62,6 +62,9 @@ function Test-AppLockerRuleConditions {
                     if ([string]::IsNullOrWhiteSpace($condition.PublisherName)) {
                         [void]$result.Errors.Add("[$collectionType] Publisher rule '$name' has empty PublisherName")
                     }
+                    elseif ($condition.PublisherName -match '\b[OLS]=\w+') {
+                        [void]$result.Errors.Add("[$collectionType] Publisher rule '$name' contains OID attributes (O=, L=, S=, C=) which cause import failures: $($condition.PublisherName)")
+                    }
 
                     # Validate BinaryVersionRange
                     $versionRange = $condition.BinaryVersionRange
