@@ -219,7 +219,9 @@ function Enable-WinRMGPO {
             try {
                 Set-GPLink -Name $GPOName -Target $domainDN -LinkEnabled Yes -ErrorAction SilentlyContinue | Out-Null
             }
-            catch { }
+            catch {
+                Write-SetupLog -Message "Warning enabling GPO link: $($_.Exception.Message)" -Level Warning
+            }
         }
 
         # Enable settings (keep link enabled)
@@ -273,7 +275,9 @@ function Disable-WinRMGPO {
             try {
                 Set-GPLink -Name $GPOName -Target $domainDN -LinkEnabled Yes -ErrorAction SilentlyContinue | Out-Null
             }
-            catch { }
+            catch {
+                Write-SetupLog -Message "Warning enabling GPO link: $($_.Exception.Message)" -Level Warning
+            }
         }
 
         # Disable settings (keep link enabled)
