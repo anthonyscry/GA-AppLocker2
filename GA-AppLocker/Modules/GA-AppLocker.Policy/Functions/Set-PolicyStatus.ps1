@@ -146,7 +146,9 @@ function Remove-Policy {
 
         # Remove from policy index
         try {
-            $null = Remove-PolicyIndexEntry -PolicyIds @($PolicyId)
+            Initialize-PolicyIndex
+            $null = Remove-PolicyIndexEntry -PolicyIds @($PolicyId) -SkipSave
+            Save-PolicyIndex
         }
         catch {
             # Index update failure should not block policy deletion
