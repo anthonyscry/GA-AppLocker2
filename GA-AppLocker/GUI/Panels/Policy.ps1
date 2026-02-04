@@ -577,7 +577,7 @@ function global:Set-SelectedPolicyStatus {
     )
 
     if (-not $script:SelectedPolicyId) {
-        Show-AppLockerMessageBox 'Please select a policy.' 'No Selection' 'OK' 'Information'
+        Show-Toast -Message 'Please select a policy.' -Type 'Warning'
         return
     }
 
@@ -586,14 +586,14 @@ function global:Set-SelectedPolicyStatus {
         
         if ($result.Success) {
             Update-PoliciesDataGrid -Window $Window -Force
-            Show-AppLockerMessageBox "Policy status updated to '$Status'." 'Success' 'OK' 'Information'
+            Show-Toast -Message "Policy status updated to '$Status'." -Type 'Success'
         }
         else {
-            Show-AppLockerMessageBox "Failed: $($result.Error)" 'Error' 'OK' 'Error'
+            Show-Toast -Message "Failed: $($result.Error)" -Type 'Error'
         }
     }
     catch {
-        Show-AppLockerMessageBox "Error: $($_.Exception.Message)" 'Error' 'OK' 'Error'
+        Show-Toast -Message "Error: $($_.Exception.Message)" -Type 'Error'
     }
 }
 
@@ -604,7 +604,7 @@ function global:Invoke-DeleteSelectedPolicy {
     $selected = if ($dataGrid) { @($dataGrid.SelectedItems | Where-Object { $_ -ne $null }) } else { @() }
 
     if (-not $selected -or $selected.Count -eq 0) {
-        Show-AppLockerMessageBox 'Please select one or more policies to delete.' 'No Selection' 'OK' 'Information'
+        Show-Toast -Message 'Please select one or more policies to delete.' -Type 'Warning'
         return
     }
 
@@ -641,11 +641,11 @@ function global:Invoke-DeleteSelectedPolicy {
     Update-SelectedPolicyInfo -Window $Window
 
     if ($errors.Count -eq 0) {
-        Show-AppLockerMessageBox "Deleted $deleted policy(s)." 'Deleted' 'OK' 'Information'
+        Show-Toast -Message "Deleted $deleted policy(s)." -Type 'Success'
     }
     else {
         $errorText = ($errors -join "`n")
-        Show-AppLockerMessageBox "Deleted $deleted policy(s).`n`nFailed:`n$errorText" 'Delete Completed' 'OK' 'Warning'
+        Show-Toast -Message "Deleted $deleted policy(s).`nFailed:`n$errorText" -Type 'Warning'
     }
 }
 
@@ -653,7 +653,7 @@ function global:Invoke-ExportSelectedPolicy {
     param($Window)
 
     if (-not $script:SelectedPolicyId) {
-        Show-AppLockerMessageBox 'Please select a policy to export.' 'No Selection' 'OK' 'Information'
+        Show-Toast -Message 'Please select a policy to export.' -Type 'Warning'
         return
     }
 
@@ -669,14 +669,14 @@ function global:Invoke-ExportSelectedPolicy {
             $result = Export-PolicyToXml -PolicyId $script:SelectedPolicyId -OutputPath $dialog.FileName
             
             if ($result.Success) {
-                Show-AppLockerMessageBox "Exported policy to:`n$($dialog.FileName)`n`nRules: $($result.Data.RuleCount)" 'Export Complete' 'OK' 'Information'
+                Show-Toast -Message "Exported policy to:`n$($dialog.FileName)`nRules: $($result.Data.RuleCount)" -Type 'Success'
             }
             else {
-                Show-AppLockerMessageBox "Failed: $($result.Error)" 'Error' 'OK' 'Error'
+                Show-Toast -Message "Failed to export policy: $($result.Error)" -Type 'Error'
             }
         }
         catch {
-            Show-AppLockerMessageBox "Error: $($_.Exception.Message)" 'Error' 'OK' 'Error'
+            Show-Toast -Message "Error: $($_.Exception.Message)" -Type 'Error'
         }
     }
 }
@@ -685,24 +685,21 @@ function global:Invoke-DeploySelectedPolicy {
     param($Window)
 
     if (-not $script:SelectedPolicyId) {
-        Show-AppLockerMessageBox 'Please select a policy to deploy.' 'No Selection' 'OK' 'Information'
+        Show-Toast -Message 'Please select a policy to deploy.' -Type 'Warning'
         return
     }
 
     $policyResult = Get-Policy -PolicyId $script:SelectedPolicyId
     if (-not $policyResult.Success) {
-        Show-AppLockerMessageBox "Could not load policy: $($policyResult.Error)" 'Error' 'OK' 'Error'
+        Show-Toast -Message "Could not load policy: $($policyResult.Error)" -Type 'Error'
         return
     }
 
     $policy = $policyResult.Data
     $gpoInfo = if ($policy.TargetGPO) { " to GPO '$($policy.TargetGPO)'" } else { '' }
 
-    $confirm = Show-AppLockerMessageBox "Navigate to Deployment panel to deploy policy '$($policy.Name)'$gpoInfo?" 'Deploy Policy' 'YesNo' 'Question'
-
-    if ($confirm -eq 'Yes') {
-        Set-ActivePanel -PanelName 'PanelDeploy'
-    }
+    Set-ActivePanel -PanelName 'PanelDeploy'
+    Show-Toast -Message "Opening Deployment panel for '$($policy.Name)'$gpoInfo" -Type 'Info'
 }
 
 function script:Get-PhaseCollectionTypes {
@@ -733,7 +730,7 @@ function global:Invoke-AddRulesToPolicy {
     param($Window)
 
     if (-not $script:SelectedPolicyId) {
-        Show-AppLockerMessageBox 'Please select a policy first.' 'No Selection' 'OK' 'Information'
+        Show-Toast -Message 'Please select a policy first.' -Type 'Warning'
         return
     }
 
@@ -777,34 +774,22 @@ function global:Invoke-AddRulesToPolicy {
     if ($availableRules.Count -eq 0) {
         $msg = 'No approved rules available to add.'
         if ($excludedByPhase -gt 0) {
-            $msg += "`n`n$excludedByPhase rule(s) excluded by Phase $phase filter:`n$excludedDetail"
+            $msg += "`n$excludedByPhase rule(s) excluded by Phase $phase filter:`n$excludedDetail"
         }
-        Show-AppLockerMessageBox $msg 'No Rules' 'OK' 'Information'
+        Show-Toast -Message $msg -Type 'Info'
         return
     }
 
-    # Show breakdown by collection type
-    $breakdown = $availableRules | Group-Object CollectionType | ForEach-Object { "$($_.Name): $($_.Count)" }
-    $confirmMsg = "Add $($availableRules.Count) approved rule(s) to this policy?`n`nPhase $phase collections: $($allowedCollections -join ', ')`n`nBreakdown:`n$($breakdown -join "`n")"
-    if ($excludedByPhase -gt 0) {
-        $confirmMsg += "`n`nExcluded from Phase ${phase}:`n$excludedDetail"
-    }
-
-    $confirm = Show-AppLockerMessageBox $confirmMsg 'Add Rules' 'YesNo' 'Question'
+    $ruleIds = $availableRules | Select-Object -ExpandProperty Id
+    $result = Add-RuleToPolicy -PolicyId $script:SelectedPolicyId -RuleId $ruleIds
     
-
-    if ($confirm -eq 'Yes') {
-        $ruleIds = $availableRules | Select-Object -ExpandProperty Id
-        $result = Add-RuleToPolicy -PolicyId $script:SelectedPolicyId -RuleId $ruleIds
-        
-        if ($result.Success) {
-            Update-PoliciesDataGrid -Window $Window -Force
-            Update-SelectedPolicyInfo -Window $Window
-            Show-AppLockerMessageBox $result.Message 'Success' 'OK' 'Information'
-        }
-        else {
-            Show-AppLockerMessageBox "Failed: $($result.Error)" 'Error' 'OK' 'Error'
-        }
+    if ($result.Success) {
+        Update-PoliciesDataGrid -Window $Window -Force
+        Update-SelectedPolicyInfo -Window $Window
+        Show-Toast -Message $result.Message -Type 'Success'
+    }
+    else {
+        Show-Toast -Message "Failed: $($result.Error)" -Type 'Error'
     }
 }
 
@@ -812,7 +797,7 @@ function global:Invoke-RemoveRulesFromPolicy {
     param($Window)
 
     if (-not $script:SelectedPolicyId) {
-        Show-AppLockerMessageBox 'Please select a policy first.' 'No Selection' 'OK' 'Information'
+        Show-Toast -Message 'Please select a policy first.' -Type 'Warning'
         return
     }
 
@@ -823,7 +808,7 @@ function global:Invoke-RemoveRulesFromPolicy {
     $ruleCount = if ($policy.RuleIds) { $policy.RuleIds.Count } else { 0 }
 
     if ($ruleCount -eq 0) {
-        Show-AppLockerMessageBox 'This policy has no rules to remove.' 'No Rules' 'OK' 'Information'
+        Show-Toast -Message 'This policy has no rules to remove.' -Type 'Info'
         return
     }
 
@@ -835,10 +820,10 @@ function global:Invoke-RemoveRulesFromPolicy {
         if ($result.Success) {
             Update-PoliciesDataGrid -Window $Window -Force
             Update-SelectedPolicyInfo -Window $Window
-            Show-AppLockerMessageBox $result.Message 'Success' 'OK' 'Information'
+            Show-Toast -Message $result.Message -Type 'Success'
         }
         else {
-            Show-AppLockerMessageBox "Failed: $($result.Error)" 'Error' 'OK' 'Error'
+            Show-Toast -Message "Failed: $($result.Error)" -Type 'Error'
         }
     }
 }
@@ -896,7 +881,7 @@ function global:Invoke-ImportRulesToPolicy {
     param($Window)
 
     if (-not $script:SelectedPolicyId) {
-        Show-AppLockerMessageBox 'Please select a policy first.' 'No Selection' 'OK' 'Information'
+        Show-Toast -Message 'Please select a policy first.' -Type 'Warning'
         return
     }
 
@@ -909,13 +894,13 @@ function global:Invoke-ImportRulesToPolicy {
     try {
         $importResult = Import-RulesFromXml -Path $dialog.FileName -Status 'Approved' -SkipDuplicates
         if (-not $importResult.Success) {
-            Show-AppLockerMessageBox "Import failed: $($importResult.Error)" 'Import Rules' 'OK' 'Error'
+            Show-Toast -Message "Import failed: $($importResult.Error)" -Type 'Error'
             return
         }
 
         $ruleIds = @($importResult.Data | ForEach-Object { $_.Id } | Where-Object { $_ })
         if ($ruleIds.Count -eq 0) {
-            Show-AppLockerMessageBox 'No new rules were imported (all duplicates or empty).' 'Import Rules' 'OK' 'Information'
+            Show-Toast -Message 'No new rules were imported (all duplicates or empty).' -Type 'Info'
             return
         }
 
@@ -925,14 +910,14 @@ function global:Invoke-ImportRulesToPolicy {
             Update-SelectedPolicyInfo -Window $Window
             $msg = "Imported $($ruleIds.Count) rule(s) and added to policy."
             if ($importResult.SkippedCount -gt 0) { $msg += " $($importResult.SkippedCount) duplicate(s) skipped." }
-            Show-AppLockerMessageBox $msg 'Import Rules' 'OK' 'Information'
+            Show-Toast -Message $msg -Type 'Success'
         }
         else {
-            Show-AppLockerMessageBox "Failed to add imported rules: $($addResult.Error)" 'Import Rules' 'OK' 'Error'
+            Show-Toast -Message "Failed to add imported rules: $($addResult.Error)" -Type 'Error'
         }
     }
     catch {
-        Show-AppLockerMessageBox "Error: $($_.Exception.Message)" 'Import Rules' 'OK' 'Error'
+        Show-Toast -Message "Error: $($_.Exception.Message)" -Type 'Error'
     }
 }
 
@@ -988,19 +973,7 @@ function global:Invoke-ComparePolicies {
             $summary = $data.Summary
             
             # Build result message
-            $msg = @"
-Policy Comparison Results
-========================
-
-Source: $($sourcePolicy.Name)
-Target: $($targetPolicy.Name)
-
-Summary:
-- Added (in target only): $($summary.AddedCount) rule(s)
-- Removed (in source only): $($summary.RemovedCount) rule(s)
-- Modified: $($summary.ModifiedCount) rule(s)
-- Unchanged: $($summary.UnchangedCount) rule(s)
-"@
+            $msg = "Comparison complete: Added $($summary.AddedCount), Removed $($summary.RemovedCount), Modified $($summary.ModifiedCount), Unchanged $($summary.UnchangedCount)."
             
             # Store comparison result for export
             $script:LastPolicyComparison = @{
@@ -1013,7 +986,7 @@ Summary:
             $btnExport = $Window.FindName('BtnExportDiffReport')
             if ($btnExport) { $btnExport.IsEnabled = $true }
             
-            Show-AppLockerMessageBox $msg 'Comparison Results' 'OK' 'Information'
+            Show-Toast -Message $msg -Type 'Info'
         }
         else {
             Show-Toast -Message "Comparison failed: $($result.Error)" -Type 'Error'
