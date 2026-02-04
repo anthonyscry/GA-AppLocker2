@@ -174,7 +174,7 @@ function global:Invoke-ScanRemoteSoftware {
 
     $hostnames = @(Get-SoftwareRemoteMachineList -Window $Window)
     if ($hostnames.Count -eq 0) {
-        Show-AppLockerMessageBox "No remote machines specified.`n`nTo add machines:`n1. Go to AD Discovery and run a connectivity test`n2. Navigate to Software Inventory -- online machines with WinRM will auto-populate`n3. Or type hostnames directly in the Remote Machines box (one per line)" 'No Machines Selected' 'OK' 'Warning'
+        Show-Toast -Message "No remote machines specified. Add machines from AD Discovery or type hostnames in Remote Machines." -Type 'Warning'
         return
     }
 
@@ -393,12 +393,13 @@ function global:Invoke-ScanRemoteSoftware {
 
             if ($r.FailedHosts.Count -gt 0) {
                 $failDetails = $r.FailedHosts -join "`n"
-                Show-AppLockerMessageBox "Scan completed but $($r.FailedHosts.Count) machine(s) failed:`n`n$failDetails" 'Partial Scan Results' 'OK' 'Warning'
+                Write-AppLockerLog -Message "Software scan partial: $($r.FailedHosts.Count) machine(s) failed.`n$failDetails" -Level 'WARN'
             }
 
             $toastMsg = "Found $($r.AllResults.Count) installed programs across $($r.HostCount) machine(s)."
             if ($r.ScansFolder) { $toastMsg += " CSVs saved to Scans folder." }
             $toastType = if ($r.FailedHosts.Count -gt 0) { 'Warning' } else { 'Success' }
+            if ($r.FailedHosts.Count -gt 0) { $toastMsg += " Failed: $($r.FailedHosts.Count) machine(s)." }
             Show-Toast -Message $toastMsg -Type $toastType
         }
     })
