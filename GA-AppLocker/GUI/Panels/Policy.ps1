@@ -617,36 +617,56 @@ function global:Invoke-DeleteSelectedPolicy {
     $confirm = Show-AppLockerMessageBox $confirmMsg 'Confirm Delete' 'YesNo' 'Warning'
     if ($confirm -ne 'Yes') { return }
 
-    $errors = [System.Collections.Generic.List[string]]::new()
-    $deleted = 0
+    $policySummaries = $selected | ForEach-Object {
+        [PSCustomObject]@{ PolicyId = $_.PolicyId; Name = $_.Name }
+    }
 
-    foreach ($policy in $selected) {
-        try {
-            $result = Remove-Policy -PolicyId $policy.PolicyId -Force
-            if ($result.Success) {
-                $deleted++
+    Invoke-AsyncOperation -ScriptBlock {
+        param($Policies)
+
+        $summary = [PSCustomObject]@{
+            Deleted = 0
+            Errors  = [System.Collections.Generic.List[string]]::new()
+        }
+
+        foreach ($policy in $Policies) {
+            try {
+                $result = Remove-Policy -PolicyId $policy.PolicyId -Force
+                if ($result.Success) {
+                    $summary.Deleted++
+                }
+                else {
+                    [void]$summary.Errors.Add("$($policy.Name): $($result.Error)")
+                }
             }
-            else {
-                [void]$errors.Add("$($policy.Name): $($result.Error)")
+            catch {
+                [void]$summary.Errors.Add("$($policy.Name): $($_.Exception.Message)")
             }
         }
-        catch {
-            [void]$errors.Add("$($policy.Name): $($_.Exception.Message)")
+
+        return $summary
+    } -Arguments @{ Policies = $policySummaries } -LoadingMessage 'Deleting policies...' -OnComplete {
+        param($summary)
+
+        $script:SelectedPolicyId = $null
+        $global:GA_SelectedPolicyId = $null
+        Update-PoliciesDataGrid -Window $Window -Force
+        Update-SelectedPolicyInfo -Window $Window
+
+        if ($summary -and $summary.Errors.Count -eq 0) {
+            Show-Toast -Message "Deleted $($summary.Deleted) policy(s)." -Type 'Success'
         }
-    }
-
-    $script:SelectedPolicyId = $null
-    $global:GA_SelectedPolicyId = $null
-    Update-PoliciesDataGrid -Window $Window -Force
-    Update-SelectedPolicyInfo -Window $Window
-
-    if ($errors.Count -eq 0) {
-        Show-Toast -Message "Deleted $deleted policy(s)." -Type 'Success'
-    }
-    else {
-        $errorText = ($errors -join "`n")
-        Show-Toast -Message "Deleted $deleted policy(s).`nFailed:`n$errorText" -Type 'Warning'
-    }
+        elseif ($summary) {
+            $errorText = ($summary.Errors -join "`n")
+            Show-Toast -Message "Deleted $($summary.Deleted) policy(s).`nFailed:`n$errorText" -Type 'Warning'
+        }
+        else {
+            Show-Toast -Message 'Delete operation completed with unknown result.' -Type 'Warning'
+        }
+    }.GetNewClosure() -OnError {
+        param($ErrorMessage)
+        Show-Toast -Message "Failed to delete policies: $ErrorMessage" -Type 'Error'
+    }.GetNewClosure()
 }
 
 function global:Invoke-ExportSelectedPolicy {
@@ -665,19 +685,28 @@ function global:Invoke-ExportSelectedPolicy {
     $dialog.FileName = "AppLockerPolicy_$(Get-Date -Format 'yyyyMMdd_HHmmss').xml"
 
     if ($dialog.ShowDialog() -eq 'OK') {
-        try {
-            $result = Export-PolicyToXml -PolicyId $script:SelectedPolicyId -OutputPath $dialog.FileName
-            
-            if ($result.Success) {
-                Show-Toast -Message "Exported policy to:`n$($dialog.FileName)`nRules: $($result.Data.RuleCount)" -Type 'Success'
+        $exportPath = $dialog.FileName
+
+        Invoke-AsyncOperation -ScriptBlock {
+            param($PolicyId, $OutputPath)
+            Export-PolicyToXml -PolicyId $PolicyId -OutputPath $OutputPath
+        } -Arguments @{ PolicyId = $script:SelectedPolicyId; OutputPath = $exportPath } -LoadingMessage 'Exporting policy...' -OnComplete {
+            param($exportResult)
+
+            if ($exportResult -and $exportResult.Success) {
+                $ruleCount = if ($exportResult.Data -and $exportResult.Data.RuleCount) { $exportResult.Data.RuleCount } else { 0 }
+                Show-Toast -Message "Exported policy to:`n$exportPath`nRules: $ruleCount" -Type 'Success'
+            }
+            elseif ($exportResult) {
+                Show-Toast -Message "Failed to export policy: $($exportResult.Error)" -Type 'Error'
             }
             else {
-                Show-Toast -Message "Failed to export policy: $($result.Error)" -Type 'Error'
+                Show-Toast -Message 'Export operation returned no result.' -Type 'Error'
             }
-        }
-        catch {
-            Show-Toast -Message "Error: $($_.Exception.Message)" -Type 'Error'
-        }
+        }.GetNewClosure() -OnError {
+            param($ErrorMessage)
+            Show-Toast -Message "Failed to export policy: $ErrorMessage" -Type 'Error'
+        }.GetNewClosure()
     }
 }
 
@@ -781,16 +810,31 @@ function global:Invoke-AddRulesToPolicy {
     }
 
     $ruleIds = $availableRules | Select-Object -ExpandProperty Id
-    $result = Add-RuleToPolicy -PolicyId $script:SelectedPolicyId -RuleId $ruleIds
-    
-    if ($result.Success) {
+    $policyName = $policy.Name
+
+    Invoke-AsyncOperation -ScriptBlock {
+        param($PolicyId, $RuleIds)
+        Add-RuleToPolicy -PolicyId $PolicyId -RuleId $RuleIds
+    } -Arguments @{ PolicyId = $script:SelectedPolicyId; RuleIds = $ruleIds } -LoadingMessage 'Updating policy rules...' -OnComplete {
+        param($addResult)
+
         Update-PoliciesDataGrid -Window $Window -Force
         Update-SelectedPolicyInfo -Window $Window
-        Show-Toast -Message $result.Message -Type 'Success'
-    }
-    else {
-        Show-Toast -Message "Failed: $($result.Error)" -Type 'Error'
-    }
+
+        if ($addResult -and $addResult.Success) {
+            $message = if ($addResult.Message) { $addResult.Message } else { "Added rules to '$policyName'." }
+            Show-Toast -Message $message -Type 'Success'
+        }
+        elseif ($addResult) {
+            Show-Toast -Message "Failed to add rules: $($addResult.Error)" -Type 'Error'
+        }
+        else {
+            Show-Toast -Message "Add rules operation returned no result for '$policyName'." -Type 'Error'
+        }
+    }.GetNewClosure() -OnError {
+        param($ErrorMessage)
+        Show-Toast -Message "Failed to add rules: $ErrorMessage" -Type 'Error'
+    }.GetNewClosure()
 }
 
 function global:Invoke-RemoveRulesFromPolicy {
@@ -815,16 +859,32 @@ function global:Invoke-RemoveRulesFromPolicy {
     $confirm = Show-AppLockerMessageBox "Remove all $ruleCount rule(s) from this policy?" 'Remove Rules' 'YesNo' 'Warning'
 
     if ($confirm -eq 'Yes') {
-        $result = Remove-RuleFromPolicy -PolicyId $script:SelectedPolicyId -RuleId $policy.RuleIds
-        
-        if ($result.Success) {
+        $ruleIds = @($policy.RuleIds)
+        $policyName = $policy.Name
+
+        Invoke-AsyncOperation -ScriptBlock {
+            param($PolicyId, $RuleIds)
+            Remove-RuleFromPolicy -PolicyId $PolicyId -RuleId $RuleIds
+        } -Arguments @{ PolicyId = $script:SelectedPolicyId; RuleIds = $ruleIds } -LoadingMessage 'Updating policy rules...' -OnComplete {
+            param($removeResult)
+
             Update-PoliciesDataGrid -Window $Window -Force
             Update-SelectedPolicyInfo -Window $Window
-            Show-Toast -Message $result.Message -Type 'Success'
-        }
-        else {
-            Show-Toast -Message "Failed: $($result.Error)" -Type 'Error'
-        }
+
+            if ($removeResult -and $removeResult.Success) {
+                $message = if ($removeResult.Message) { $removeResult.Message } else { "Removed rules from '$policyName'." }
+                Show-Toast -Message $message -Type 'Success'
+            }
+            elseif ($removeResult) {
+                Show-Toast -Message "Failed to remove rules: $($removeResult.Error)" -Type 'Error'
+            }
+            else {
+                Show-Toast -Message "Remove rules operation returned no result for '$policyName'." -Type 'Error'
+            }
+        }.GetNewClosure() -OnError {
+            param($ErrorMessage)
+            Show-Toast -Message "Failed to remove rules: $ErrorMessage" -Type 'Error'
+        }.GetNewClosure()
     }
 }
 
