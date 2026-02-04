@@ -3,12 +3,11 @@ function Add-RuleToPolicy {
     .SYNOPSIS
         Adds one or more rules to a policy.
 
-
-.DESCRIPTION
-    Adds one or more rules to a policy.
+    .DESCRIPTION
+        Adds one or more rules to a policy.
 
     .PARAMETER PolicyId
-        The unique identifier of the policy.
+        The unique identifier of policy.
 
     .PARAMETER RuleId
         The rule ID(s) to add.
@@ -60,7 +59,33 @@ function Add-RuleToPolicy {
         $policy.Version = $currentVersion + 1
 
         $policy | ConvertTo-Json -Depth 5 | Set-Content -Path $policyFile -Encoding UTF8
-        
+
+        # Update policy index
+        try {
+            Initialize-PolicyIndex
+            $indexEntry = [PSCustomObject]@{
+                PolicyId        = $policy.PolicyId
+                Name            = $policy.Name
+                Description     = $policy.Description
+                EnforcementMode = $policy.EnforcementMode
+                Phase           = $policy.Phase
+                Status          = $policy.Status
+                RuleIds         = @($policy.RuleIds)
+                TargetOUs       = if ($policy.TargetOUs) { @($policy.TargetOUs) } else { @() }
+                TargetGPO       = $policy.TargetGPO
+                CreatedAt       = $policy.CreatedAt
+                ModifiedAt      = $policy.ModifiedAt
+                Version         = $policy.Version
+                FilePath        = $policyFile
+            }
+            $null = Add-PolicyIndexEntry -Entry $indexEntry -SkipSave
+            Save-PolicyIndex
+        }
+        catch {
+            # Index update failure should not block rule addition
+            Write-PolicyLog -Message "Failed to update policy index for rule addition: $($_.Exception.Message)" -Level 'WARNING'
+        }
+
         # Invalidate GlobalSearch cache
         if (Get-Command -Name 'Clear-AppLockerCache' -ErrorAction SilentlyContinue) {
             Clear-AppLockerCache -Pattern "GlobalSearch_*" | Out-Null
@@ -85,12 +110,11 @@ function Remove-RuleFromPolicy {
     .SYNOPSIS
         Removes one or more rules from a policy.
 
-
-.DESCRIPTION
-    Removes one or more rules from a policy.
+    .DESCRIPTION
+        Removes one or more rules from a policy.
 
     .PARAMETER PolicyId
-        The unique identifier of the policy.
+        The unique identifier of policy.
 
     .PARAMETER RuleId
         The rule ID(s) to remove.
@@ -137,7 +161,33 @@ function Remove-RuleFromPolicy {
         $policy.Version = $currentVersion + 1
 
         $policy | ConvertTo-Json -Depth 5 | Set-Content -Path $policyFile -Encoding UTF8
-        
+
+        # Update policy index
+        try {
+            Initialize-PolicyIndex
+            $indexEntry = [PSCustomObject]@{
+                PolicyId        = $policy.PolicyId
+                Name            = $policy.Name
+                Description     = $policy.Description
+                EnforcementMode = $policy.EnforcementMode
+                Phase           = $policy.Phase
+                Status          = $policy.Status
+                RuleIds         = @($policy.RuleIds)
+                TargetOUs       = if ($policy.TargetOUs) { @($policy.TargetOUs) } else { @() }
+                TargetGPO       = $policy.TargetGPO
+                CreatedAt       = $policy.CreatedAt
+                ModifiedAt      = $policy.ModifiedAt
+                Version         = $policy.Version
+                FilePath        = $policyFile
+            }
+            $null = Add-PolicyIndexEntry -Entry $indexEntry -SkipSave
+            Save-PolicyIndex
+        }
+        catch {
+            # Index update failure should not block rule removal
+            Write-PolicyLog -Message "Failed to update policy index for rule removal: $($_.Exception.Message)" -Level 'WARNING'
+        }
+
         # Invalidate GlobalSearch cache
         if (Get-Command -Name 'Clear-AppLockerCache' -ErrorAction SilentlyContinue) {
             Clear-AppLockerCache -Pattern "GlobalSearch_*" | Out-Null
