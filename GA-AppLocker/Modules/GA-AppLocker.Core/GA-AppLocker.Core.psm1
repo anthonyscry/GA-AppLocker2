@@ -75,6 +75,8 @@ if (-not (Test-Path $logsPath)) {
 Export-ModuleMember -Function @(
     # Logging & Config
     'Write-AppLockerLog',
+    'Measure-AppLockerOperation',
+    'Export-AppLockerHealthReport',
     'Get-AppLockerConfig',
     'Set-AppLockerConfig',
     'Test-Prerequisites',

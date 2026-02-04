@@ -46,7 +46,13 @@ function Write-AppLockerLog {
         [string]$Level = 'Info',
 
         [Parameter()]
-        [switch]$NoConsole
+        [switch]$NoConsole,
+
+        [Parameter()]
+        [TimeSpan]$Duration,
+
+        [Parameter()]
+        [string]$Panel
     )
 
     #region --- Build Log Entry ---
@@ -54,7 +60,14 @@ function Write-AppLockerLog {
     # where Microsoft.PowerShell.Utility module resolution breaks after extended runtime.
     $now = [DateTime]::Now
     $timestamp = $now.ToString('yyyy-MM-dd HH:mm:ss')
-    $logEntry = "[$timestamp] [$Level] $Message"
+
+    # Build log entry with optional panel and duration
+    $durationInfo = if ($Duration -and $Duration.TotalMilliseconds -gt 0) {
+        " ($($Duration.TotalMilliseconds)ms)"
+    } else { "" }
+
+    $panelInfo = if ($Panel) { "[$Panel] " } else { "" }
+    $logEntry = "[$timestamp] [$Level] ${panelInfo}$Message${durationInfo}"
     #endregion
 
     #region --- Write to File ---

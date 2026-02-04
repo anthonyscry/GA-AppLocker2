@@ -63,6 +63,8 @@ Features:
     FunctionsToExport = @(
         # Core module
         'Write-AppLockerLog',
+        'Measure-AppLockerOperation',
+        'Export-AppLockerHealthReport',
         'Get-AppLockerConfig',
         'Set-AppLockerConfig',
         'Test-Prerequisites',

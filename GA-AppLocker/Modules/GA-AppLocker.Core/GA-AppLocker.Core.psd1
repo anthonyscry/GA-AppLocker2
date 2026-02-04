@@ -38,7 +38,9 @@
     FunctionsToExport = @(
         # Logging
         'Write-AppLockerLog',
-        
+        'Measure-AppLockerOperation',
+        'Export-AppLockerHealthReport',
+
         # Configuration
         'Get-AppLockerConfig',
         'Set-AppLockerConfig',

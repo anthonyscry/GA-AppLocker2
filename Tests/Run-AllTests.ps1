@@ -56,13 +56,9 @@ Write-Host ""
 
 # Check for Pester
 $pester = Get-Module -Name Pester -ListAvailable | Sort-Object Version -Descending | Select-Object -First 1
-if (-not $pester -or $pester.Version -lt [version]'5.0.0') {
-    Write-Host "[WARN] Pester 5+ not found. Installing..." -ForegroundColor Yellow
-    Install-Module -Name Pester -Force -SkipPublisherCheck -Scope CurrentUser
-    Import-Module Pester -Force
-} else {
-    Import-Module Pester -Force
-}
+$pesterVersion = $pester.Version
+
+Write-Host "Detected Pester version: $pesterVersion" -ForegroundColor Cyan
 
 # Paths
 $projectRoot = Split-Path -Parent $PSScriptRoot
@@ -73,35 +69,37 @@ Write-Host "Project Root: $projectRoot" -ForegroundColor Gray
 Write-Host "Tests Path:   $testsPath" -ForegroundColor Gray
 Write-Host ""
 
-# Build Pester configuration
-$config = New-PesterConfiguration
-$config.Run.Path = $testsPath
-$config.Run.Exit = $false
-$config.Output.Verbosity = 'Detailed'
+# Build Pester 3.4 compatible parameters
+# Note: Pester 3.4 does not use -Configuration parameter
+# Use script paths and switches directly
+$invokePesterParams = @{}
+
+# Build parameters dynamically
+$invokePesterParams['Script'] = @($testsPath)
 
 if ($Tag) {
-    $config.Filter.Tag = $Tag
+    $invokePesterParams['Tag'] = $Tag
     Write-Host "Filter: Tags = $($Tag -join ', ')" -ForegroundColor Yellow
 }
 
 if ($ExcludeTag) {
-    $config.Filter.ExcludeTag = $ExcludeTag
+    $invokePesterParams['ExcludeTag'] = $ExcludeTag
     Write-Host "Filter: ExcludeTags = $($ExcludeTag -join ', ')" -ForegroundColor Yellow
 }
 
 if ($Quick) {
-    $config.Filter.Tag = @('Behavioral','Core')
+    $invokePesterParams['Tag'] = @('Behavioral','Core')
     Write-Host "Quick Mode: Running Behavioral Core tests only" -ForegroundColor Yellow
 }
 
 if ($Legacy) {
     $legacyPath = Join-Path $PSScriptRoot 'Legacy'
-    $config.Run.Path = @($testsPath, $legacyPath)
+    $invokePesterParams['Script'] = @($testsPath, $legacyPath)
     Write-Host "Legacy Mode: Running Behavioral + Legacy tests" -ForegroundColor Yellow
 }
 
 if ($Coverage) {
-    $config.CodeCoverage.Enabled = $true
+    $invokePesterParams['CodeCoverage'] = $true
     # Cover all module Functions/ directories
     $coveragePaths = @()
     $modulesDir = Join-Path $modulePath 'Modules'
@@ -112,18 +110,19 @@ if ($Coverage) {
             $coveragePaths += Join-Path $funcDir '*.ps1'
         }
     }
-    $config.CodeCoverage.Path = $coveragePaths
-    $config.CodeCoverage.OutputPath = Join-Path $projectRoot 'coverage.xml'
-    $config.CodeCoverage.OutputFormat = 'JaCoCo'
+    $invokePesterParams['CodeCoveragePath'] = $coveragePaths
+    $invokePesterParams['CodeCoverageOutputFile'] = Join-Path $projectRoot 'coverage.xml'
+    $invokePesterParams['CodeCoverageOutputFormat'] = 'JaCoCo'
     Write-Host "Code Coverage: Enabled ($($coveragePaths.Count) module paths)" -ForegroundColor Yellow
 }
 
 if ($OutputPath) {
-    $config.TestResult.Enabled = $true
-    $config.TestResult.OutputPath = $OutputPath
-    $config.TestResult.OutputFormat = 'NUnitXml'
+    $invokePesterParams['OutputFile'] = $OutputPath
     Write-Host "Test Results: $OutputPath" -ForegroundColor Yellow
 }
+
+# Always return PassThru result
+$invokePesterParams['PassThru'] = $true
 
 Write-Host ""
 
@@ -174,13 +173,15 @@ if ($analyzerInstalled) {
 Write-Host ""
 
 # ============================================================
-# PHASE 2: Pester Unit Tests
+# PHASE 2: Pester Unit Tests (Pester 3.4 compatible)
 # ============================================================
 Write-Host "=" * 60 -ForegroundColor Cyan
-Write-Host "  PHASE 2: Pester Tests" -ForegroundColor Cyan
+Write-Host "  PHASE 2: Pester Tests (Pester $pesterVersion)" -ForegroundColor Cyan
 Write-Host "=" * 60 -ForegroundColor Cyan
 
-$pesterResult = Invoke-Pester -Configuration $config
+# Invoke Pester with parameter hashtable (Pester 3.4 compatible)
+# Note: -PassThru is required to get result object in Pester 3.4
+$pesterResult = Invoke-Pester @invokePesterParams
 
 if ($pesterResult.FailedCount -gt 0) {
     Write-Host "`n[FAIL] $($pesterResult.FailedCount) Pester test(s) failed" -ForegroundColor Red

@@ -505,6 +505,7 @@ function Get-BackupHistory {
             }
             catch {
                 # Couldn't read manifest - might still be valid backup
+                Write-AppLockerLog -Level Debug -NoConsole -Message "Empty catch in Get-BackupHistory (manifest read): $($_.Exception.Message)"
                 $backupInfo.IsValid = $false
             }
 
