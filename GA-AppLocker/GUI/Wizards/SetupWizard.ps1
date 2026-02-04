@@ -551,7 +551,7 @@ function Auto-DetectDomain {
 
     try {
         $domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
-        
+
         $Window.FindName('DomainName').Text = $domain.Name
         $Window.FindName('DomainController').Text = $domain.PdcRoleOwner.Name
         
@@ -565,7 +565,7 @@ function Auto-DetectDomain {
         $script:WizardState.Results.Domain['SearchBase'] = $searchBase
     }
     catch {
-        Show-AppLockerMessageBox "Could not auto-detect domain. Please enter details manually.`n`nError: $($_.Exception.Message)" 'Auto-Detect Failed' 'OK' 'Warning'
+        Show-Toast -Message "Auto-detect failed: $($_.Exception.Message)" -Type 'Warning' -DurationMs 6000
     }
 }
 
@@ -580,16 +580,16 @@ function Test-WizardCredentials {
             # Test with current credentials
             $result = Test-Connection -ComputerName $dc -Count 1 -Quiet
             if ($result) {
-                Show-AppLockerMessageBox "Connection successful!" 'Test Result' 'OK' 'Information'
+                Show-Toast -Message "Connection to $dc succeeded." -Type 'Success'
                 $script:WizardState.Results.Credentials['Type'] = 'Current'
             }
         }
         else {
             $username = $Window.FindName('CredUsername').Text
             $password = $Window.FindName('CredPassword').SecurePassword
-            
+
             if ([string]::IsNullOrEmpty($username)) {
-                Show-AppLockerMessageBox "Please enter a username." 'Validation' 'OK' 'Warning'
+                Show-Toast -Message "Enter a username for specific credentials." -Type 'Warning' -DurationMs 5000
                 return
             }
 
@@ -597,15 +597,15 @@ function Test-WizardCredentials {
             
             # Test credential
             $result = Test-WsMan -ComputerName $dc -Credential $cred -ErrorAction Stop
-            
-            Show-AppLockerMessageBox "Credentials verified successfully!" 'Test Result' 'OK' 'Information'
-            
+
+            Show-Toast -Message "Credentials verified successfully." -Type 'Success'
+
             $script:WizardState.Results.Credentials['Type'] = 'Specific'
             $script:WizardState.Results.Credentials['Username'] = $username
         }
     }
     catch {
-        Show-AppLockerMessageBox "Connection test failed.`n`nError: $($_.Exception.Message)" 'Test Failed' 'OK' 'Error'
+        Show-Toast -Message "Connection test failed: $($_.Exception.Message)" -Type 'Error' -DurationMs 6000
     }
 }
 
@@ -641,7 +641,7 @@ function Configure-WinRMGPO {
         try {
             $result = Initialize-WinRMGPO
             if ($result.Success) {
-                Show-AppLockerMessageBox "WinRM GPO created successfully!" 'Success' 'OK' 'Information'
+                Show-Toast -Message "WinRM GPO created successfully." -Type 'Success'
                 $script:WizardState.Results.WinRM['GPOCreated'] = $true
                 Move-WizardNext -Window $Window
             }
@@ -650,11 +650,11 @@ function Configure-WinRMGPO {
             }
         }
         catch {
-            Show-AppLockerMessageBox "Failed to create WinRM GPO.`n`n$($_.Exception.Message)" 'Error' 'OK' 'Error'
+            Show-Toast -Message "Failed to create WinRM GPO: $($_.Exception.Message)" -Type 'Error' -DurationMs 6000
         }
     }
     else {
-        Show-AppLockerMessageBox "WinRM GPO function not available." 'Error' 'OK' 'Warning'
+        Show-Toast -Message "WinRM GPO function not available." -Type 'Warning' -DurationMs 5000
     }
 }
 
@@ -686,15 +686,15 @@ function Create-AppLockerGPOs {
         $script:WizardState.Results.GPO['Created'] = $created
 
         if ($created.Count -gt 0) {
-            Show-AppLockerMessageBox "Created: $($created -join ' ')" 'Success' 'OK' 'Information'
+            Show-Toast -Message "Created: $($created -join ', ')" -Type 'Success'
             Move-WizardNext -Window $Window
         }
         else {
-            Show-AppLockerMessageBox "No items were created." 'Info' 'OK' 'Information'
+            Show-Toast -Message "No items were created." -Type 'Info'
         }
     }
     catch {
-        Show-AppLockerMessageBox "Error creating GPOs: $($_.Exception.Message)" 'Error' 'OK' 'Error'
+        Show-Toast -Message "Error creating GPOs: $($_.Exception.Message)" -Type 'Error' -DurationMs 6000
     }
 }
 
@@ -725,7 +725,7 @@ function Refresh-WizardOUs {
         }
     }
     catch {
-        Show-AppLockerMessageBox "Could not retrieve OUs: $($_.Exception.Message)" 'Error' 'OK' 'Warning'
+        Show-Toast -Message "Could not retrieve OUs: $($_.Exception.Message)" -Type 'Error' -DurationMs 6000
     }
 }
 
@@ -767,7 +767,7 @@ function Validate-WizardStep {
             # Domain step - require at least domain name
             $domainName = $Window.FindName('DomainName').Text
             if ([string]::IsNullOrWhiteSpace($domainName)) {
-                Show-AppLockerMessageBox "Please enter or auto-detect a domain name." 'Validation' 'OK' 'Warning'
+                Show-Toast -Message "Enter or auto-detect a domain name." -Type 'Warning' -DurationMs 5000
                 return $false
             }
         }
@@ -776,7 +776,7 @@ function Validate-WizardStep {
             if ($Window.FindName('UseSpecificCreds').IsChecked) {
                 $username = $Window.FindName('CredUsername').Text
                 if ([string]::IsNullOrWhiteSpace($username)) {
-                    Show-AppLockerMessageBox "Please enter a username." 'Validation' 'OK' 'Warning'
+                    Show-Toast -Message "Enter a username to continue." -Type 'Warning' -DurationMs 5000
                     return $false
                 }
             }
