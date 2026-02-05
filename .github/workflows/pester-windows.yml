@@ -1,0 +1,52 @@
+﻿name: Pester (Windows)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  pester:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: PowerShell info
+        shell: pwsh
+        run: |
+          $PSVersionTable
+          "LOCALAPPDATA=$env:LOCALAPPDATA"
+          "GITHUB_WORKSPACE=$env:GITHUB_WORKSPACE"
+
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module Pester -Force -Scope CurrentUser
+          Import-Module Pester
+          Get-Module Pester -ListAvailable | Select-Object -First 1 Name,Version | Format-Table -AutoSize
+
+      - name: Run Pester (Behavioral)
+        shell: pwsh
+        run: |
+          $resultsDir = Join-Path $env:GITHUB_WORKSPACE "TestResults"
+          New-Item -ItemType Directory -Force -Path $resultsDir | Out-Null
+
+          $config = New-PesterConfiguration
+          $config.Run.Path = "Tests/Behavioral"
+          $config.Run.Exit = $true
+          $config.Output.Verbosity = "Detailed"
+          $config.TestResult.Enabled = $true
+          $config.TestResult.OutputFormat = "NUnitXml"
+          $config.TestResult.OutputPath = (Join-Path $resultsDir "pester-results.xml")
+
+          Invoke-Pester -Configuration $config
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pester-results
+          path: TestResults\pester-results.xml
