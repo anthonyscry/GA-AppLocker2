@@ -33,7 +33,7 @@ if (Test-Path $functionPath) {
         'BulkOperations.ps1',   # Bulk operations
         'IndexWatcher.ps1',     # File watcher
         'RuleRepository.ps1',    # Repository pattern
-        'Initialize-RuleIndexFromRules.ps1'  # Task 1: Rules index rebuild
+        'Initialize-RuleIndexFromFile.ps1'  # Task 1: Rules index rebuild
     )
     
     foreach ($fileName in $loadOrder) {
@@ -67,7 +67,7 @@ Write-StorageLog -Message "Storage module loaded (JSON-only mode)"
 
 # Initialize rule index from rule files (Task 1)
 try {
-    Initialize-RuleIndexFromRules -Force
+    Initialize-RuleIndexFromFile -Force
 }
 catch {
     Write-StorageLog -Message "Failed to initialize rule index at startup: $($_.Exception.Message)" -Level Error
@@ -95,7 +95,7 @@ Export-ModuleMember -Function @(
     'Update-RuleStatusInIndex',
     
     # Index Management
-    'Initialize-RuleIndexFromRules',
+    'Initialize-RuleIndexFromFile',
     'Reset-RulesIndexCache',
     'Rebuild-RulesIndex',
     'Remove-OrphanedRuleFiles',
