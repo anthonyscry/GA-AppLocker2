@@ -2,6 +2,13 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.64] - 2026-02-05
+
+### Fixed
+- Fixed startup crash caused by missing `catch` block on `try` statement in Rules panel (`GUI\Panels\Rules.ps1` line 828). The outer `try` in `Set-SelectedRuleStatus` (small-batch path) was missing its error handler.
+
+---
+
 ## [1.2.63] - 2026-02-05
 
 ### Fixed

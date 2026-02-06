@@ -826,6 +826,10 @@ function global:Set-SelectedRuleStatus {
             Write-Log -Level Warning -Message "Errors updating rules: $($errors.Count) failures"
         }
     }
+    catch {
+        Write-Log -Level Error -Message "Failed to update rules: $($_.Exception.Message)"
+        Show-Toast -Message "Failed to update rules: $($_.Exception.Message)" -Type 'Error'
+    }
 
     # Reset selection state and refresh the grid
     Reset-RulesSelectionState -Window $Window
