@@ -217,43 +217,40 @@ function global:Show-WizardStep2 {
     $settings = $script:WizardState.Settings
     $artifacts = $script:WizardState.Artifacts
     
-    # Use Invoke-AsyncOperation if available, otherwise calculate synchronously
-    # Try-catch used since Get-Command fails in WPF context
-    $asyncAvailable = $false
-    try { $asyncAvailable = [bool](Get-Command -Name 'Invoke-AsyncOperation' -ErrorAction Stop) } catch { }
-    
-    if ($asyncAvailable) {
-        Invoke-AsyncOperation -ScriptBlock {
-            param($Artifacts, $Settings)
-            Get-BatchPreview `
-                -Artifacts $Artifacts `
-                -Mode $Settings.Mode `
-                -SkipDlls:$Settings.SkipDlls `
-                -SkipUnsigned:$Settings.SkipUnsigned `
-                -SkipWshScripts:$Settings.SkipWshScripts `
-                -SkipShellScripts:$Settings.SkipShellScripts `
-                -DedupeMode $Settings.DedupeMode `
-                -PublisherLevel $Settings.PublisherLevel
-        } -Arguments @{ Artifacts = $artifacts; Settings = $settings } -OnComplete {
-            param($Result)
+    # Use Invoke-BackgroundWork (imports only needed sub-modules, no full module import)
+    $modulePath = (Get-Module GA-AppLocker).ModuleBase
+
+    $bgWork = {
+        param([string]$ModulePath, $Artifacts, $Settings)
+        $modulesDir = Join-Path $ModulePath 'Modules'
+        foreach ($mod in @('GA-AppLocker.Core', 'GA-AppLocker.Storage', 'GA-AppLocker.Rules')) {
+            $modPath = Join-Path $modulesDir "$mod\$mod.psd1"
+            if (Test-Path $modPath) { Import-Module $modPath -Force -ErrorAction Stop }
+        }
+        return Get-BatchPreview `
+            -Artifacts $Artifacts `
+            -Mode $Settings.Mode `
+            -SkipDlls:$Settings.SkipDlls `
+            -SkipUnsigned:$Settings.SkipUnsigned `
+            -SkipWshScripts:$Settings.SkipWshScripts `
+            -SkipShellScripts:$Settings.SkipShellScripts `
+            -DedupeMode $Settings.DedupeMode `
+            -PublisherLevel $Settings.PublisherLevel
+    }
+
+    $onComplete = {
+        param($Result)
+        if ($Result) {
             $script:WizardState.Preview = $Result
             Update-WizardPreviewUI -Preview $Result
         }
-    } else {
-        # Synchronous fallback
-        $preview = Get-BatchPreview `
-            -Artifacts $artifacts `
-            -Mode $settings.Mode `
-            -SkipDlls:$settings.SkipDlls `
-            -SkipUnsigned:$settings.SkipUnsigned `
-            -SkipWshScripts:$settings.SkipWshScripts `
-            -SkipShellScripts:$settings.SkipShellScripts `
-            -DedupeMode $settings.DedupeMode `
-            -PublisherLevel $settings.PublisherLevel
-        
-        $script:WizardState.Preview = $preview
-        Update-WizardPreviewUI -Preview $preview
     }
+
+    Invoke-BackgroundWork -ScriptBlock $bgWork `
+        -ArgumentList @($modulePath, $artifacts, $settings) `
+        -OnComplete $onComplete `
+        -LoadingMessage 'Calculating preview...' `
+        -TimeoutSeconds 60
     
     # Update button states
     Update-WizardButtons
@@ -363,62 +360,48 @@ function global:Start-WizardBatchGeneration {
         })
     }
     
-    # Use async operation if available (try-catch since Get-Command fails in WPF context)
-    $asyncAvailable = $false
-    try { $asyncAvailable = [bool](Get-Command -Name 'Invoke-AsyncOperation' -ErrorAction Stop) } catch { }
-    
-    if ($asyncAvailable) {
-        Invoke-AsyncOperation -ScriptBlock {
-            param($Artifacts, $Settings)
-            
-            Invoke-BatchRuleGeneration `
-                -Artifacts $Artifacts `
-                -Mode $Settings.Mode `
-                -Action $Settings.Action `
-                -Status $Settings.Status `
-                -PublisherLevel $Settings.PublisherLevel `
-                -SkipDlls:$Settings.SkipDlls `
-                -SkipUnsigned:$Settings.SkipUnsigned `
-                -SkipWshScripts:$Settings.SkipWshScripts `
-                -SkipShellScripts:$Settings.SkipShellScripts `
-                -DedupeMode $Settings.DedupeMode
-            
-        } -Arguments @{ Artifacts = $artifacts; Settings = $settings } -OnComplete {
-            param($Result)
+    # Use Invoke-BackgroundWork (imports only needed sub-modules, no full module import)
+    $modulePath = (Get-Module GA-AppLocker).ModuleBase
+
+    $bgWork = {
+        param([string]$ModulePath, $Artifacts, $Settings)
+        $modulesDir = Join-Path $ModulePath 'Modules'
+        foreach ($mod in @('GA-AppLocker.Core', 'GA-AppLocker.Storage', 'GA-AppLocker.Rules')) {
+            $modPath = Join-Path $modulesDir "$mod\$mod.psd1"
+            if (Test-Path $modPath) { Import-Module $modPath -Force -ErrorAction Stop }
+        }
+        return Invoke-BatchRuleGeneration `
+            -Artifacts $Artifacts `
+            -Mode $Settings.Mode `
+            -Action $Settings.Action `
+            -Status $Settings.Status `
+            -PublisherLevel $Settings.PublisherLevel `
+            -SkipDlls:$Settings.SkipDlls `
+            -SkipUnsigned:$Settings.SkipUnsigned `
+            -SkipWshScripts:$Settings.SkipWshScripts `
+            -SkipShellScripts:$Settings.SkipShellScripts `
+            -DedupeMode $Settings.DedupeMode
+    }
+
+    $onComplete = {
+        param($Result)
+        if ($Result) {
             Complete-WizardGeneration -Result $Result
         }
-    } else {
-        # Synchronous fallback with inline progress
-        try {
-            $result = Invoke-BatchRuleGeneration `
-                -Artifacts $artifacts `
-                -Mode $settings.Mode `
-                -Action $settings.Action `
-                -Status $settings.Status `
-                -PublisherLevel $settings.PublisherLevel `
-                -SkipDlls:$settings.SkipDlls `
-                -SkipUnsigned:$settings.SkipUnsigned `
-                -SkipWshScripts:$settings.SkipWshScripts `
-                -SkipShellScripts:$settings.SkipShellScripts `
-                -DedupeMode $settings.DedupeMode `
-                -OnProgress {
-                    param($Pct, $Msg)
-                    $progressBar = $global:GA_MainWindow.FindName('WizardProgressBar')
-                    $txtStatus = $global:GA_MainWindow.FindName('WizardTxtStatus')
-                    if ($progressBar) { $progressBar.Value = $Pct }
-                    if ($txtStatus) { $txtStatus.Text = $Msg }
-                    [System.Windows.Forms.Application]::DoEvents()
-                }
-            
-            Complete-WizardGeneration -Result $result
-        }
-        catch {
+        else {
             Complete-WizardGeneration -Result @{
                 Success = $false
-                Errors = @($_.Exception.Message)
+                Errors = @('Background generation returned no result')
             }
         }
     }
+
+    Invoke-BackgroundWork -ScriptBlock $bgWork `
+        -ArgumentList @($modulePath, $artifacts, $settings) `
+        -OnComplete $onComplete `
+        -LoadingMessage 'Generating rules...' `
+        -LoadingSubMessage 'Batch processing artifacts...' `
+        -TimeoutSeconds 300
 }
 
 function global:Complete-WizardGeneration {

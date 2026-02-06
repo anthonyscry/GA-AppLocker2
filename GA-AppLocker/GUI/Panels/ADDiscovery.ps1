@@ -880,12 +880,15 @@ function global:Invoke-ConnectivityTest {
         $global:GA_ConnTest_FilterText  = $null
     }
 
+    # Timeout scales with machine count: base 45s + 2s per machine (WinRM can be slow on air-gapped nets)
+    $dynamicTimeout = [Math]::Max(60, 45 + ($hostnames.Count * 2))
+
     Invoke-BackgroundWork -ScriptBlock $bgWork `
-        -ArgumentList @($hostnames, 5000, 15) `
+        -ArgumentList @($hostnames, 5000, 30) `
         -OnComplete $onComplete `
         -LoadingMessage 'Testing connectivity...' `
-        -LoadingSubMessage "Checking $($hostnames.Count) machines" `
-        -TimeoutSeconds 30
+        -LoadingSubMessage "Checking $($hostnames.Count) machines (ping + WinRM)" `
+        -TimeoutSeconds $dynamicTimeout
 }
 
 #endregion

@@ -722,27 +722,40 @@ function global:Set-SelectedRuleStatus {
     
     $count = $selectedItems.Count
     
-    # For large selections, use async batch processing to keep UI responsive
+    # For large selections, use background work to keep UI responsive
     if ($count -gt 50) {
         $ruleIds = @($selectedItems | ForEach-Object { $_.Id })
+        $rulesPath = $null
+        try { $rulesPath = Join-Path (Get-AppLockerDataPath) 'Rules' } catch { }
+        if (-not $rulesPath) { $rulesPath = Join-Path $env:LOCALAPPDATA 'GA-AppLocker\Rules' }
+        $modulePath = (Get-Module GA-AppLocker).ModuleBase
 
-        Invoke-AsyncOperation -ScriptBlock {
-            param($RuleIds, $Status)
+        # Stash data in $global: for the OnComplete callback
+        $global:GA_BulkStatus_Window = $Window
+        $global:GA_BulkStatus_Status = $Status
 
-            $dataPath = Get-AppLockerDataPath
-            $rulePath = Join-Path $dataPath 'Rules'
+        $bgWork = {
+            param([string[]]$RuleIds, [string]$StatusValue, [string]$RulesPath, [string]$ModulePath)
+
+            # Import only Storage+Core for index update
+            $modulesDir = Join-Path $ModulePath 'Modules'
+            foreach ($mod in @('GA-AppLocker.Core', 'GA-AppLocker.Storage')) {
+                $modPath = Join-Path $modulesDir "$mod\$mod.psd1"
+                if (Test-Path $modPath) { Import-Module $modPath -Force -ErrorAction Stop }
+            }
+
             $updatedIds = [System.Collections.Generic.List[string]]::new()
             $errors = [System.Collections.Generic.List[string]]::new()
             $now = Get-Date -Format 'o'
 
             foreach ($id in $RuleIds) {
                 try {
-                    $ruleFile = Join-Path $rulePath "$id.json"
-                    if (Test-Path $ruleFile) {
+                    $ruleFile = [System.IO.Path]::Combine($RulesPath, "$id.json")
+                    if ([System.IO.File]::Exists($ruleFile)) {
                         $rule = Get-Content -Path $ruleFile -Raw | ConvertFrom-Json
-                        $rule.Status = $Status
+                        $rule.Status = $StatusValue
                         $rule.ModifiedDate = $now
-                        $rule | ConvertTo-Json -Depth 10 | Set-Content -Path $ruleFile -Encoding UTF8
+                        $rule | ConvertTo-Json -Depth 5 | Set-Content -Path $ruleFile -Encoding UTF8
                         [void]$updatedIds.Add($id)
                     }
                 }
@@ -753,7 +766,7 @@ function global:Set-SelectedRuleStatus {
 
             if ($updatedIds.Count -gt 0) {
                 try {
-                    Update-RuleStatusInIndex -RuleIds $updatedIds.ToArray() -Status $Status | Out-Null
+                    Update-RuleStatusInIndex -RuleIds $updatedIds.ToArray() -Status $StatusValue | Out-Null
                 }
                 catch {
                     [void]$errors.Add("Index update failed: $($_.Exception.Message)")
@@ -764,28 +777,39 @@ function global:Set-SelectedRuleStatus {
                 Updated = $updatedIds.Count
                 Errors = $errors.ToArray()
             }
-        } -Arguments @{ RuleIds = $ruleIds; Status = $Status } -LoadingMessage "Updating $count rules to '$Status'..." -LoadingSubMessage 'Please wait' -OnComplete {
-            param($Result)
+        }
 
-            Reset-RulesSelectionState -Window $Window
-            Update-RulesDataGrid -Window $Window
-            Update-DashboardStats -Window $Window
-            Update-WorkflowBreadcrumb -Window $Window
+        $onComplete = {
+            param($Result)
+            $win = $global:GA_BulkStatus_Window
+            $st = $global:GA_BulkStatus_Status
+
+            Reset-RulesSelectionState -Window $win
+            Update-RulesDataGrid -Window $win
+            try { Update-DashboardStats -Window $win } catch { }
+            try { Update-WorkflowBreadcrumb -Window $win } catch { }
 
             $updated = if ($Result -and $Result.Updated) { $Result.Updated } else { 0 }
             $errorCount = if ($Result -and $Result.Errors) { $Result.Errors.Count } else { 0 }
 
             if ($updated -gt 0) {
-                Show-Toast -Message "Updated $updated rule(s) to '$Status'." -Type 'Success'
+                Show-Toast -Message "Updated $updated rule(s) to '$st'." -Type 'Success'
             }
             if ($errorCount -gt 0) {
                 Write-Log -Level Warning -Message "Errors updating rules: $errorCount failures"
                 Show-Toast -Message "$errorCount rule(s) failed to update." -Type 'Warning'
             }
-        } -OnError {
-            param($ErrorMessage)
-            Show-Toast -Message "Failed to update rules: $ErrorMessage" -Type 'Error'
+
+            $global:GA_BulkStatus_Window = $null
+            $global:GA_BulkStatus_Status = $null
         }
+
+        Invoke-BackgroundWork -ScriptBlock $bgWork `
+            -ArgumentList @($ruleIds, $Status, $rulesPath, $modulePath) `
+            -OnComplete $onComplete `
+            -LoadingMessage "Updating $count rules to '$Status'..." `
+            -LoadingSubMessage 'Please wait' `
+            -TimeoutSeconds 120
 
         return
     }
@@ -937,26 +961,46 @@ function global:Invoke-ApproveTrustedVendors {
 
     if ($confirm -ne 'Yes') { return }
 
-    # Use async to prevent UI freeze
-    Invoke-AsyncOperation -ScriptBlock {
-        Approve-TrustedVendorRules
-    } -LoadingMessage 'Approving trusted vendor rules...' -OnComplete {
+    # Use Invoke-BackgroundWork to prevent UI freeze (no full module import)
+    $global:GA_ApproveTrusted_Window = $Window
+    $modulePath = (Get-Module GA-AppLocker).ModuleBase
+
+    $bgWork = {
+        param([string]$ModulePath)
+        $modulesDir = Join-Path $ModulePath 'Modules'
+        foreach ($mod in @('GA-AppLocker.Core', 'GA-AppLocker.Storage', 'GA-AppLocker.Rules')) {
+            $modPath = Join-Path $modulesDir "$mod\$mod.psd1"
+            if (Test-Path $modPath) { Import-Module $modPath -Force -ErrorAction Stop }
+        }
+        return Approve-TrustedVendorRules
+    }
+
+    $onComplete = {
         param($Result)
-        if ($Result.Success) {
+        $win = $global:GA_ApproveTrusted_Window
+        if ($Result -and $Result.Success) {
             $message = "Approved $($Result.TotalUpdated) rules from trusted vendors."
             Show-Toast -Message $message -Type 'Success'
             Write-Log -Message $message
-            # Reset selection state before refreshing grid
-            Reset-RulesSelectionState -Window $Window
-            Update-RulesDataGrid -Window $Window -Async
-            # Refresh dashboard stats and sidebar counts
-            Update-DashboardStats -Window $Window
-            try { Update-WorkflowBreadcrumb -Window $Window } catch { }
+            Reset-RulesSelectionState -Window $win
+            Update-RulesDataGrid -Window $win
+            try { Update-DashboardStats -Window $win } catch { }
+            try { Update-WorkflowBreadcrumb -Window $win } catch { }
         }
-        else {
+        elseif ($Result) {
             Show-Toast -Message "Failed to approve rules: $($Result.Error)" -Type 'Error'
         }
-    }.GetNewClosure()
+        else {
+            Show-Toast -Message 'Approve trusted vendors completed.' -Type 'Info'
+        }
+        $global:GA_ApproveTrusted_Window = $null
+    }
+
+    Invoke-BackgroundWork -ScriptBlock $bgWork `
+        -ArgumentList @($modulePath) `
+        -OnComplete $onComplete `
+        -LoadingMessage 'Approving trusted vendor rules...' `
+        -TimeoutSeconds 120
 }
 
 function global:Invoke-RemoveDuplicateRules {
@@ -982,26 +1026,46 @@ function global:Invoke-RemoveDuplicateRules {
 
         if ($confirm -ne 'Yes') { return }
 
-        # Actual removal - run async to prevent UI freeze on large datasets
-        Invoke-AsyncOperation -ScriptBlock {
-            Remove-DuplicateRules -RuleType All -Strategy KeepOldest
-        } -LoadingMessage 'Removing duplicate rules...' -OnComplete {
+        # Actual removal - use Invoke-BackgroundWork (no full module import)
+        $global:GA_Dedupe_Window = $Window
+        $modulePath = (Get-Module GA-AppLocker).ModuleBase
+
+        $bgWork = {
+            param([string]$ModulePath)
+            $modulesDir = Join-Path $ModulePath 'Modules'
+            foreach ($mod in @('GA-AppLocker.Core', 'GA-AppLocker.Storage', 'GA-AppLocker.Rules')) {
+                $modPath = Join-Path $modulesDir "$mod\$mod.psd1"
+                if (Test-Path $modPath) { Import-Module $modPath -Force -ErrorAction Stop }
+            }
+            return Remove-DuplicateRules -RuleType All -Strategy KeepOldest
+        }
+
+        $onComplete = {
             param($Result)
-            if ($Result.Success) {
+            $win = $global:GA_Dedupe_Window
+            if ($Result -and $Result.Success) {
                 $msg = "Removed $($Result.RemovedCount) duplicate rules."
                 Show-Toast -Message $msg -Type 'Success'
                 Write-Log -Message $msg
-                # Reset selection state before refreshing grid
-                Reset-RulesSelectionState -Window $Window
-                Update-RulesDataGrid -Window $Window
-                # Refresh dashboard stats and sidebar counts
-                Update-DashboardStats -Window $Window
-                try { Update-WorkflowBreadcrumb -Window $Window } catch { }
+                Reset-RulesSelectionState -Window $win
+                Update-RulesDataGrid -Window $win
+                try { Update-DashboardStats -Window $win } catch { }
+                try { Update-WorkflowBreadcrumb -Window $win } catch { }
             }
-            else {
+            elseif ($Result) {
                 Show-Toast -Message "Failed to remove duplicates: $($Result.Error)" -Type 'Error'
             }
-        }.GetNewClosure()
+            else {
+                Show-Toast -Message 'Dedupe completed.' -Type 'Info'
+            }
+            $global:GA_Dedupe_Window = $null
+        }
+
+        Invoke-BackgroundWork -ScriptBlock $bgWork `
+            -ArgumentList @($modulePath) `
+            -OnComplete $onComplete `
+            -LoadingMessage 'Removing duplicate rules...' `
+            -TimeoutSeconds 120
     }
     catch {
         Show-Toast -Message "Error: $($_.Exception.Message)" -Type 'Error'
@@ -1642,25 +1706,35 @@ function global:Invoke-ChangeSelectedRulesAction {
 
         if ($count -gt 50) {
             $ruleIds = @($selectedItems | ForEach-Object { $_.Id })
+            $rulesPath = $null
+            try { $rulesPath = Join-Path (Get-AppLockerDataPath) 'Rules' } catch { }
+            if (-not $rulesPath) { $rulesPath = Join-Path $env:LOCALAPPDATA 'GA-AppLocker\Rules' }
+            $modulePath = (Get-Module GA-AppLocker).ModuleBase
 
-            Invoke-AsyncOperation -ScriptBlock {
-                param($RuleIds, $ActionValue)
+            $global:GA_BulkAction_Window = $Window
+            $global:GA_BulkAction_NewAction = $newAction
 
-                $dataPath = Get-AppLockerDataPath
-                $rulePath = Join-Path $dataPath 'Rules'
+            $bgWork = {
+                param([string[]]$RuleIds, [string]$ActionValue, [string]$RulesPath, [string]$ModulePath)
+
+                $modulesDir = Join-Path $ModulePath 'Modules'
+                foreach ($mod in @('GA-AppLocker.Core', 'GA-AppLocker.Storage')) {
+                    $modPath = Join-Path $modulesDir "$mod\$mod.psd1"
+                    if (Test-Path $modPath) { Import-Module $modPath -Force -ErrorAction Stop }
+                }
+
                 $updatedIds = [System.Collections.Generic.List[string]]::new()
                 $errors = [System.Collections.Generic.List[string]]::new()
                 $now = Get-Date -Format 'o'
 
                 foreach ($id in $RuleIds) {
                     try {
-                        $ruleFile = Join-Path $rulePath "$id.json"
-                        if (Test-Path $ruleFile) {
+                        $ruleFile = [System.IO.Path]::Combine($RulesPath, "$id.json")
+                        if ([System.IO.File]::Exists($ruleFile)) {
                             $rule = Get-Content -Path $ruleFile -Raw | ConvertFrom-Json
                             $rule.Action = $ActionValue
                             $rule.ModifiedDate = $now
-                            $json = $rule | ConvertTo-Json -Depth 10
-                            Set-Content -Path $ruleFile -Value $json -Encoding UTF8
+                            $rule | ConvertTo-Json -Depth 5 | Set-Content -Path $ruleFile -Encoding UTF8
                             [void]$updatedIds.Add($id)
                         }
                     }
@@ -1683,27 +1757,37 @@ function global:Invoke-ChangeSelectedRulesAction {
                     Updated = $updatedIds.Count
                     Errors = $errors.ToArray()
                 }
-            } -Arguments @{ RuleIds = $ruleIds; ActionValue = $newAction } -LoadingMessage "Changing action to '$newAction'..." -LoadingSubMessage "$count rule(s)" -OnComplete {
-                param($Result)
+            }
 
-                Reset-RulesSelectionState -Window $Window
-                Update-RulesDataGrid -Window $Window
-                Update-DashboardStats -Window $Window
+            $onComplete = {
+                param($Result)
+                $win = $global:GA_BulkAction_Window
+                $act = $global:GA_BulkAction_NewAction
+
+                Reset-RulesSelectionState -Window $win
+                Update-RulesDataGrid -Window $win
+                try { Update-DashboardStats -Window $win } catch { }
 
                 $updated = if ($Result -and $Result.Updated) { $Result.Updated } else { 0 }
                 $errorCount = if ($Result -and $Result.Errors) { $Result.Errors.Count } else { 0 }
 
                 if ($updated -gt 0) {
-                    Show-Toast -Message "Changed $updated rule(s) to '$newAction'." -Type 'Success'
+                    Show-Toast -Message "Changed $updated rule(s) to '$act'." -Type 'Success'
                 }
                 if ($errorCount -gt 0) {
                     Write-Log -Level Warning -Message "Errors updating rule actions: $errorCount failures"
                     Show-Toast -Message "$errorCount rule(s) failed to update." -Type 'Warning'
                 }
-            } -OnError {
-                param($ErrorMessage)
-                Show-Toast -Message "Failed to change action: $ErrorMessage" -Type 'Error'
+                $global:GA_BulkAction_Window = $null
+                $global:GA_BulkAction_NewAction = $null
             }
+
+            Invoke-BackgroundWork -ScriptBlock $bgWork `
+                -ArgumentList @($ruleIds, $newAction, $rulesPath, $modulePath) `
+                -OnComplete $onComplete `
+                -LoadingMessage "Changing action to '$newAction'..." `
+                -LoadingSubMessage "$count rule(s)" `
+                -TimeoutSeconds 120
 
             return
         }
@@ -1847,25 +1931,36 @@ function global:Invoke-ChangeSelectedRulesGroup {
 
         if ($count -gt 50) {
             $ruleIds = @($selectedItems | ForEach-Object { $_.Id })
+            $rulesPath = $null
+            try { $rulesPath = Join-Path (Get-AppLockerDataPath) 'Rules' } catch { }
+            if (-not $rulesPath) { $rulesPath = Join-Path $env:LOCALAPPDATA 'GA-AppLocker\Rules' }
+            $modulePath = (Get-Module GA-AppLocker).ModuleBase
 
-            Invoke-AsyncOperation -ScriptBlock {
-                param($RuleIds, $Sid)
+            $global:GA_BulkGroup_Window = $Window
+            $global:GA_BulkGroup_GroupName = $groupName
+            $global:GA_BulkGroup_Sid = $targetSid
 
-                $dataPath = Get-AppLockerDataPath
-                $rulePath = Join-Path $dataPath 'Rules'
+            $bgWork = {
+                param([string[]]$RuleIds, [string]$Sid, [string]$RulesPath, [string]$ModulePath)
+
+                $modulesDir = Join-Path $ModulePath 'Modules'
+                foreach ($mod in @('GA-AppLocker.Core', 'GA-AppLocker.Storage')) {
+                    $modPath = Join-Path $modulesDir "$mod\$mod.psd1"
+                    if (Test-Path $modPath) { Import-Module $modPath -Force -ErrorAction Stop }
+                }
+
                 $updatedIds = [System.Collections.Generic.List[string]]::new()
                 $errors = [System.Collections.Generic.List[string]]::new()
                 $now = Get-Date -Format 'o'
 
                 foreach ($id in $RuleIds) {
                     try {
-                        $ruleFile = Join-Path $rulePath "$id.json"
-                        if (Test-Path $ruleFile) {
+                        $ruleFile = [System.IO.Path]::Combine($RulesPath, "$id.json")
+                        if ([System.IO.File]::Exists($ruleFile)) {
                             $rule = Get-Content -Path $ruleFile -Raw | ConvertFrom-Json
                             $rule.UserOrGroupSid = $Sid
                             $rule.ModifiedDate = $now
-                            $json = $rule | ConvertTo-Json -Depth 10
-                            Set-Content -Path $ruleFile -Value $json -Encoding UTF8
+                            $rule | ConvertTo-Json -Depth 5 | Set-Content -Path $ruleFile -Encoding UTF8
                             [void]$updatedIds.Add($id)
                         }
                     }
@@ -1888,27 +1983,39 @@ function global:Invoke-ChangeSelectedRulesGroup {
                     Updated = $updatedIds.Count
                     Errors = $errors.ToArray()
                 }
-            } -Arguments @{ RuleIds = $ruleIds; Sid = $targetSid } -LoadingMessage "Changing target group to '$groupName'..." -LoadingSubMessage "$count rule(s)" -OnComplete {
-                param($Result)
+            }
 
-                Reset-RulesSelectionState -Window $Window
-                Update-RulesDataGrid -Window $Window
-                Update-DashboardStats -Window $Window
+            $onComplete = {
+                param($Result)
+                $win = $global:GA_BulkGroup_Window
+                $gn = $global:GA_BulkGroup_GroupName
+                $sid = $global:GA_BulkGroup_Sid
+
+                Reset-RulesSelectionState -Window $win
+                Update-RulesDataGrid -Window $win
+                try { Update-DashboardStats -Window $win } catch { }
 
                 $updated = if ($Result -and $Result.Updated) { $Result.Updated } else { 0 }
                 $errorCount = if ($Result -and $Result.Errors) { $Result.Errors.Count } else { 0 }
 
                 if ($updated -gt 0) {
-                    Show-Toast -Message "Changed $updated rule(s) to group '$groupName' ($targetSid)." -Type 'Success'
+                    Show-Toast -Message "Changed $updated rule(s) to group '$gn' ($sid)." -Type 'Success'
                 }
                 if ($errorCount -gt 0) {
                     Write-Log -Level Warning -Message "Errors updating target group: $errorCount failures"
                     Show-Toast -Message "$errorCount rule(s) failed to update." -Type 'Warning'
                 }
-            } -OnError {
-                param($ErrorMessage)
-                Show-Toast -Message "Failed to change target group: $ErrorMessage" -Type 'Error'
+                $global:GA_BulkGroup_Window = $null
+                $global:GA_BulkGroup_GroupName = $null
+                $global:GA_BulkGroup_Sid = $null
             }
+
+            Invoke-BackgroundWork -ScriptBlock $bgWork `
+                -ArgumentList @($ruleIds, $targetSid, $rulesPath, $modulePath) `
+                -OnComplete $onComplete `
+                -LoadingMessage "Changing target group to '$groupName'..." `
+                -LoadingSubMessage "$count rule(s)" `
+                -TimeoutSeconds 120
 
             return
         }
