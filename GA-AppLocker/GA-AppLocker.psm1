@@ -271,6 +271,25 @@ function Start-AppLockerDashboard {
 }
 #endregion
 
+function Update-RulesGrid {
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        [array]$Rules
+    )
+
+    if (-not $Rules) {
+        return
+    }
+
+    $ruleList = [System.Collections.Generic.List[PSCustomObject]]::new()
+    foreach ($rule in $Rules) {
+        [void]$ruleList.Add([PSCustomObject]$rule)
+    }
+
+    return $true
+}
+
 #region ===== EXPORTS =====
 # Export all functions from this module and nested modules
 # The FunctionsToExport in .psd1 filters what's actually visible
@@ -318,6 +337,8 @@ Export-ModuleMember -Function @(
     'Get-AppLockerEventLogs',
     'Start-ArtifactScan',
     'Get-ScanResults',
+    'Get-DefaultScanPaths',
+    'Write-ScanLog',
     'Export-ScanResults',
     # Scanning - Scheduled
     'New-ScheduledScan',
@@ -332,6 +353,7 @@ Export-ModuleMember -Function @(
     'ConvertFrom-Artifact',
     'Get-Rule',
     'Get-AllRules',
+    'Update-RulesGrid',
     'Remove-Rule',
     'Export-RulesToXml',
     'Set-RuleStatus',

@@ -41,7 +41,8 @@ param(
     [switch]$Coverage,
     [string]$OutputPath,
     [switch]$Quick,
-    [switch]$Legacy
+    [switch]$Legacy,
+    [switch]$MustPass
 )
 
 $ErrorActionPreference = 'Stop'
@@ -64,6 +65,13 @@ Write-Host "Detected Pester version: $pesterVersion" -ForegroundColor Cyan
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $testsPath = Join-Path $PSScriptRoot 'Behavioral'
 $modulePath = Join-Path $projectRoot 'GA-AppLocker'
+$mustPassTests = @(
+    (Join-Path $PSScriptRoot 'Behavioral\Workflows\CoreFlows.E2E.Tests.ps1'),
+    (Join-Path $PSScriptRoot 'Behavioral\Core\Rules.Behavior.Tests.ps1'),
+    (Join-Path $PSScriptRoot 'Behavioral\Core\Policy.Behavior.Tests.ps1'),
+    (Join-Path $PSScriptRoot 'Behavioral\GUI\ADDiscovery.AutoRefresh.Tests.ps1'),
+    (Join-Path $PSScriptRoot 'Behavioral\GUI\Dashboard.WinRMButton.Tests.ps1')
+)
 
 Write-Host "Project Root: $projectRoot" -ForegroundColor Gray
 Write-Host "Tests Path:   $testsPath" -ForegroundColor Gray
@@ -74,8 +82,19 @@ Write-Host ""
 # Use script paths and switches directly
 $invokePesterParams = @{}
 
-# Build parameters dynamically
-$invokePesterParams['Script'] = @($testsPath)
+# Build parameters dynamically (default run is curated high-signal gate)
+$missingMustPass = @($mustPassTests | Where-Object { -not (Test-Path $_) })
+if ($missingMustPass.Count -gt 0) {
+    throw "Must-pass test files missing:`n$($missingMustPass -join "`n")"
+}
+
+$invokePesterParams['Script'] = @($mustPassTests)
+if ($MustPass) {
+    Write-Host "MustPass Mode: Running curated high-signal gate ($($mustPassTests.Count) files)" -ForegroundColor Yellow
+}
+elseif (-not $Quick -and -not $Legacy) {
+    Write-Host "Default Mode: Running curated high-signal gate ($($mustPassTests.Count) files)" -ForegroundColor Yellow
+}
 
 if ($Tag) {
     $invokePesterParams['Tag'] = $Tag
@@ -87,12 +106,12 @@ if ($ExcludeTag) {
     Write-Host "Filter: ExcludeTags = $($ExcludeTag -join ', ')" -ForegroundColor Yellow
 }
 
-if ($Quick) {
-    $invokePesterParams['Tag'] = @('Behavioral','Core')
-    Write-Host "Quick Mode: Running Behavioral Core tests only" -ForegroundColor Yellow
+if ($Quick -and -not $MustPass) {
+    $invokePesterParams['Script'] = @($mustPassTests)
+    Write-Host "Quick Mode: Running curated must-pass gate ($($mustPassTests.Count) files)" -ForegroundColor Yellow
 }
 
-if ($Legacy) {
+if ($Legacy -and -not $MustPass) {
     $legacyPath = Join-Path $PSScriptRoot 'Legacy'
     $invokePesterParams['Script'] = @($testsPath, $legacyPath)
     Write-Host "Legacy Mode: Running Behavioral + Legacy tests" -ForegroundColor Yellow
@@ -195,7 +214,7 @@ Write-Host ""
 # ============================================================
 # PHASE 3: Legacy Test Suite (optional)
 # ============================================================
-if ($Legacy) {
+if ($Legacy -and -not $MustPass) {
     Write-Host "=" * 60 -ForegroundColor Cyan
     Write-Host "  PHASE 3: Legacy Test Suite (Test-AllModules.ps1)" -ForegroundColor Cyan
     Write-Host "=" * 60 -ForegroundColor Cyan

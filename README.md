@@ -138,17 +138,19 @@ All data stored locally in `%LOCALAPPDATA%\GA-AppLocker\`:
 ## Testing
 
 ```powershell
-# Behavioral tests (current code validation - 6/6 passing)
-.\Tests\Behavioral\
+# Curated must-pass gate (high-signal default)
+.\Tests\Run-AllTests.ps1
 
-# Note: Legacy test suite (1313 tests, obsolete after v1.2.46) has been archived to Tests\Legacy_Archived\
-# and permanently excluded via Tests/.gitignore. Behavioral tests only test current functionality.
+# Explicit curated gate
+.\Tests\Run-AllTests.ps1 -MustPass
 ```
 
 ## Version History
 
 | Version | Date | Key Changes |
 |---------|------|-------------|
+| 1.2.63 | Feb 5, 2026 | Repository cleanup + release hygiene update: removed obsolete tracked artifacts/reports, standardized curated test gate as default, and aligned runtime packaging/docs/versioning for `Run-Dashboard.ps1`, `Run-Dashboard-ForceFresh.ps1`, Troubleshooting scripts, and release assets. |
+| 1.2.62 | Feb 5, 2026 | Performance and UX stabilization release: principal-aware dedupe fix, async/non-blocking bulk rule operations, AD Discovery WinRM status auto-refresh without manual refresh, dashboard toggle interlock to prevent double-presses, curated high-signal must-pass test gate, and release packaging updates (Run-Dashboard + force-fresh launcher + Troubleshooting scripts). |
 | 1.2.60 | Feb 3, 2026 | Fix 3 critical bugs from user testing: (1) WinRM button label now stays "Enable WinRM" (toggle state shows status), (2) AD Discovery DataGrid auto-refreshes after connectivity test (no manual refresh needed), (3) Rules panel bulk buttons no longer crash (Initialize-JsonIndex and Write-StorageLog scope fix). Added 10 behavioral tests. |
 | 1.2.59 | Feb 3, 2026 | AD Discovery panel UI improvements: Added "Selected: N" count label (updates in real-time), added "Refresh" button, standardized filter textbox height (Padding="6,4" FontSize="11"), changed "Filter:" to "Search:" for consistency with other panels. |
 | 1.2.58 | Feb 3, 2026 | Fix 3 bugs: (1) Test Connectivity now correctly tests only selected machines (Get-CheckedMachines .ToArray() fix for PS 5.1 List<T> enumeration), (2) Dashboard GPO toggles enable after Initialize All (window ref fix), (3) Local scan blocks when not elevated (clearer UX). Added Run-Dashboard-ForceFresh.ps1 for module cache clearing. |

@@ -2,6 +2,27 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.63] - 2026-02-05
+
+### Fixed
+- Dedupe now preserves rules for different principals even when index entries miss `UserOrGroupSid` by resolving SID from full rule JSON before grouping.
+- AD Discovery connectivity updates now render WinRM status immediately (including filtered views) without requiring manual refresh.
+- Dashboard GPO/WinRM toggles now use a busy interlock to prevent accidental double-toggle while operations are in flight.
+
+### Performance
+- Rules panel bulk status/action/group updates run asynchronously for larger selections to keep the UI responsive.
+- Scanning avoids duplicate artifact processing for overlapping scan paths.
+- Connectivity/WinRM checks skip duplicate hostnames and use lower-overhead property updates in hot loops.
+
+### Added
+- Curated high-signal must-pass test gate and workflow E2E coverage (`Tests/Run-MustPass.ps1`, `Tests/Behavioral/Workflows/CoreFlows.E2E.Tests.ps1`).
+- Packaging now includes `Run-Dashboard-ForceFresh.ps1` in release archives.
+
+### Removed
+- Obsolete tracked release artifacts (`.zip`), dead-code placeholders (`*.dead`), and superseded one-off phase/urgent/readiness report files from repository root.
+
+---
+
 ## [1.2.60] - 2026-02-03
 
 ### Fixed

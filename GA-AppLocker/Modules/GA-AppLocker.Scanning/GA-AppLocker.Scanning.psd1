@@ -24,6 +24,8 @@
         'Get-AppLockerEventLogs',
         'Start-ArtifactScan',
         'Get-ScanResults',
+        'Get-DefaultScanPaths',
+        'Write-ScanLog',
         'Export-ScanResults',
         # Scheduled Scans
         'New-ScheduledScan',

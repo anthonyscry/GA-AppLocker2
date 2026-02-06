@@ -35,7 +35,7 @@ $script:ArtifactExtensions = @(
 # Default paths loaded from config; fallback if config unavailable
 $script:DefaultScanPaths = $null
 
-function script:Get-DefaultScanPaths {
+function Get-DefaultScanPaths {
     if ($null -eq $script:DefaultScanPaths) {
         try {
             $config = Get-AppLockerConfig
@@ -66,7 +66,7 @@ $script:AppLockerEventIds = @(8001, 8002, 8003, 8004, 8005, 8006, 8007, 8020, 80
 #endregion
 
 #region ===== SAFE LOGGING WRAPPER =====
-function script:Write-ScanLog {
+function Write-ScanLog {
     param([string]$Message, [string]$Level = 'Info')
     if (Get-Command -Name 'Write-AppLockerLog' -ErrorAction SilentlyContinue) {
         Write-AppLockerLog -Message $Message -Level $Level -NoConsole
@@ -239,6 +239,8 @@ Export-ModuleMember -Function @(
     'Get-AppLockerEventLogs',
     'Start-ArtifactScan',
     'Get-ScanResults',
+    'Get-DefaultScanPaths',
+    'Write-ScanLog',
     'Export-ScanResults',
     # Scheduled Scans
     'New-ScheduledScan',
