@@ -340,6 +340,15 @@ function global:Invoke-StartArtifactScan {
     $script:ScanCancelled = $false
     Update-ScanUIState -Window $Window -Scanning $true
     Update-ScanProgress -Window $Window -Text "Starting scan: $scanName" -Percent 5
+    $statusLabel = $Window.FindName('ScanStatusLabel')
+    if ($statusLabel) {
+        $statusLabel.Text = 'Running'
+        $statusLabel.Foreground = [System.Windows.Media.Brushes]::Gold
+    }
+    if (Get-Command -Name 'Show-LoadingOverlay' -ErrorAction SilentlyContinue) {
+        Show-LoadingOverlay -Message 'Scan in progress...' -SubMessage "Starting scan: $scanName"
+    }
+    try { Request-UiRender -Window $Window } catch { }
 
     # Build scan parameters
     $scanParams = @{
@@ -441,6 +450,9 @@ function global:Invoke-StartArtifactScan {
         
             # Update progress
             Update-ScanProgress -Window $win -Text $syncHash.StatusText -Percent $syncHash.Progress
+            if (Get-Command -Name 'Update-LoadingText' -ErrorAction SilentlyContinue) {
+                Update-LoadingText -Message 'Scan in progress...' -SubMessage $syncHash.StatusText
+            }
         
             # Check if cancelled
             if ($script:ScanCancelled) {
@@ -460,6 +472,9 @@ function global:Invoke-StartArtifactScan {
                 $global:GA_ScanInProgress = $false
                 Update-ScanUIState -Window $win -Scanning $false
                 Update-ScanProgress -Window $win -Text "Scan cancelled" -Percent 0
+                if (Get-Command -Name 'Hide-LoadingOverlay' -ErrorAction SilentlyContinue) {
+                    Hide-LoadingOverlay
+                }
                 
                 $statusLabel = $win.FindName('ScanStatusLabel')
                 if ($statusLabel) {
@@ -489,6 +504,9 @@ function global:Invoke-StartArtifactScan {
                 $script:ScanInProgress = $false
                 $global:GA_ScanInProgress = $false
                 Update-ScanUIState -Window $win -Scanning $false
+                if (Get-Command -Name 'Hide-LoadingOverlay' -ErrorAction SilentlyContinue) {
+                    Hide-LoadingOverlay
+                }
             
                 if ($syncHash.Error) {
                     Update-ScanProgress -Window $win -Text "Error: $($syncHash.Error)" -Percent 0
@@ -586,6 +604,10 @@ function global:Update-ScanUIState {
 
     if ($btnStart) { $btnStart.IsEnabled = -not $Scanning }
     if ($btnStop) { $btnStop.IsEnabled = $Scanning }
+
+    if ($Window) {
+        $Window.Cursor = if ($Scanning) { [System.Windows.Input.Cursors]::Wait } else { [System.Windows.Input.Cursors]::Arrow }
+    }
 }
 
 function global:Update-ScanProgress {

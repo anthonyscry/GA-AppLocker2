@@ -317,83 +317,57 @@ function Test-MachineConnectivity {
             }
 
             if ($uniqueOnlineHostnames.Count -gt 0) {
+                # Bound WinRM check latency with per-host job timeouts
                 $threadCount = [Math]::Min($effectiveThrottle, $uniqueOnlineHostnames.Count)
-                $runspacePool = [RunspaceFactory]::CreateRunspacePool(1, $threadCount)
-                $runspacePool.Open()
+                $chunkSize = [Math]::Max(1, $threadCount)
+                $perHostTimeoutSec = [Math]::Max(2, $TimeoutSeconds)
 
-                $batchSize = [Math]::Max(5, [Math]::Min(25, [int][Math]::Ceiling($uniqueOnlineHostnames.Count / [Math]::Max(1, $threadCount * 2))))
-                $runspaces = [System.Collections.Generic.List[PSCustomObject]]::new()
+                for ($i = 0; $i -lt $uniqueOnlineHostnames.Count; $i += $chunkSize) {
+                    $end = [Math]::Min($i + $chunkSize - 1, $uniqueOnlineHostnames.Count - 1)
+                    $chunk = @($uniqueOnlineHostnames[$i..$end])
+                    $jobs = @()
 
-                for ($i = 0; $i -lt $uniqueOnlineHostnames.Count; $i += $batchSize) {
-                    $end = [Math]::Min($i + $batchSize - 1, $uniqueOnlineHostnames.Count - 1)
-                    $batch = @($uniqueOnlineHostnames[$i..$end])
-
-                    $powershell = [PowerShell]::Create()
-                    $powershell.RunspacePool = $runspacePool
-
-                    [void]$powershell.AddScript({
-                        param($Hostnames)
-                        $batchResults = @{}
-                        foreach ($hostname in $Hostnames) {
+                    foreach ($hostname in $chunk) {
+                        $jobs += Start-Job -ScriptBlock {
+                            param($TargetHost)
                             try {
-                                $null = Test-WSMan -ComputerName $hostname -ErrorAction Stop
-                                $batchResults[$hostname] = $true
+                                $null = Test-WSMan -ComputerName $TargetHost -ErrorAction Stop
+                                [PSCustomObject]@{ Hostname = $TargetHost; Available = $true }
                             }
                             catch {
-                                $batchResults[$hostname] = $false
+                                [PSCustomObject]@{ Hostname = $TargetHost; Available = $false }
                             }
-                        }
-                        return [PSCustomObject]@{ Results = $batchResults }
-                    }).AddArgument($batch)
+                        } -ArgumentList $hostname
+                    }
 
-                    $handle = $powershell.BeginInvoke()
-                    [void]$runspaces.Add([PSCustomObject]@{
-                        PowerShell = $powershell
-                        Handle     = $handle
-                        Hostnames  = $batch
-                    })
-                }
+                    if ($jobs.Count -gt 0) {
+                        $null = Wait-Job -Job $jobs -Timeout $perHostTimeoutSec
 
-                # Wait for all runspaces with timeout (3 seconds per machine, min 15 sec total)
-                $totalTimeout = [Math]::Max(15, $uniqueOnlineHostnames.Count * 3)
-                $deadline = [datetime]::Now.AddSeconds($totalTimeout)
-
-                foreach ($rs in $runspaces) {
-                    try {
-                        $remainingMs = [Math]::Max(100, ($deadline - [datetime]::Now).TotalMilliseconds)
-                        if ($rs.Handle.AsyncWaitHandle.WaitOne([int]$remainingMs)) {
-                            $rsResult = $rs.PowerShell.EndInvoke($rs.Handle)
-                            foreach ($resultItem in @($rsResult)) {
-                                if ($resultItem -and $resultItem.Results) {
-                                    foreach ($hostname in $resultItem.Results.Keys) {
-                                        $winrmResults[$hostname] = [bool]$resultItem.Results[$hostname]
+                        foreach ($job in $jobs) {
+                            try {
+                                if ($job.State -eq 'Completed') {
+                                    $jobResult = Receive-Job -Job $job -ErrorAction SilentlyContinue
+                                    if ($jobResult -and $jobResult.Hostname) {
+                                        $winrmResults[$jobResult.Hostname] = [bool]$jobResult.Available
                                     }
                                 }
-                            }
-                        }
-                        else {
-                            # Timed out - mark batch as unavailable
-                            foreach ($hostname in $rs.Hostnames) {
-                                $winrmResults[$hostname] = $false
-                            }
-                            try {
-                                $rs.PowerShell.Stop()
+                                else {
+                                    try { Stop-Job -Job $job -Force -ErrorAction SilentlyContinue } catch { }
+                                }
                             }
                             catch { }
+                            finally {
+                                Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+                            }
                         }
-                    }
-                    catch {
-                        foreach ($hostname in $rs.Hostnames) {
-                            $winrmResults[$hostname] = $false
+
+                        foreach ($hostname in $chunk) {
+                            if (-not $winrmResults.ContainsKey($hostname)) {
+                                $winrmResults[$hostname] = $false
+                            }
                         }
-                    }
-                    finally {
-                        $rs.PowerShell.Dispose()
                     }
                 }
-
-                $runspacePool.Close()
-                $runspacePool.Dispose()
             }
 
             # Apply WinRM results

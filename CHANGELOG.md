@@ -2,6 +2,15 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.65] - 2026-02-05
+
+### Fixed
+- Scanner Start Scan now displays loading overlay with live status and wait cursor during scan execution.
+- Connectivity test bounded timeout improvements to prevent indefinite hangs on unreachable hosts.
+- AD Discovery OU Select All/Clear buttons removed to simplify UI and prevent accidental bulk operations.
+
+---
+
 ## [1.2.64] - 2026-02-05
 
 ### Fixed

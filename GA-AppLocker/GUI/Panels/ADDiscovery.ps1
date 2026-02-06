@@ -193,33 +193,6 @@ function Initialize-DiscoveryPanel {
         }
     }
 
-    # Wire up Select All / Clear OUs buttons
-    $btnSelectAllOUs = $Window.FindName('BtnSelectAllOUs')
-    if ($btnSelectAllOUs) {
-        $script:ADDiscovery_Handlers['BtnSelectAllOUs'] = {
-            param($sender, $e)
-            Show-Toast -Message "Bulk OU selection is not yet available." -Type 'Info'
-        }
-        $btnSelectAllOUs.Add_Click($script:ADDiscovery_Handlers['BtnSelectAllOUs'])
-    }
-
-    $btnClearOUs = $Window.FindName('BtnClearOUs')
-    if ($btnClearOUs) {
-        $script:ADDiscovery_Handlers['BtnClearOUs'] = {
-            param($sender, $e)
-            # Reset filter to show all machines
-            if ($script:DiscoveredMachines) {
-                Update-MachineDataGrid -Window $Window -Machines $script:DiscoveredMachines
-                
-                $machineCount = $Window.FindName('DiscoveryMachineCount')
-                if ($machineCount) {
-                    $machineCount.Text = "$($script:DiscoveredMachines.Count) machines"
-                }
-            }
-        }
-        $btnClearOUs.Add_Click($script:ADDiscovery_Handlers['BtnClearOUs'])
-    }
-
     # Wire up OUTreeView selection to filter machines (Bug 3: missing feature)
     $treeView = $Window.FindName('OUTreeView')
     if ($treeView) {
@@ -796,7 +769,7 @@ function global:Invoke-ConnectivityTest {
         Invoke-AsyncOperation -ScriptBlock {
             param($Machines)
             Test-MachineConnectivity -Machines $Machines
-        } -Arguments @{ Machines = $machines } -LoadingMessage 'Testing connectivity...' -LoadingSubMessage "Checking $($machines.Count) machines" -TimeoutSeconds 600 -OnComplete {
+        } -Arguments @{ Machines = $machines } -LoadingMessage 'Testing connectivity...' -LoadingSubMessage "Checking $($machines.Count) machines" -TimeoutSeconds 120 -OnComplete {
             param($Result)
             & $onComplete -Result $Result
         } -OnError {
