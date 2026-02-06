@@ -333,7 +333,10 @@ function global:Set-ActivePanel {
 
     # Auto-refresh Policy grid on navigation
     if ($PanelName -eq 'PanelPolicy') {
-        try { Update-PoliciesDataGrid -Window $Window } catch { }
+        $Window.Dispatcher.BeginInvoke(
+            [System.Windows.Threading.DispatcherPriority]::Background,
+            [Action]{ try { Update-PoliciesDataGrid -Window $global:GA_MainWindow -Async -NoOverlay } catch { } }
+        ) | Out-Null
     }
 
     # Auto-refresh Deploy panel on navigation (deferred so panel renders immediately)

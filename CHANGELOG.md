@@ -2,6 +2,14 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.78] - 2026-02-06
+
+### Fixed
+- **Dashboard GPO toggles no-op** -- switched Dashboard toggle interlock state from script scope to global scope so WPF click handlers and callback scope always see/update the same busy/snapshot values.
+- **Policy Builder navigation freeze** -- Policy panel auto-load on navigation now runs asynchronously via dispatcher background invoke (`Update-PoliciesDataGrid -Async -NoOverlay`) instead of synchronous load on panel switch.
+
+---
+
 ## [1.2.77] - 2026-02-06
 
 ### Fixed

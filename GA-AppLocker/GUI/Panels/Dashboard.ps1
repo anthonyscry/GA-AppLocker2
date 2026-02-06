@@ -1,8 +1,8 @@
 #region Dashboard Panel Functions
 # Dashboard.ps1 - Dashboard panel initialization and stats
 
-$script:DashboardToggleBusy = $false
-$script:DashboardToggleEnabledSnapshot = @{}
+$global:GA_DashboardToggleBusy = $false
+$global:GA_DashboardToggleEnabledSnapshot = @{}
 
 function global:Set-DashboardToggleInterlock {
     param(
@@ -22,11 +22,11 @@ function global:Set-DashboardToggleInterlock {
     )
 
     if ($Busy) {
-        $script:DashboardToggleEnabledSnapshot = @{}
+        $global:GA_DashboardToggleEnabledSnapshot = @{}
         foreach ($name in $toggleNames) {
             $btn = $win.FindName($name)
             if ($btn) {
-                $script:DashboardToggleEnabledSnapshot[$name] = [bool]$btn.IsEnabled
+                $global:GA_DashboardToggleEnabledSnapshot[$name] = [bool]$btn.IsEnabled
                 $btn.IsEnabled = $false
                 $btn.Opacity = 0.65
             }
@@ -48,8 +48,8 @@ function global:Set-DashboardToggleInterlock {
         if (-not $btn) { continue }
 
         $btn.Opacity = 1.0
-        if ($RestoreEnabled -and $script:DashboardToggleEnabledSnapshot.ContainsKey($name)) {
-            $btn.IsEnabled = [bool]$script:DashboardToggleEnabledSnapshot[$name]
+        if ($RestoreEnabled -and $global:GA_DashboardToggleEnabledSnapshot.ContainsKey($name)) {
+            $btn.IsEnabled = [bool]$global:GA_DashboardToggleEnabledSnapshot[$name]
         }
     }
 
@@ -59,7 +59,7 @@ function global:Set-DashboardToggleInterlock {
         $busyLabel.Visibility = 'Collapsed'
     }
 
-    $script:DashboardToggleEnabledSnapshot = @{}
+    $global:GA_DashboardToggleEnabledSnapshot = @{}
     try { $win.Cursor = [System.Windows.Input.Cursors]::Arrow } catch { }
 }
 
@@ -101,9 +101,9 @@ function Initialize-DashboardPanel {
             $btn.Add_Click({
                 param($sender, $e)
                 if ($sender -and -not $sender.IsEnabled) { return }
-                if ($script:DashboardToggleBusy) { return }
+                if ($global:GA_DashboardToggleBusy) { return }
 
-                $script:DashboardToggleBusy = $true
+                $global:GA_DashboardToggleBusy = $true
                 $dashWindow = if ($Window) { $Window } else { $global:GA_MainWindow }
                 Set-DashboardToggleInterlock -Window $dashWindow -Busy
 
@@ -119,7 +119,7 @@ function Initialize-DashboardPanel {
                         $refreshSucceeded = $false
                     }
 
-                    $script:DashboardToggleBusy = $false
+                    $global:GA_DashboardToggleBusy = $false
                     if ($refreshSucceeded) {
                         Set-DashboardToggleInterlock -Window $dashWindow
                     }
