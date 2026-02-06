@@ -19,7 +19,33 @@ function global:Show-AppLockerMessageBox {
         if ($Button -eq 'YesNo' -or $Button -eq 'YesNoCancel') { return 'Yes' }
         return 'OK'
     }
-    return [System.Windows.MessageBox]::Show($Message, $Title, $Button, $Icon)
+
+    # Keep dialogs owned by the main window to avoid "hidden modal" states
+    # (common after minimize/restore in VM/RDP sessions).
+    try {
+        $owner = $global:GA_MainWindow
+        $mbButton = [System.Windows.MessageBoxButton]::$Button
+        $mbIcon = [System.Windows.MessageBoxImage]::$Icon
+
+        if ($owner) {
+            try {
+                if ($owner.WindowState -eq 'Minimized') { $owner.WindowState = 'Normal' }
+                $owner.Activate() | Out-Null
+            }
+            catch { }
+
+            $result = [System.Windows.MessageBox]::Show($owner, $Message, $Title, $mbButton, $mbIcon)
+        }
+        else {
+            $result = [System.Windows.MessageBox]::Show($Message, $Title, $mbButton, $mbIcon)
+        }
+
+        return [string]$result
+    }
+    catch {
+        # Fallback for unexpected enum/owner issues
+        return [string][System.Windows.MessageBox]::Show($Message, $Title, $Button, $Icon)
+    }
 }
 
 function global:Write-Log {

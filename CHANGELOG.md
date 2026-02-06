@@ -2,6 +2,14 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.76] - 2026-02-06
+
+### Fixed
+- **Post-minimize UI no-op after Service/Admin allow actions** -- hardened `Show-AppLockerMessageBox` to always use the main window as owner and reactivate/restore it before showing dialogs.
+- **Hidden modal dialog trap** -- prevents off-screen/unowned MessageBox states (common in VM/RDP minimize/restore flows) that can make the app appear clickable while all commands are blocked.
+
+---
+
 ## [1.2.75] - 2026-02-06
 
 ### Fixed
