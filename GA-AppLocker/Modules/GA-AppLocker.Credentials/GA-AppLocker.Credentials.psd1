@@ -15,9 +15,7 @@
     Copyright         = '(c) 2026 GA-AppLocker. All rights reserved.'
     Description       = 'Tiered credential management for GA-AppLocker Dashboard'
     PowerShellVersion = '5.1'
-    RequiredModules   = @(
-        @{ ModuleName = 'GA-AppLocker.Core'; ModuleVersion = '1.0.0' }
-    )
+    RequiredModules   = @()
     FunctionsToExport = @(
         'New-CredentialProfile',
         'Get-CredentialProfile',

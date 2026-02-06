@@ -15,9 +15,7 @@
     Copyright         = '(c) 2026 GA-AppLocker. All rights reserved.'
     Description       = 'Active Directory discovery module for GA-AppLocker Dashboard with LDAP fallback'
     PowerShellVersion = '5.1'
-    RequiredModules   = @(
-        @{ ModuleName = 'GA-AppLocker.Core'; ModuleVersion = '1.0.0' }
-    )
+    RequiredModules   = @()
     FunctionsToExport = @(
         # Main discovery functions (with LDAP fallback)
         'Get-DomainInfo',

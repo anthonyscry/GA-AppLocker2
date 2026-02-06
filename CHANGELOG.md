@@ -2,6 +2,23 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.69] - 2026-02-05
+
+### Fixed
+- **CRITICAL**: Fix permanent UI freeze when clicking "Test Connectivity" in AD Discovery panel.
+  Root cause: `Invoke-AsyncOperation` imported the entire GA-AppLocker module (10 sub-modules, ~195 functions) into a background runspace -- this could hang indefinitely during module load. If it failed, a synchronous fallback ran `Test-MachineConnectivity` directly on the WPF STA thread, blocking the UI permanently (Test-WSMan has no built-in timeout on air-gapped networks).
+  Fix: Replaced with a lightweight direct runspace that embeds ping (WMI Win32_PingStatus) and WinRM (Test-WSMan) logic inline -- zero module imports needed. DispatcherTimer polls every 200ms with a hard 30-second deadline. Background work uses nested RunspacePools with per-host deadlines (5s ping, 15s WinRM). If the 30s deadline is exceeded, the runspace is killed and the overlay is dismissed with a timeout toast.
+
+---
+
+## [1.2.68] - 2026-02-05
+
+### Fixed
+- WinRM connectivity tests now enforce a hard timeout and avoid UI freezes during AD Discovery.
+- Connectivity test async UI timeout is clamped to 30 seconds to prevent hangs.
+
+---
+
 ## [1.2.67] - 2026-02-05
 
 ### Fixed
