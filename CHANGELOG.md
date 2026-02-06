@@ -2,6 +2,13 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.72] - 2026-02-06
+
+### Fixed
+- **Rule Generation Wizard freeze** -- `Invoke-BatchRuleGeneration` ran synchronously on WPF STA thread. Both `Invoke-DirectRuleGenerationWithSettings` and `Invoke-DirectRuleGeneration` now use `Invoke-BackgroundWork` with only 3 sub-module imports (Core + Storage + Rules) in a background runspace. 5-minute timeout.
+
+---
+
 ## [1.2.71] - 2026-02-06
 
 ### Redesigned - Centralized Background Work Engine

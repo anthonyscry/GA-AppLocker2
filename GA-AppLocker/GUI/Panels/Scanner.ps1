@@ -1762,6 +1762,7 @@ function global:Invoke-DirectRuleGenerationWithSettings {
     <#
     .SYNOPSIS
         Generates rules using settings from the configuration dialog.
+        Runs in a background runspace via Invoke-BackgroundWork to prevent UI freeze.
     #>
     param(
         $Window,
@@ -1769,138 +1770,135 @@ function global:Invoke-DirectRuleGenerationWithSettings {
     )
     
     $artifactCount = $script:CurrentScanArtifacts.Count
-    Show-Toast -Message "Generating rules from $artifactCount artifacts..." -Type 'Info'
     Write-Log -Message "Starting batch rule generation for $artifactCount artifacts"
-    Write-Log -Message "Settings: PublisherLevel=$($Settings.PublisherLevel), Action=$($Settings.Action), UnsignedMode=$($Settings.UnsignedMode), SkipDlls=$($Settings.SkipDlls), SkipWshScripts=$($Settings.SkipWshScripts), SkipShellScripts=$($Settings.SkipShellScripts), SkipUnsigned=$($Settings.SkipUnsigned)"
-    
-    # Show loading overlay (use try-catch - Get-Command fails in WPF context)
-    try { Show-LoadingOverlay -Message "Generating Rules..." -SubMessage "Processing $artifactCount artifacts..." } catch { }
-    
-    try {
-        # Build parameter hashtable for batch generation
-        $genParams = @{
-            Artifacts      = $script:CurrentScanArtifacts
-            Mode           = 'Smart'
-            Action         = $Settings.Action
-            Status         = $Settings.Status
-            DedupeMode     = 'Smart'
-            PublisherLevel = $Settings.PublisherLevel
-            UserOrGroupSid = $Settings.TargetSid
-            UnsignedMode   = $Settings.UnsignedMode
+
+    # Stash in $global: for background runspace and OnComplete callback
+    $global:GA_RuleGen_Window = $Window
+    $modulePath = (Get-Module GA-AppLocker).ModuleBase
+
+    # Background: import only needed sub-modules, run batch generation
+    $bgWork = {
+        param($ModulePath, $Artifacts, $GenSettings)
+        
+        # Import only the sub-modules needed for rule generation
+        $modulesDir = Join-Path $ModulePath 'Modules'
+        $requiredModules = @('GA-AppLocker.Core', 'GA-AppLocker.Storage', 'GA-AppLocker.Rules')
+        foreach ($mod in $requiredModules) {
+            $modPath = Join-Path $modulesDir "$mod\$mod.psd1"
+            if (Test-Path $modPath) { Import-Module $modPath -Force -ErrorAction Stop }
         }
-        
-        # Add skip switches if enabled
-        if ($Settings.SkipDlls) { $genParams['SkipDlls'] = $true }
-        if ($Settings.SkipWshScripts) { $genParams['SkipWshScripts'] = $true }
-        if ($Settings.SkipShellScripts) { $genParams['SkipShellScripts'] = $true }
-        if ($Settings.SkipUnsigned) { $genParams['SkipUnsigned'] = $true }
-        
-        # Use batch generation with user's settings from dialog
-        $result = Invoke-BatchRuleGeneration @genParams
-        
-        # Hide loading overlay (use try-catch - Get-Command fails in WPF context)
-        try { Hide-LoadingOverlay } catch { }
-        
-        # Show results
-        $msg = "Created $($result.RulesCreated) rules"
-        if ($result.AlreadyExisted -gt 0) { $msg += " ($($result.AlreadyExisted) already existed)" }
-        Show-Toast -Message $msg -Type 'Success'
-        Write-Log -Message "Batch generation complete: $($result.RulesCreated) created, $($result.AlreadyExisted) existed"
-        
-        # Navigate to Rules panel to see results (use try-catch - Get-Command fails in WPF context)
+
+        $genParams = @{
+            Artifacts      = $Artifacts
+            Mode           = 'Smart'
+            Action         = $GenSettings.Action
+            Status         = $GenSettings.Status
+            DedupeMode     = 'Smart'
+            PublisherLevel = $GenSettings.PublisherLevel
+            UserOrGroupSid = $GenSettings.TargetSid
+            UnsignedMode   = $GenSettings.UnsignedMode
+        }
+        if ($GenSettings.SkipDlls) { $genParams['SkipDlls'] = $true }
+        if ($GenSettings.SkipWshScripts) { $genParams['SkipWshScripts'] = $true }
+        if ($GenSettings.SkipShellScripts) { $genParams['SkipShellScripts'] = $true }
+        if ($GenSettings.SkipUnsigned) { $genParams['SkipUnsigned'] = $true }
+
+        return Invoke-BatchRuleGeneration @genParams
+    }
+
+    $onComplete = {
+        param($result)
+        $win = $global:GA_RuleGen_Window
+        if ($result -and $result.RulesCreated -ne $null) {
+            $msg = "Created $($result.RulesCreated) rules"
+            if ($result.AlreadyExisted -gt 0) { $msg += " ($($result.AlreadyExisted) already existed)" }
+            Show-Toast -Message $msg -Type 'Success'
+        }
+        else {
+            Show-Toast -Message 'Rule generation completed.' -Type 'Info'
+        }
         try { Set-ActivePanel -PanelName 'PanelRules' } catch { }
-        
-        # Auto-refresh the Rules DataGrid to show newly created rules (use try-catch - Get-Command fails in WPF context)
-        try { Update-RulesDataGrid -Window $Window } catch { }
+        try { Update-RulesDataGrid -Window $win } catch { }
+        $global:GA_RuleGen_Window = $null
     }
-    catch {
-        try { Hide-LoadingOverlay } catch { }
-        Show-Toast -Message "Generation failed: $($_.Exception.Message)" -Type 'Error'
-        Write-Log -Level Error -Message "Batch generation failed: $($_.Exception.Message)"
-    }
+
+    Invoke-BackgroundWork -ScriptBlock $bgWork `
+        -ArgumentList @($modulePath, $script:CurrentScanArtifacts, $Settings) `
+        -OnComplete $onComplete `
+        -LoadingMessage 'Generating Rules...' `
+        -LoadingSubMessage "Processing $artifactCount artifacts..." `
+        -TimeoutSeconds 300
 }
 
 function global:Invoke-DirectRuleGeneration {
     <#
     .SYNOPSIS
         Generates rules directly without wizard UI. Called after user confirmation.
+        Runs in background via Invoke-BackgroundWork to prevent UI freeze.
     #>
     param($Window)
     
     $artifactCount = $script:CurrentScanArtifacts.Count
-    Show-Toast -Message "Generating rules from $artifactCount artifacts (Smart mode)..." -Type 'Info'
     Write-Log -Message "Starting batch rule generation for $artifactCount artifacts"
-    
-    # Show loading overlay (use try-catch - Get-Command fails in WPF context)
-    try { Show-LoadingOverlay -Message "Generating Rules..." -SubMessage "Processing $artifactCount artifacts..." } catch { }
-    
-    try {
-        # Read Publisher Granularity from Rules panel ComboBox
-        $pubLevelCombo = $Window.FindName('CboPublisherLevel')
-        $publisherLevel = if ($pubLevelCombo -and $pubLevelCombo.SelectedItem -and $pubLevelCombo.SelectedItem.Tag) {
-            $tag = $pubLevelCombo.SelectedItem.Tag
-            Write-Log -Message "Publisher Granularity: $tag (from $($pubLevelCombo.SelectedItem.Content))"
-            $tag
-        } else {
-            Write-Log -Message "Publisher Granularity: PublisherProduct (default)"
-            'PublisherProduct'
+
+    # Read UI settings on the UI thread (WPF controls can only be accessed here)
+    $pubLevelCombo = $Window.FindName('CboPublisherLevel')
+    $publisherLevel = if ($pubLevelCombo -and $pubLevelCombo.SelectedItem -and $pubLevelCombo.SelectedItem.Tag) {
+        $pubLevelCombo.SelectedItem.Tag
+    } else { 'PublisherProduct' }
+
+    $rbAllow = $Window.FindName('RbRuleAllow')
+    $action = if ($rbAllow -and $rbAllow.IsChecked) { 'Allow' } else { 'Deny' }
+
+    $targetCombo = $Window.FindName('CboRuleTargetGroup')
+    $targetSid = if ($targetCombo -and $targetCombo.SelectedItem -and $targetCombo.SelectedItem.Tag) {
+        $targetCombo.SelectedItem.Tag
+    } else { 'S-1-5-11' }
+
+    $unsignedCombo = $Window.FindName('CboUnsignedMode')
+    $unsignedMode = if ($unsignedCombo -and $unsignedCombo.SelectedItem -and $unsignedCombo.SelectedItem.Tag) {
+        $unsignedCombo.SelectedItem.Tag
+    } else { 'Hash' }
+
+    $global:GA_RuleGen_Window = $Window
+    $modulePath = (Get-Module GA-AppLocker).ModuleBase
+
+    $bgWork = {
+        param($ModulePath, $Artifacts, $Action, $PublisherLevel, $TargetSid, $UnsignedMode)
+
+        $modulesDir = Join-Path $ModulePath 'Modules'
+        foreach ($mod in @('GA-AppLocker.Core', 'GA-AppLocker.Storage', 'GA-AppLocker.Rules')) {
+            $modPath = Join-Path $modulesDir "$mod\$mod.psd1"
+            if (Test-Path $modPath) { Import-Module $modPath -Force -ErrorAction Stop }
         }
-        
-        # Read Rule Action (Allow/Deny)
-        $rbAllow = $Window.FindName('RbRuleAllow')
-        $action = if ($rbAllow -and $rbAllow.IsChecked) { 'Allow' } else { 'Deny' }
-        Write-Log -Message "Rule Action: $action"
-        
-        # Read Target Group
-        $targetCombo = $Window.FindName('CboRuleTargetGroup')
-        $targetSid = if ($targetCombo -and $targetCombo.SelectedItem -and $targetCombo.SelectedItem.Tag) {
-            $targetCombo.SelectedItem.Tag
-        } else {
-            'S-1-5-11'  # Authenticated Users
+
+        return Invoke-BatchRuleGeneration -Artifacts $Artifacts `
+            -Mode 'Smart' -Action $Action -Status 'Pending' -DedupeMode 'Smart' `
+            -PublisherLevel $PublisherLevel -UserOrGroupSid $TargetSid -UnsignedMode $UnsignedMode
+    }
+
+    $onComplete = {
+        param($result)
+        $win = $global:GA_RuleGen_Window
+        if ($result -and $result.RulesCreated -ne $null) {
+            $msg = "Created $($result.RulesCreated) rules"
+            if ($result.AlreadyExisted -gt 0) { $msg += " ($($result.AlreadyExisted) already existed)" }
+            Show-Toast -Message $msg -Type 'Success'
         }
-        Write-Log -Message "Target Group SID: $targetSid"
-        
-        # Read Unsigned File Handling mode
-        $unsignedCombo = $Window.FindName('CboUnsignedMode')
-        $unsignedMode = if ($unsignedCombo -and $unsignedCombo.SelectedItem -and $unsignedCombo.SelectedItem.Tag) {
-            $tag = $unsignedCombo.SelectedItem.Tag
-            Write-Log -Message "Unsigned File Handling: $tag (from $($unsignedCombo.SelectedItem.Content))"
-            $tag
-        } else {
-            Write-Log -Message "Unsigned File Handling: Hash (default)"
-            'Hash'
+        else {
+            Show-Toast -Message 'Rule generation completed.' -Type 'Info'
         }
-        
-        # Use batch generation with user's settings
-        $result = Invoke-BatchRuleGeneration -Artifacts $script:CurrentScanArtifacts `
-            -Mode 'Smart' `
-            -Action $action `
-            -Status 'Pending' `
-            -DedupeMode 'Smart' `
-            -PublisherLevel $publisherLevel `
-            -UserOrGroupSid $targetSid `
-            -UnsignedMode $unsignedMode
-        
-        # Hide loading overlay (use try-catch - Get-Command fails in WPF context)
-        try { Hide-LoadingOverlay } catch { }
-        
-        # Show results
-        $msg = "Created $($result.RulesCreated) rules"
-        if ($result.AlreadyExisted -gt 0) { $msg += " ($($result.AlreadyExisted) already existed)" }
-        Show-Toast -Message $msg -Type 'Success'
-        Write-Log -Message "Batch generation complete: $($result.RulesCreated) created, $($result.AlreadyExisted) existed"
-        
-        # Navigate to Rules panel to see results (use try-catch - Get-Command fails in WPF context)
         try { Set-ActivePanel -PanelName 'PanelRules' } catch { }
-        
-        # Auto-refresh the Rules DataGrid to show newly created rules (use try-catch - Get-Command fails in WPF context)
-        try { Update-RulesDataGrid -Window $Window } catch { }
+        try { Update-RulesDataGrid -Window $win } catch { }
+        $global:GA_RuleGen_Window = $null
     }
-    catch {
-        try { Hide-LoadingOverlay } catch { }
-        Show-Toast -Message "Generation failed: $($_.Exception.Message)" -Type 'Error'
-        Write-Log -Level Error -Message "Batch generation failed: $($_.Exception.Message)"
-    }
+
+    Invoke-BackgroundWork -ScriptBlock $bgWork `
+        -ArgumentList @($modulePath, $script:CurrentScanArtifacts, $action, $publisherLevel, $targetSid, $unsignedMode) `
+        -OnComplete $onComplete `
+        -LoadingMessage 'Generating Rules...' `
+        -LoadingSubMessage "Processing $artifactCount artifacts..." `
+        -TimeoutSeconds 300
 }
 #endregion
 #endregion
