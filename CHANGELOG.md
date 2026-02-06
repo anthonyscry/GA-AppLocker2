@@ -2,6 +2,18 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.74] - 2026-02-06
+
+### Fixed
+- **AD Discovery false WinRM failures** -- connectivity test now uses per-host wait timeouts inside the runspace pool (instead of a shared shrinking deadline), preventing later hosts from being marked unavailable due to earlier slow hosts.
+- **Connectivity test timeout stability** -- added in-progress guard, empty-host guard, improved dynamic timeout sizing by batch count, and explicit timeout cleanup via `OnTimeout` callback.
+- **Background engine timeout cleanup gap** -- `Invoke-BackgroundWork` now supports `OnTimeout`, returns a job id, and adds `Stop-BackgroundWork` for explicit cancellation; overlay hide now occurs when all jobs are complete instead of per-job completion.
+- **Wizard preview stuck-loading failure path** -- preview step now handles null/timeout results with a safe fallback preview object and warning toast instead of remaining in loading state.
+- **Wizard cancel semantics** -- closing the wizard while preview/generation is running now cancels the active background job(s) and clears wizard job state.
+- **Rules bulk operations timeout hygiene** -- migrated operations now provide `OnTimeout` cleanup to clear operation-scoped globals and reset selection/UI safely.
+
+---
+
 ## [1.2.72] - 2026-02-06
 
 ### Fixed

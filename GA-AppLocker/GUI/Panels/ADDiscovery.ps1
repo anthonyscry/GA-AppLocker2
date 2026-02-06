@@ -687,6 +687,11 @@ function global:Invoke-ConnectivityTest {
 
     $win = if ($Window) { $Window } else { $global:GA_MainWindow }
 
+    if ($global:GA_ConnTest_InProgress) {
+        Show-Toast -Message 'Connectivity test already running. Please wait.' -Type 'Info'
+        return
+    }
+
     if ($null -eq $script:DiscoveredMachines -or $script:DiscoveredMachines.Count -eq 0) {
         Show-AppLockerMessageBox 'No machines discovered. Click "Refresh Domain" first.' 'No Machines' 'OK' 'Information'
         return
@@ -710,11 +715,17 @@ function global:Invoke-ConnectivityTest {
     }
     $hostnames = $hostnameList.ToArray()
 
+    if ($hostnames.Count -eq 0) {
+        Show-Toast -Message 'No valid hostnames selected for connectivity test.' -Type 'Warning'
+        return
+    }
+
     # Stash cross-scope data in $global: for the OnComplete callback
     # (OnComplete runs on UI thread but outside the original $script: scope)
     $global:GA_ConnTest_Machines     = $machines
     $global:GA_ConnTest_AllMachines  = $script:DiscoveredMachines
     $global:GA_ConnTest_FilterText   = $script:ADDiscovery_FilterText
+    $global:GA_ConnTest_InProgress   = $true
 
     # Self-contained background scriptblock (NO module imports)
     $bgWork = {
@@ -752,11 +763,10 @@ function global:Invoke-ConnectivityTest {
                 }).AddArgument($h).AddArgument($PingTimeoutMs)
                 [void]$jobs.Add([PSCustomObject]@{ PS = $p; Handle = $p.BeginInvoke(); Host = $h })
             }
-            $deadline = [datetime]::Now.AddSeconds($PingTimeoutMs / 1000 + 10)
+            $perPingWaitMs = [Math]::Max(1000, $PingTimeoutMs + 5000)
             foreach ($j in $jobs) {
                 try {
-                    $ms = [Math]::Max(100, ($deadline - [datetime]::Now).TotalMilliseconds)
-                    if ($j.Handle.AsyncWaitHandle.WaitOne([int]$ms)) {
+                    if ($j.Handle.AsyncWaitHandle.WaitOne([int]$perPingWaitMs)) {
                         $r = $j.PS.EndInvoke($j.Handle)
                         if ($r -and $r.Hostname) { $pingResults[$r.Hostname] = $r.Success }
                         else { $pingResults[$j.Host] = $false }
@@ -789,11 +799,10 @@ function global:Invoke-ConnectivityTest {
                 }).AddArgument($h)
                 [void]$jobs2.Add([PSCustomObject]@{ PS = $p; Handle = $p.BeginInvoke(); Host = $h })
             }
-            $deadline2 = [datetime]::Now.AddSeconds($WinrmDeadlineSec)
+            $perWinrmWaitMs = [Math]::Max(1000, $WinrmDeadlineSec * 1000)
             foreach ($j in $jobs2) {
                 try {
-                    $ms = [Math]::Max(100, ($deadline2 - [datetime]::Now).TotalMilliseconds)
-                    if ($j.Handle.AsyncWaitHandle.WaitOne([int]$ms)) {
+                    if ($j.Handle.AsyncWaitHandle.WaitOne([int]$perWinrmWaitMs)) {
                         $r = $j.PS.EndInvoke($j.Handle)
                         if ($r -and $r.Hostname) { $winrmResults[$r.Hostname] = $r.Available }
                         else { $winrmResults[$j.Host] = $false }
@@ -878,14 +887,33 @@ function global:Invoke-ConnectivityTest {
         $global:GA_ConnTest_Machines    = $null
         $global:GA_ConnTest_AllMachines = $null
         $global:GA_ConnTest_FilterText  = $null
+        $global:GA_ConnTest_InProgress  = $false
     }
 
-    # Timeout scales with machine count: base 45s + 2s per machine (WinRM can be slow on air-gapped nets)
-    $dynamicTimeout = [Math]::Max(60, 45 + ($hostnames.Count * 2))
+    $onTimeout = {
+        param($TimeoutMessage)
+        $win = $global:GA_MainWindow
+        if ($win) {
+            $mc = $win.FindName('DiscoveryMachineCount')
+            if ($mc) { $mc.Text = 'Connectivity test timed out' }
+        }
+        Show-Toast -Message "$TimeoutMessage Try fewer machines or re-run connectivity test." -Type 'Warning'
+
+        # Cleanup globals
+        $global:GA_ConnTest_Machines    = $null
+        $global:GA_ConnTest_AllMachines = $null
+        $global:GA_ConnTest_FilterText  = $null
+        $global:GA_ConnTest_InProgress  = $false
+    }
+
+    # Scale timeout by runspace batches (20 max concurrency)
+    $batchCount = [Math]::Ceiling([double]$hostnames.Count / 20.0)
+    $dynamicTimeout = [Math]::Max(90, [int](60 + ($batchCount * 45)))
 
     Invoke-BackgroundWork -ScriptBlock $bgWork `
         -ArgumentList @($hostnames, 5000, 30) `
         -OnComplete $onComplete `
+        -OnTimeout $onTimeout `
         -LoadingMessage 'Testing connectivity...' `
         -LoadingSubMessage "Checking $($hostnames.Count) machines (ping + WinRM)" `
         -TimeoutSeconds $dynamicTimeout

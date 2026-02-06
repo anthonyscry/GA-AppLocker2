@@ -30,6 +30,8 @@ $script:WizardState = @{
         DedupeMode     = 'Smart'
     }
     IsGenerating    = $false
+    PreviewJobId    = $null
+    GenerationJobId = $null
     GenerationResult = $null
 }
 #endregion
@@ -47,6 +49,8 @@ function global:Initialize-RuleGenerationWizard {
     $script:WizardState.Preview = $null
     $script:WizardState.GenerationResult = $null
     $script:WizardState.IsGenerating = $false
+    $script:WizardState.PreviewJobId = $null
+    $script:WizardState.GenerationJobId = $null
     
     # Calculate artifact summary
     $script:WizardState.ArtifactSummary = Get-ArtifactSummary -Artifacts $Artifacts
@@ -240,15 +244,50 @@ function global:Show-WizardStep2 {
 
     $onComplete = {
         param($Result)
+        $script:WizardState.PreviewJobId = $null
         if ($Result) {
             $script:WizardState.Preview = $Result
             Update-WizardPreviewUI -Preview $Result
         }
+        else {
+            $fallback = [PSCustomObject]@{
+                TotalArtifacts      = if ($script:WizardState.Artifacts) { $script:WizardState.Artifacts.Count } else { 0 }
+                AfterExclusions     = 0
+                AfterDedup          = 0
+                NewRulesToCreate    = 0
+                ExistingRules       = 0
+                EstimatedPublisher  = 0
+                EstimatedHash       = 0
+                SampleRules         = @()
+            }
+            $script:WizardState.Preview = $fallback
+            Update-WizardPreviewUI -Preview $fallback
+            try { Show-Toast -Message 'Preview failed. Please retry.' -Type 'Warning' } catch { }
+        }
     }
 
-    Invoke-BackgroundWork -ScriptBlock $bgWork `
+    $onTimeout = {
+        param($TimeoutMessage)
+        $script:WizardState.PreviewJobId = $null
+        $fallback = [PSCustomObject]@{
+            TotalArtifacts      = if ($script:WizardState.Artifacts) { $script:WizardState.Artifacts.Count } else { 0 }
+            AfterExclusions     = 0
+            AfterDedup          = 0
+            NewRulesToCreate    = 0
+            ExistingRules       = 0
+            EstimatedPublisher  = 0
+            EstimatedHash       = 0
+            SampleRules         = @()
+        }
+        $script:WizardState.Preview = $fallback
+        Update-WizardPreviewUI -Preview $fallback
+        try { Show-Toast -Message $TimeoutMessage -Type 'Warning' } catch { }
+    }
+
+    $script:WizardState.PreviewJobId = Invoke-BackgroundWork -ScriptBlock $bgWork `
         -ArgumentList @($modulePath, $artifacts, $settings) `
         -OnComplete $onComplete `
+        -OnTimeout $onTimeout `
         -LoadingMessage 'Calculating preview...' `
         -TimeoutSeconds 60
     
@@ -396,9 +435,18 @@ function global:Start-WizardBatchGeneration {
         }
     }
 
-    Invoke-BackgroundWork -ScriptBlock $bgWork `
+    $onTimeout = {
+        param($TimeoutMessage)
+        Complete-WizardGeneration -Result @{
+            Success = $false
+            Errors = @($TimeoutMessage)
+        }
+    }
+
+    $script:WizardState.GenerationJobId = Invoke-BackgroundWork -ScriptBlock $bgWork `
         -ArgumentList @($modulePath, $artifacts, $settings) `
         -OnComplete $onComplete `
+        -OnTimeout $onTimeout `
         -LoadingMessage 'Generating rules...' `
         -LoadingSubMessage 'Batch processing artifacts...' `
         -TimeoutSeconds 300
@@ -408,6 +456,7 @@ function global:Complete-WizardGeneration {
     param([PSCustomObject]$Result)
     
     $script:WizardState.IsGenerating = $false
+    $script:WizardState.GenerationJobId = $null
     $script:WizardState.GenerationResult = $Result
     
     # Update UI on main thread
@@ -531,6 +580,17 @@ function global:Close-RuleGenerationWizard {
     $wizard = $global:GA_MainWindow.FindName('RuleWizardOverlay')
     if ($wizard) {
         $wizard.Visibility = 'Collapsed'
+    }
+
+    # Stop any in-flight preview/generation job when closing
+    if ($script:WizardState.GenerationJobId) {
+        try { [void](Stop-BackgroundWork -JobId $script:WizardState.GenerationJobId -SuppressToast) } catch { }
+        $script:WizardState.GenerationJobId = $null
+        try { Show-Toast -Message 'Rule generation canceled.' -Type 'Info' } catch { }
+    }
+    if ($script:WizardState.PreviewJobId) {
+        try { [void](Stop-BackgroundWork -JobId $script:WizardState.PreviewJobId -SuppressToast) } catch { }
+        $script:WizardState.PreviewJobId = $null
     }
     
     # Reset state

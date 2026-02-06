@@ -132,6 +132,8 @@ function global:Invoke-BackgroundWork {
 
         [scriptblock]$OnComplete,
 
+        [scriptblock]$OnTimeout,
+
         [string]$LoadingMessage = 'Processing...',
         [string]$LoadingSubMessage = '',
 
@@ -167,10 +169,46 @@ function global:Invoke-BackgroundWork {
         StartTime  = [DateTime]::UtcNow
         Timeout    = $TimeoutSeconds
         OnComplete = $OnComplete
+        OnTimeout  = $OnTimeout
     }
 
     # Ensure the shared monitor timer is running
     global:Start-BackgroundMonitor
+
+    return $jobId
+}
+
+function global:Stop-BackgroundWork {
+    <# Stops a specific background job by JobId. #>
+    param(
+        [Parameter(Mandatory)]
+        [string]$JobId,
+
+        [switch]$SuppressToast
+    )
+
+    if (-not $global:GA_BackgroundJobs -or -not $global:GA_BackgroundJobs.ContainsKey($JobId)) {
+        return $false
+    }
+
+    $job = $global:GA_BackgroundJobs[$JobId]
+    try { $job.PS.Stop() } catch { }
+    try { $job.PS.Dispose() } catch { }
+    try { $job.Runspace.Close(); $job.Runspace.Dispose() } catch { }
+    [void]$global:GA_BackgroundJobs.Remove($JobId)
+
+    if ($global:GA_BackgroundJobs.Count -eq 0) {
+        try { Hide-LoadingOverlay } catch { }
+        if ($global:GA_BackgroundTimer) {
+            try { $global:GA_BackgroundTimer.Stop() } catch { }
+        }
+    }
+
+    if (-not $SuppressToast) {
+        try { Show-Toast -Message 'Background operation canceled.' -Type 'Info' } catch { }
+    }
+
+    return $true
 }
 
 function global:Start-BackgroundMonitor {
@@ -185,6 +223,7 @@ function global:Start-BackgroundMonitor {
         $global:GA_BackgroundTimer.Add_Tick({
             if (-not $global:GA_BackgroundJobs -or $global:GA_BackgroundJobs.Count -eq 0) {
                 # No jobs -- stop the timer to save CPU
+                try { Hide-LoadingOverlay } catch { }
                 $global:GA_BackgroundTimer.Stop()
                 return
             }
@@ -209,8 +248,20 @@ function global:Start-BackgroundMonitor {
                     try { $job.PS.Stop() } catch { }
                     try { $job.PS.Dispose() } catch { }
                     try { $job.Runspace.Close(); $job.Runspace.Dispose() } catch { }
-                    Hide-LoadingOverlay
-                    Show-Toast -Message "Operation timed out after $($job.Timeout)s." -Type 'Warning'
+
+                    $timeoutMessage = "Operation timed out after $($job.Timeout)s."
+                    if ($job.OnTimeout) {
+                        try {
+                            & $job.OnTimeout $timeoutMessage
+                        }
+                        catch {
+                            try { Show-Toast -Message "Error: $($_.Exception.Message)" -Type 'Error' } catch { }
+                            try { Write-AppLockerLog -Message "OnTimeout error: $($_.Exception.Message)" -Level ERROR -NoConsole } catch { }
+                        }
+                    }
+                    else {
+                        try { Show-Toast -Message $timeoutMessage -Type 'Warning' } catch { }
+                    }
                     continue
                 }
 
@@ -227,9 +278,6 @@ function global:Start-BackgroundMonitor {
                 # Cleanup runspace
                 try { $job.PS.Dispose() } catch { }
                 try { $job.Runspace.Close(); $job.Runspace.Dispose() } catch { }
-
-                # Hide overlay and invoke completion callback on UI thread
-                Hide-LoadingOverlay
 
                 if ($job.OnComplete) {
                     try {
@@ -249,6 +297,7 @@ function global:Start-BackgroundMonitor {
 
             # Auto-stop timer when no jobs remain
             if ($global:GA_BackgroundJobs.Count -eq 0) {
+                try { Hide-LoadingOverlay } catch { }
                 $global:GA_BackgroundTimer.Stop()
             }
         })

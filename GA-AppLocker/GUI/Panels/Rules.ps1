@@ -804,9 +804,21 @@ function global:Set-SelectedRuleStatus {
             $global:GA_BulkStatus_Status = $null
         }
 
+        $onTimeout = {
+            param($TimeoutMessage)
+            $win = $global:GA_BulkStatus_Window
+            if ($win) {
+                try { Reset-RulesSelectionState -Window $win } catch { }
+            }
+            $global:GA_BulkStatus_Window = $null
+            $global:GA_BulkStatus_Status = $null
+            Show-Toast -Message $TimeoutMessage -Type 'Warning'
+        }
+
         Invoke-BackgroundWork -ScriptBlock $bgWork `
             -ArgumentList @($ruleIds, $Status, $rulesPath, $modulePath) `
             -OnComplete $onComplete `
+            -OnTimeout $onTimeout `
             -LoadingMessage "Updating $count rules to '$Status'..." `
             -LoadingSubMessage 'Please wait' `
             -TimeoutSeconds 120
@@ -945,9 +957,23 @@ function global:Invoke-DeleteSelectedRules {
         $global:GA_Delete_Window  = $null
     }
 
+    $onTimeout = {
+        param($TimeoutMessage)
+        $win = $global:GA_Delete_Window
+        if ($win) {
+            try { Reset-RulesSelectionState -Window $win } catch { }
+            try { Update-RulesDataGrid -Window $win } catch { }
+        }
+        $global:GA_Delete_RuleIds = $null
+        $global:GA_Delete_Count   = $null
+        $global:GA_Delete_Window  = $null
+        Show-Toast -Message $TimeoutMessage -Type 'Warning'
+    }
+
     Invoke-BackgroundWork -ScriptBlock $bgWork `
         -ArgumentList @($idsToDelete, $rulesPath) `
         -OnComplete $onComplete `
+        -OnTimeout $onTimeout `
         -LoadingMessage "Deleting $count rules..." `
         -LoadingSubMessage 'Removing files...' `
         -TimeoutSeconds 60
@@ -996,9 +1022,16 @@ function global:Invoke-ApproveTrustedVendors {
         $global:GA_ApproveTrusted_Window = $null
     }
 
+    $onTimeout = {
+        param($TimeoutMessage)
+        $global:GA_ApproveTrusted_Window = $null
+        Show-Toast -Message $TimeoutMessage -Type 'Warning'
+    }
+
     Invoke-BackgroundWork -ScriptBlock $bgWork `
         -ArgumentList @($modulePath) `
         -OnComplete $onComplete `
+        -OnTimeout $onTimeout `
         -LoadingMessage 'Approving trusted vendor rules...' `
         -TimeoutSeconds 120
 }
@@ -1061,9 +1094,16 @@ function global:Invoke-RemoveDuplicateRules {
             $global:GA_Dedupe_Window = $null
         }
 
+        $onTimeout = {
+            param($TimeoutMessage)
+            $global:GA_Dedupe_Window = $null
+            Show-Toast -Message $TimeoutMessage -Type 'Warning'
+        }
+
         Invoke-BackgroundWork -ScriptBlock $bgWork `
             -ArgumentList @($modulePath) `
             -OnComplete $onComplete `
+            -OnTimeout $onTimeout `
             -LoadingMessage 'Removing duplicate rules...' `
             -TimeoutSeconds 120
     }
@@ -1782,9 +1822,21 @@ function global:Invoke-ChangeSelectedRulesAction {
                 $global:GA_BulkAction_NewAction = $null
             }
 
+            $onTimeout = {
+                param($TimeoutMessage)
+                $win = $global:GA_BulkAction_Window
+                if ($win) {
+                    try { Reset-RulesSelectionState -Window $win } catch { }
+                }
+                $global:GA_BulkAction_Window = $null
+                $global:GA_BulkAction_NewAction = $null
+                Show-Toast -Message $TimeoutMessage -Type 'Warning'
+            }
+
             Invoke-BackgroundWork -ScriptBlock $bgWork `
                 -ArgumentList @($ruleIds, $newAction, $rulesPath, $modulePath) `
                 -OnComplete $onComplete `
+                -OnTimeout $onTimeout `
                 -LoadingMessage "Changing action to '$newAction'..." `
                 -LoadingSubMessage "$count rule(s)" `
                 -TimeoutSeconds 120
@@ -2010,9 +2062,22 @@ function global:Invoke-ChangeSelectedRulesGroup {
                 $global:GA_BulkGroup_Sid = $null
             }
 
+            $onTimeout = {
+                param($TimeoutMessage)
+                $win = $global:GA_BulkGroup_Window
+                if ($win) {
+                    try { Reset-RulesSelectionState -Window $win } catch { }
+                }
+                $global:GA_BulkGroup_Window = $null
+                $global:GA_BulkGroup_GroupName = $null
+                $global:GA_BulkGroup_Sid = $null
+                Show-Toast -Message $TimeoutMessage -Type 'Warning'
+            }
+
             Invoke-BackgroundWork -ScriptBlock $bgWork `
                 -ArgumentList @($ruleIds, $targetSid, $rulesPath, $modulePath) `
                 -OnComplete $onComplete `
+                -OnTimeout $onTimeout `
                 -LoadingMessage "Changing target group to '$groupName'..." `
                 -LoadingSubMessage "$count rule(s)" `
                 -TimeoutSeconds 120
