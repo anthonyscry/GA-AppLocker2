@@ -2,6 +2,26 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.71] - 2026-02-06
+
+### Redesigned - Centralized Background Work Engine
+Complete rethink of how background operations work in the WPF UI. Replaces all ad-hoc runspace + DispatcherTimer + `.GetNewClosure()` patterns with a single reliable `Invoke-BackgroundWork` engine.
+
+**Architecture:**
+- New `global:Invoke-BackgroundWork` function in UIHelpers.ps1
+- ALL job state stored in `$global:GA_BackgroundJobs` (zero `$script:` in callbacks -- eliminates PS scope bug)
+- ONE shared `DispatcherTimer` monitors all background jobs (no per-job timers)
+- NO `.GetNewClosure()` on the timer tick (the root cause of every previous failure)
+- Bare MTA runspaces with NO module imports (instant startup vs 10-30s hangs)
+- OnComplete callbacks run on UI thread using `$global:` for cross-scope data
+
+**Operations fixed:**
+- **Test Connectivity** -- rewired to `Invoke-BackgroundWork` with inline ping/WinRM (30s deadline)
+- **Bulk Delete** (1400+ rules) -- file I/O in background runspace, index update on UI thread (60s deadline)
+- **Local/Remote Scanner** -- runspace changed from STA to MTA, imports only 3 sub-modules (Core + Scanning + Credentials) instead of all 10
+
+---
+
 ## [1.2.70] - 2026-02-06
 
 ### Fixed

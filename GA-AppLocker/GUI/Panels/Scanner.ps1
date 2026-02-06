@@ -378,14 +378,14 @@ function global:Invoke-StartArtifactScan {
             StatusText = "Initializing scan..."
         })
 
-    # Create and start the background runspace
+    # Create and start the background runspace (MTA -- no STA/ReuseThread overhead)
     $script:ScanRunspace = [runspacefactory]::CreateRunspace()
-    $script:ScanRunspace.ApartmentState = 'STA'
-    $script:ScanRunspace.ThreadOptions = 'ReuseThread'
+    $script:ScanRunspace.ApartmentState = 'MTA'
     $script:ScanRunspace.Open()
     $script:ScanRunspace.SessionStateProxy.SetVariable('SyncHash', $script:ScanSyncHash)
 
-    # Import module path for the runspace
+    # Import ONLY the scanning sub-modules (not the full 10-module root GA-AppLocker.psd1)
+    # This avoids importing GUI, Deployment, Validation, etc. which are not needed for scanning
     $modulePath = (Get-Module GA-AppLocker).ModuleBase
     $script:ScanRunspace.SessionStateProxy.SetVariable('ModulePath', $modulePath)
 
@@ -396,16 +396,17 @@ function global:Invoke-StartArtifactScan {
             param($SyncHash, $ModulePath)
         
             try {
-                # Import the module in this runspace
-                $SyncHash.StatusText = "Loading modules..."
+                $SyncHash.StatusText = "Loading scan modules..."
                 $SyncHash.Progress = 15
             
-                $manifestPath = Join-Path $ModulePath "GA-AppLocker.psd1"
-                if (Test-Path $manifestPath) {
-                    Import-Module $manifestPath -Force -ErrorAction Stop
-                }
-                else {
-                    throw "Module not found at: $manifestPath"
+                # Import only the sub-modules needed for scanning (fast: 3 modules instead of 10)
+                $modulesDir = Join-Path $ModulePath 'Modules'
+                $requiredModules = @('GA-AppLocker.Core', 'GA-AppLocker.Scanning', 'GA-AppLocker.Credentials')
+                foreach ($mod in $requiredModules) {
+                    $modPath = Join-Path $modulesDir "$mod\$mod.psd1"
+                    if (Test-Path $modPath) {
+                        Import-Module $modPath -Force -ErrorAction Stop
+                    }
                 }
             
                 $machineCount = if ($SyncHash.Params.Machines) { $SyncHash.Params.Machines.Count } else { 0 }
@@ -413,7 +414,7 @@ function global:Invoke-StartArtifactScan {
                 $SyncHash.StatusText = "Scanning ${localText}${machineCount} remote machine(s)..."
                 $SyncHash.Progress = 25
             
-                # Execute the scan - clone params and add SyncHash for progress reporting
+                # Execute the scan
                 $scanParams = @{}
                 foreach ($key in $SyncHash.Params.Keys) {
                     $scanParams[$key] = $SyncHash.Params[$key]

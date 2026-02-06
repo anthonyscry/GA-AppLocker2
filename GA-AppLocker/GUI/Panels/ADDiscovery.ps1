@@ -680,21 +680,6 @@ function global:Get-CheckedMachines {
 }
 
 function global:Invoke-ConnectivityTest {
-    <#
-    .SYNOPSIS
-        Tests connectivity for selected (or all) discovered machines using a lightweight
-        background runspace -- NO full module import, NO Invoke-AsyncOperation.
-    .DESCRIPTION
-        Previous approach used Invoke-AsyncOperation which imported the entire GA-AppLocker
-        module (10 sub-modules, ~195 functions) into a background runspace. The module import
-        could hang or take 10-30 seconds, and if it failed the synchronous fallback blocked
-        the WPF STA thread permanently (Test-WSMan has no built-in timeout on air-gapped networks).
-
-        This rewrite embeds the ping + WinRM logic INLINE in the runspace scriptblock so
-        no Import-Module is needed. A DispatcherTimer polls for completion every 200 ms
-        with a hard 30-second deadline. If the background work exceeds the deadline the
-        runspace is killed and the overlay is dismissed with a timeout toast.
-    #>
     param(
         $Window,
         [switch]$Async
@@ -710,40 +695,29 @@ function global:Invoke-ConnectivityTest {
     $machineCount = $win.FindName('DiscoveryMachineCount')
     if ($machineCount) { $machineCount.Text = 'Testing connectivity...' }
 
-    # Use selected machines if any are selected; otherwise fall back to all discovered machines
     $checkedMachines = @(Get-CheckedMachines -Window $win)
-    try { Write-AppLockerLog -Message "Invoke-ConnectivityTest: Get-CheckedMachines returned $($checkedMachines.Count) machines" -Level DEBUG -NoConsole } catch { }
-
     if ($checkedMachines.Count -gt 0) {
         $machines = $checkedMachines
-        if ($machineCount) { $machineCount.Text = "Testing $($machines.Count) selected machines..." }
-        try { Write-AppLockerLog -Message "Invoke-ConnectivityTest: Testing $($machines.Count) SELECTED machines" -Level INFO -NoConsole } catch { }
     }
     else {
         $machines = $script:DiscoveredMachines
-        try { Write-AppLockerLog -Message "Invoke-ConnectivityTest: No selection, testing ALL $($machines.Count) discovered machines" -Level INFO -NoConsole } catch { }
     }
 
-    # --- Build a plain array of hostnames (serializable) to pass into the runspace ---
+    # Build plain hostname array (serializable for background runspace)
     $hostnameList = [System.Collections.Generic.List[string]]::new()
     foreach ($m in $machines) {
-        if ($m.Hostname) { [void]$hostnameList.Add([string]$m.Hostname) }
+        if ($m -and $m.Hostname) { [void]$hostnameList.Add([string]$m.Hostname) }
     }
     $hostnames = $hostnameList.ToArray()
 
-    # Show loading overlay
-    Show-LoadingOverlay -Message 'Testing connectivity...' -SubMessage "Checking $($hostnames.Count) machines"
+    # Stash cross-scope data in $global: for the OnComplete callback
+    # (OnComplete runs on UI thread but outside the original $script: scope)
+    $global:GA_ConnTest_Machines     = $machines
+    $global:GA_ConnTest_AllMachines  = $script:DiscoveredMachines
+    $global:GA_ConnTest_FilterText   = $script:ADDiscovery_FilterText
 
-    # --- Create a lightweight runspace — NO module import ---
-    $runspace = [runspacefactory]::CreateRunspace()
-    $runspace.ApartmentState = 'MTA'
-    $runspace.Open()
-
-    $ps = [powershell]::Create()
-    $ps.Runspace = $runspace
-
-    # Self-contained scriptblock: ping via WMI, WinRM via Test-WSMan, with deadlines
-    [void]$ps.AddScript({
+    # Self-contained background scriptblock (NO module imports)
+    $bgWork = {
         param([string[]]$Hostnames, [int]$PingTimeoutMs, [int]$WinrmDeadlineSec)
 
         $pingResults = @{}
@@ -751,7 +725,7 @@ function global:Invoke-ConnectivityTest {
         $onlineCount = 0
         $winrmCount = 0
 
-        # --- Ping phase: parallel runspace pool ---
+        # Ping phase: parallel runspace pool
         if ($Hostnames.Count -le 5) {
             foreach ($h in $Hostnames) {
                 try {
@@ -776,8 +750,7 @@ function global:Invoke-ConnectivityTest {
                     }
                     catch { return @{ Hostname = $hn; Success = $false } }
                 }).AddArgument($h).AddArgument($PingTimeoutMs)
-                $handle = $p.BeginInvoke()
-                [void]$jobs.Add([PSCustomObject]@{ PS = $p; Handle = $handle; Host = $h })
+                [void]$jobs.Add([PSCustomObject]@{ PS = $p; Handle = $p.BeginInvoke(); Host = $h })
             }
             $deadline = [datetime]::Now.AddSeconds($PingTimeoutMs / 1000 + 10)
             foreach ($j in $jobs) {
@@ -796,13 +769,12 @@ function global:Invoke-ConnectivityTest {
             $pool.Close(); $pool.Dispose()
         }
 
-        # Count online
         $onlineHosts = [System.Collections.Generic.List[string]]::new()
         foreach ($h in $Hostnames) {
             if ($pingResults[$h]) { $onlineCount++; [void]$onlineHosts.Add($h) }
         }
 
-        # --- WinRM phase: parallel runspace pool for online hosts only ---
+        # WinRM phase: parallel runspace pool for online hosts
         if ($onlineHosts.Count -gt 0) {
             $pool2 = [RunspaceFactory]::CreateRunspacePool(1, [Math]::Min(20, $onlineHosts.Count))
             $pool2.Open()
@@ -812,14 +784,10 @@ function global:Invoke-ConnectivityTest {
                 $p.RunspacePool = $pool2
                 [void]$p.AddScript({
                     param($hn)
-                    try {
-                        $null = Test-WSMan -ComputerName $hn -ErrorAction Stop
-                        return @{ Hostname = $hn; Available = $true }
-                    }
+                    try { $null = Test-WSMan -ComputerName $hn -ErrorAction Stop; return @{ Hostname = $hn; Available = $true } }
                     catch { return @{ Hostname = $hn; Available = $false } }
                 }).AddArgument($h)
-                $handle = $p.BeginInvoke()
-                [void]$jobs2.Add([PSCustomObject]@{ PS = $p; Handle = $handle; Host = $h })
+                [void]$jobs2.Add([PSCustomObject]@{ PS = $p; Handle = $p.BeginInvoke(); Host = $h })
             }
             $deadline2 = [datetime]::Now.AddSeconds($WinrmDeadlineSec)
             foreach ($j in $jobs2) {
@@ -836,159 +804,88 @@ function global:Invoke-ConnectivityTest {
                 finally { $j.PS.Dispose() }
             }
             $pool2.Close(); $pool2.Dispose()
-
-            foreach ($h in $onlineHosts) {
-                if ($winrmResults[$h]) { $winrmCount++ }
-            }
+            foreach ($h in $onlineHosts) { if ($winrmResults[$h]) { $winrmCount++ } }
         }
 
-        return @{
-            PingResults  = $pingResults
-            WinrmResults = $winrmResults
-            OnlineCount  = $onlineCount
-            WinrmCount   = $winrmCount
-            TotalCount   = $Hostnames.Count
-        }
-    })
-    [void]$ps.AddArgument($hostnames)   # Hostnames
-    [void]$ps.AddArgument(5000)          # PingTimeoutMs (5 s)
-    [void]$ps.AddArgument(15)            # WinrmDeadlineSec (15 s hard cap)
-
-    $asyncResult = $ps.BeginInvoke()
-
-    # --- DispatcherTimer polls for completion, hard 30 s deadline ---
-    $timer = [System.Windows.Threading.DispatcherTimer]::new()
-    $timer.Interval = [TimeSpan]::FromMilliseconds(200)
-
-    # CRITICAL: $script: variables are NOT accessible inside .GetNewClosure() -- the closure
-    # creates its own module scope so $script: resolves to THAT module's private scope (always $null).
-    # Lesson #2 from CLAUDE.md. We must pass all cross-scope data through $ctx.
-    $allDiscoveredMachines = $script:DiscoveredMachines   # capture by reference
-    $currentFilterText     = $script:ADDiscovery_FilterText
-
-    $ctx = @{
-        PS            = $ps
-        Runspace      = $runspace
-        AsyncResult   = $asyncResult
-        Timer         = $timer
-        StartTime     = [DateTime]::UtcNow
-        Deadline      = 30
-        Machines      = $machines               # subset being tested
-        AllMachines   = $allDiscoveredMachines   # full list (same reference as $script:DiscoveredMachines)
-        FilterText    = $currentFilterText
-        Win           = $win
+        return @{ PingResults = $pingResults; WinrmResults = $winrmResults; OnlineCount = $onlineCount; WinrmCount = $winrmCount; TotalCount = $Hostnames.Count }
     }
 
-    $timer.Add_Tick({
-        $c = $ctx
-        if ($null -eq $c) { return }   # safety: closure captured nothing
+    # OnComplete runs on UI thread -- uses $global: for cross-scope data
+    $onComplete = {
+        param($bg)
+        $win = $global:GA_MainWindow
+        $machines     = $global:GA_ConnTest_Machines
+        $allMachines  = $global:GA_ConnTest_AllMachines
+        $filterText   = $global:GA_ConnTest_FilterText
 
-        $elapsed = ([DateTime]::UtcNow - $c.StartTime).TotalSeconds
-        $done = $false
+        # Map results onto machine objects
+        foreach ($m in $machines) {
+            if ($null -eq $m) { continue }
+            $h = $m.Hostname
+            $isOnline = $false
+            if ($bg -and $bg.PingResults -and $bg.PingResults.ContainsKey($h)) {
+                $isOnline = [bool]$bg.PingResults[$h]
+            }
+            if ($m.PSObject.Properties['IsOnline']) { $m.IsOnline = $isOnline }
+            else { $m | Add-Member -NotePropertyName 'IsOnline' -NotePropertyValue $isOnline -Force }
 
-        try { $done = $c.AsyncResult.IsCompleted } catch { $done = $true }
-        $timedOut = ($elapsed -ge $c.Deadline)
-
-        if (-not $done -and -not $timedOut) { return }
-
-        # --- Stop timer first ---
-        $c.Timer.Stop()
-
-        if ($timedOut -and -not $done) {
-            try { $c.PS.Stop() } catch { }
-            try { $c.PS.Dispose(); $c.Runspace.Close(); $c.Runspace.Dispose() } catch { }
-            Hide-LoadingOverlay
-            $mc = $c.Win.FindName('DiscoveryMachineCount')
-            if ($mc) { $mc.Text = 'Connectivity test timed out (30 s)' }
-            Show-Toast -Message 'Connectivity test timed out after 30 seconds.' -Type 'Warning'
-            try { Write-AppLockerLog -Message 'Connectivity test timed out after 30 s' -Level WARNING -NoConsole } catch { }
-            return
-        }
-
-        # --- Completed normally: harvest results ---
-        try {
-            $output = $c.PS.EndInvoke($c.AsyncResult)
-            $bg = if ($output -and $output.Count -gt 0) { $output[0] } else { $null }
-
-            # Map background results back onto machine objects
-            foreach ($m in $c.Machines) {
-                if ($null -eq $m) { continue }
-                $h = $m.Hostname
-                $isOnline = $false
-                if ($bg -and $bg.PingResults -and $bg.PingResults.ContainsKey($h)) {
-                    $isOnline = [bool]$bg.PingResults[$h]
+            $winrmStatus = 'Offline'
+            if ($isOnline) {
+                $winrmAvail = $false
+                if ($bg -and $bg.WinrmResults -and $bg.WinrmResults.ContainsKey($h)) {
+                    $winrmAvail = [bool]$bg.WinrmResults[$h]
                 }
-                if ($m.PSObject.Properties['IsOnline']) { $m.IsOnline = $isOnline }
-                else { $m | Add-Member -NotePropertyName 'IsOnline' -NotePropertyValue $isOnline -Force }
-
-                $winrmStatus = 'Offline'
-                if ($isOnline) {
-                    $winrmAvail = $false
-                    if ($bg -and $bg.WinrmResults -and $bg.WinrmResults.ContainsKey($h)) {
-                        $winrmAvail = [bool]$bg.WinrmResults[$h]
-                    }
-                    $winrmStatus = if ($winrmAvail) { 'Available' } else { 'Unavailable' }
-                }
-                if ($m.PSObject.Properties['WinRMStatus']) { $m.WinRMStatus = $winrmStatus }
-                else { $m | Add-Member -NotePropertyName 'WinRMStatus' -NotePropertyValue $winrmStatus -Force }
+                $winrmStatus = if ($winrmAvail) { 'Available' } else { 'Unavailable' }
             }
-
-            # Merge tested machines back into full discovered list (via $ctx reference, NOT $script:)
-            $testedByHost = @{}
-            foreach ($m in $c.Machines) {
-                if ($null -ne $m -and $m.Hostname) { $testedByHost[$m.Hostname] = $m }
-            }
-            if ($c.AllMachines -and $c.AllMachines.Count -gt 0) {
-                for ($i = 0; $i -lt $c.AllMachines.Count; $i++) {
-                    $h_ = $c.AllMachines[$i].Hostname
-                    if ($h_ -and $testedByHost.ContainsKey($h_)) {
-                        $c.AllMachines[$i] = $testedByHost[$h_]
-                    }
-                }
-            }
-
-            # Refresh DataGrid (respecting active text filter)
-            $machinesForGrid = if ($c.AllMachines) { $c.AllMachines } else { $c.Machines }
-            $activeFilterText = if ($c.FilterText) { $c.FilterText.Trim() } else { '' }
-            if (-not [string]::IsNullOrWhiteSpace($activeFilterText)) {
-                $machinesForGrid = @($machinesForGrid | Where-Object {
-                    $_ -ne $null -and (
-                        $_.Hostname -like "*$activeFilterText*" -or
-                        $_.MachineType -like "*$activeFilterText*" -or
-                        $_.OperatingSystem -like "*$activeFilterText*" -or
-                        $_.DistinguishedName -like "*$activeFilterText*"
-                    )
-                })
-            }
-            Update-MachineDataGrid -Window $c.Win -Machines $machinesForGrid
-            $dataGrid = $c.Win.FindName('MachineDataGrid')
-            if ($dataGrid) { $dataGrid.Items.Refresh() }
-            try { Request-UiRender -Window $c.Win } catch { }
-            try { Update-WorkflowBreadcrumb -Window $c.Win } catch { }
-
-            $onlineN  = if ($bg) { $bg.OnlineCount } else { 0 }
-            $winrmN   = if ($bg) { $bg.WinrmCount } else { 0 }
-            $totalN   = if ($bg) { $bg.TotalCount } else { 0 }
-
-            Hide-LoadingOverlay
-            $mc = $c.Win.FindName('DiscoveryMachineCount')
-            if ($mc) { $mc.Text = "$onlineN/$totalN online, $winrmN WinRM" }
-            Show-Toast -Message "Connectivity complete. WinRM available: $winrmN. Return to Scanner to select targets." -Type 'Info'
-            try { global:Update-WinRMAvailableCount -Window $c.Win } catch { }
+            if ($m.PSObject.Properties['WinRMStatus']) { $m.WinRMStatus = $winrmStatus }
+            else { $m | Add-Member -NotePropertyName 'WinRMStatus' -NotePropertyValue $winrmStatus -Force }
         }
-        catch {
-            Hide-LoadingOverlay
-            $mc = $c.Win.FindName('DiscoveryMachineCount')
-            if ($mc) { $mc.Text = "Error: $($_.Exception.Message)" }
-            try { Write-AppLockerLog -Message "Connectivity test error: $($_.Exception.Message)" -Level ERROR -NoConsole } catch { }
-        }
-        finally {
-            try { $c.PS.Dispose(); $c.Runspace.Close(); $c.Runspace.Dispose() } catch { }
-        }
-    }.GetNewClosure())
 
-    $timer.Start()
-    try { Write-AppLockerLog -Message "Invoke-ConnectivityTest: lightweight runspace launched, 30 s deadline" -Level INFO -NoConsole } catch { }
+        # Merge tested machines back into the full discovered list
+        $testedByHost = @{}
+        foreach ($m in $machines) {
+            if ($null -ne $m -and $m.Hostname) { $testedByHost[$m.Hostname] = $m }
+        }
+        if ($allMachines -and $allMachines.Count -gt 0) {
+            for ($i = 0; $i -lt $allMachines.Count; $i++) {
+                $h_ = $allMachines[$i].Hostname
+                if ($h_ -and $testedByHost.ContainsKey($h_)) { $allMachines[$i] = $testedByHost[$h_] }
+            }
+        }
+
+        # Refresh DataGrid
+        $machinesForGrid = if ($allMachines) { $allMachines } else { $machines }
+        $ft = if ($filterText) { $filterText.Trim() } else { '' }
+        if (-not [string]::IsNullOrWhiteSpace($ft)) {
+            $machinesForGrid = @($machinesForGrid | Where-Object {
+                $_ -ne $null -and ($_.Hostname -like "*$ft*" -or $_.MachineType -like "*$ft*" -or $_.OperatingSystem -like "*$ft*" -or $_.DistinguishedName -like "*$ft*")
+            })
+        }
+        Update-MachineDataGrid -Window $win -Machines $machinesForGrid
+        $dataGrid = $win.FindName('MachineDataGrid')
+        if ($dataGrid) { $dataGrid.Items.Refresh() }
+        try { Update-WorkflowBreadcrumb -Window $win } catch { }
+
+        $onlineN = if ($bg) { $bg.OnlineCount } else { 0 }
+        $winrmN  = if ($bg) { $bg.WinrmCount } else { 0 }
+        $totalN  = if ($bg) { $bg.TotalCount } else { 0 }
+        $mc = $win.FindName('DiscoveryMachineCount')
+        if ($mc) { $mc.Text = "$onlineN/$totalN online, $winrmN WinRM" }
+        Show-Toast -Message "Connectivity complete. WinRM available: $winrmN." -Type 'Info'
+        try { global:Update-WinRMAvailableCount -Window $win } catch { }
+
+        # Cleanup globals
+        $global:GA_ConnTest_Machines    = $null
+        $global:GA_ConnTest_AllMachines = $null
+        $global:GA_ConnTest_FilterText  = $null
+    }
+
+    Invoke-BackgroundWork -ScriptBlock $bgWork `
+        -ArgumentList @($hostnames, 5000, 15) `
+        -OnComplete $onComplete `
+        -LoadingMessage 'Testing connectivity...' `
+        -LoadingSubMessage "Checking $($hostnames.Count) machines" `
+        -TimeoutSeconds 30
 }
 
 #endregion

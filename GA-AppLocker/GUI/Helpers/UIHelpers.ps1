@@ -99,3 +99,162 @@ function global:Request-UiRender {
 }
 
 #endregion
+
+#region Background Work Engine
+<#
+.SYNOPSIS
+    Centralized background work system for all long-running operations.
+.DESCRIPTION
+    Replaces all ad-hoc runspace + DispatcherTimer patterns with a single reliable engine.
+    Design principles:
+      - ALL state stored in $global:GA_BackgroundJobs (no $script: in callbacks)
+      - ONE shared DispatcherTimer monitors all jobs (no per-job timers)
+      - NO .GetNewClosure() on the timer tick (avoids PS scope bugs)
+      - Bare MTA runspaces with NO module imports (fast startup)
+      - OnComplete callbacks run on the UI thread and receive results as parameters
+    
+    Usage:
+      Invoke-BackgroundWork -ScriptBlock { param($a,$b); ... return @{...} } `
+          -ArgumentList @($arg1, $arg2) `
+          -OnComplete $onCompleteBlock `
+          -LoadingMessage 'Working...'
+    
+    The OnComplete scriptblock receives one parameter: the background result object.
+    Use $global: variables if OnComplete needs to update module-scoped state.
+#>
+
+function global:Invoke-BackgroundWork {
+    param(
+        [Parameter(Mandatory)]
+        [scriptblock]$ScriptBlock,
+
+        [object[]]$ArgumentList,
+
+        [scriptblock]$OnComplete,
+
+        [string]$LoadingMessage = 'Processing...',
+        [string]$LoadingSubMessage = '',
+
+        [int]$TimeoutSeconds = 60
+    )
+
+    # Show overlay immediately
+    Show-LoadingOverlay -Message $LoadingMessage -SubMessage $LoadingSubMessage
+
+    # Create bare MTA runspace (NO module import -- fast startup)
+    $rs = [runspacefactory]::CreateRunspace()
+    $rs.ApartmentState = 'MTA'
+    $rs.Open()
+
+    $ps = [powershell]::Create()
+    $ps.Runspace = $rs
+    [void]$ps.AddScript($ScriptBlock)
+    if ($ArgumentList) {
+        foreach ($arg in $ArgumentList) {
+            [void]$ps.AddArgument($arg)
+        }
+    }
+
+    $handle = $ps.BeginInvoke()
+
+    # Register job in global registry
+    if (-not $global:GA_BackgroundJobs) { $global:GA_BackgroundJobs = @{} }
+    $jobId = 'bgj_' + [guid]::NewGuid().ToString('N').Substring(0, 8)
+    $global:GA_BackgroundJobs[$jobId] = @{
+        PS         = $ps
+        Runspace   = $rs
+        Handle     = $handle
+        StartTime  = [DateTime]::UtcNow
+        Timeout    = $TimeoutSeconds
+        OnComplete = $OnComplete
+    }
+
+    # Ensure the shared monitor timer is running
+    global:Start-BackgroundMonitor
+}
+
+function global:Start-BackgroundMonitor {
+    <# Starts the single shared DispatcherTimer that monitors all background jobs. #>
+    if ($global:GA_BackgroundTimer -and $global:GA_BackgroundTimer.IsEnabled) { return }
+
+    if (-not $global:GA_BackgroundTimer) {
+        $global:GA_BackgroundTimer = [System.Windows.Threading.DispatcherTimer]::new()
+        $global:GA_BackgroundTimer.Interval = [TimeSpan]::FromMilliseconds(250)
+
+        # CRITICAL: NO .GetNewClosure() -- only references $global: variables
+        $global:GA_BackgroundTimer.Add_Tick({
+            if (-not $global:GA_BackgroundJobs -or $global:GA_BackgroundJobs.Count -eq 0) {
+                # No jobs -- stop the timer to save CPU
+                $global:GA_BackgroundTimer.Stop()
+                return
+            }
+
+            $completedIds = [System.Collections.Generic.List[string]]::new()
+
+            foreach ($id in @($global:GA_BackgroundJobs.Keys)) {
+                $job = $global:GA_BackgroundJobs[$id]
+                if ($null -eq $job) { [void]$completedIds.Add($id); continue }
+
+                $elapsed = ([DateTime]::UtcNow - $job.StartTime).TotalSeconds
+                $done = $false
+                try { $done = $job.Handle.IsCompleted } catch { $done = $true }
+                $timedOut = ($elapsed -ge $job.Timeout)
+
+                if (-not $done -and -not $timedOut) { continue }
+
+                [void]$completedIds.Add($id)
+
+                if ($timedOut -and -not $done) {
+                    # Kill hung job
+                    try { $job.PS.Stop() } catch { }
+                    try { $job.PS.Dispose() } catch { }
+                    try { $job.Runspace.Close(); $job.Runspace.Dispose() } catch { }
+                    Hide-LoadingOverlay
+                    Show-Toast -Message "Operation timed out after $($job.Timeout)s." -Type 'Warning'
+                    continue
+                }
+
+                # Harvest result
+                $result = $null
+                try {
+                    $output = $job.PS.EndInvoke($job.Handle)
+                    $result = if ($output -and $output.Count -gt 0) { $output[0] } else { $null }
+                }
+                catch {
+                    try { Write-AppLockerLog -Message "Background job error: $($_.Exception.Message)" -Level ERROR -NoConsole } catch { }
+                }
+
+                # Cleanup runspace
+                try { $job.PS.Dispose() } catch { }
+                try { $job.Runspace.Close(); $job.Runspace.Dispose() } catch { }
+
+                # Hide overlay and invoke completion callback on UI thread
+                Hide-LoadingOverlay
+
+                if ($job.OnComplete) {
+                    try {
+                        & $job.OnComplete $result
+                    }
+                    catch {
+                        Show-Toast -Message "Error: $($_.Exception.Message)" -Type 'Error'
+                        try { Write-AppLockerLog -Message "OnComplete error: $($_.Exception.Message)" -Level ERROR -NoConsole } catch { }
+                    }
+                }
+            }
+
+            # Remove completed jobs
+            foreach ($id in $completedIds) {
+                [void]$global:GA_BackgroundJobs.Remove($id)
+            }
+
+            # Auto-stop timer when no jobs remain
+            if ($global:GA_BackgroundJobs.Count -eq 0) {
+                $global:GA_BackgroundTimer.Stop()
+            }
+        })
+        # NO .GetNewClosure() here!
+    }
+
+    $global:GA_BackgroundTimer.Start()
+}
+#endregion
