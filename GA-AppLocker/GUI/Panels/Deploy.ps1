@@ -186,6 +186,12 @@ function global:Update-DeploymentJobsDataGrid {
             $job = $_
             $props = @{}
             $_.PSObject.Properties | ForEach-Object { $props[$_.Name] = $_.Value }
+
+            # Backward compatibility: older job records may use Id instead of JobId
+            if ((-not $props.ContainsKey('JobId') -or [string]::IsNullOrWhiteSpace([string]$props['JobId'])) -and $props.ContainsKey('Id')) {
+                $props['JobId'] = [string]$props['Id']
+            }
+
             $props['ProgressDisplay'] = "$($_.Progress)%"
             # Safely parse CreatedAt (may be DateTime, string, or PSCustomObject from JSON)
             $createdDisplay = ''
@@ -317,7 +323,21 @@ function global:Update-SelectedJobInfo {
     $progressBar = $Window.FindName('DeploymentProgressBar')
 
     if ($selectedItem) {
-        $script:SelectedDeploymentJobId = $selectedItem.JobId
+        $resolvedJobId = $null
+        if ($selectedItem.PSObject.Properties['JobId']) {
+            $resolvedJobId = [string]$selectedItem.JobId
+        }
+        if ([string]::IsNullOrWhiteSpace($resolvedJobId) -and $selectedItem.PSObject.Properties['Id']) {
+            $resolvedJobId = [string]$selectedItem.Id
+        }
+
+        if ([string]::IsNullOrWhiteSpace($resolvedJobId)) {
+            $script:SelectedDeploymentJobId = $null
+        }
+        else {
+            $script:SelectedDeploymentJobId = $resolvedJobId.Trim()
+        }
+
         if ($messageBox)  { $messageBox.Text = $selectedItem.Message }
         if ($progressBar) { $progressBar.Value = $selectedItem.Progress }
     }
@@ -392,7 +412,10 @@ function global:Invoke-DeploySelectedJob {
         return
     }
 
-    if (-not $script:SelectedDeploymentJobId) {
+    # Re-resolve selected job each click to avoid stale/invalid selection state
+    Update-SelectedJobInfo -Window $Window
+
+    if ([string]::IsNullOrWhiteSpace($script:SelectedDeploymentJobId)) {
         Show-Toast -Message 'Please select a deployment job.' -Type 'Warning'
         return
     }
@@ -416,7 +439,7 @@ function global:Invoke-DeploySelectedJob {
     # Create synchronized hashtable for cross-thread communication
     $script:DeploySyncHash = [hashtable]::Synchronized(@{
         Window     = $Window
-        JobId      = $script:SelectedDeploymentJobId
+        JobId      = ([string]$script:SelectedDeploymentJobId).Trim()
         Result     = $null
         Error      = $null
         IsComplete = $false
@@ -457,7 +480,7 @@ function global:Invoke-DeploySelectedJob {
             $SyncHash.Progress = 30
             
             # Execute the deployment
-            $result = Start-Deployment -JobId $SyncHash.JobId
+            $result = Start-Deployment -JobId $SyncHash.JobId -WhatIf:$false
             
             $SyncHash.Progress = 90
             $SyncHash.StatusText = 'Finalizing...'
@@ -617,7 +640,7 @@ function global:Invoke-CancelDeploymentJob {
     if ($confirm -ne 'Yes') { return }
 
     try {
-        $result = Stop-Deployment -JobId $script:SelectedDeploymentJobId
+        $result = Stop-Deployment -JobId $script:SelectedDeploymentJobId -WhatIf:$false
 
         if ($result.Success) {
             Update-DeploymentJobsDataGrid -Window $Window

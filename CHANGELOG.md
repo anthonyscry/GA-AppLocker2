@@ -2,6 +2,15 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.81] - 2026-02-06
+
+### Fixed
+- **Dedupe reports removable rules but removes 0** -- Rules panel dedupe action now explicitly executes real removal (`-WhatIf:$false`) to avoid inheriting preview-only behavior.
+- **Deployment error: empty JobId binding** -- Deploy panel now normalizes selected job identifiers (`JobId` with `Id` fallback), re-resolves selection before deploy, trims/validates non-empty IDs, and uses explicit real execution for start/stop (`-WhatIf:$false`).
+- **Legacy deployment row compatibility** -- Deployment grid hydration now backfills `JobId` from `Id` for older records so actions operate on valid identifiers.
+
+---
+
 ## [1.2.80] - 2026-02-06
 
 ### Fixed

@@ -1105,7 +1105,7 @@ function global:Invoke-RemoveDuplicateRules {
                 $modPath = Join-Path $modulesDir "$mod\$mod.psd1"
                 if (Test-Path $modPath) { Import-Module $modPath -Force -ErrorAction Stop }
             }
-            return Remove-DuplicateRules -RuleType All -Strategy KeepOldest
+            return Remove-DuplicateRules -RuleType All -Strategy KeepOldest -WhatIf:$false
         }
 
         $onComplete = {
