@@ -812,29 +812,66 @@ function global:Invoke-AddRulesToPolicy {
     $ruleIds = $availableRules | Select-Object -ExpandProperty Id
     $policyName = $policy.Name
 
-    Invoke-AsyncOperation -ScriptBlock {
-        param($PolicyId, $RuleIds)
-        Add-RuleToPolicy -PolicyId $PolicyId -RuleId $RuleIds
-    } -Arguments @{ PolicyId = $script:SelectedPolicyId; RuleIds = $ruleIds } -LoadingMessage 'Updating policy rules...' -OnComplete {
+    $modulePath = (Get-Module GA-AppLocker).ModuleBase
+    $global:GA_PolicyAdd_Window = $Window
+    $global:GA_PolicyAdd_PolicyId = $script:SelectedPolicyId
+    $global:GA_PolicyAdd_PolicyName = $policyName
+
+    $bgWork = {
+        param($ModulePath, $PolicyId, $RuleIds)
+
+        $modulesDir = Join-Path $ModulePath 'Modules'
+        foreach ($mod in @('GA-AppLocker.Core', 'GA-AppLocker.Policy')) {
+            $modPath = Join-Path $modulesDir "$mod\$mod.psd1"
+            if (Test-Path $modPath) {
+                Import-Module $modPath -Force -ErrorAction Stop
+            }
+        }
+
+        return Add-RuleToPolicy -PolicyId $PolicyId -RuleId $RuleIds
+    }
+
+    $onComplete = {
         param($addResult)
 
-        Update-PoliciesDataGrid -Window $Window -Force
-        Update-SelectedPolicyInfo -Window $Window
+        $win = $global:GA_PolicyAdd_Window
+        $policyNameValue = $global:GA_PolicyAdd_PolicyName
+
+        if ($win) {
+            Update-PoliciesDataGrid -Window $win -Force
+            Update-SelectedPolicyInfo -Window $win
+        }
 
         if ($addResult -and $addResult.Success) {
-            $message = if ($addResult.Message) { $addResult.Message } else { "Added rules to '$policyName'." }
+            $message = if ($addResult.Message) { $addResult.Message } else { "Added rules to '$policyNameValue'." }
             Show-Toast -Message $message -Type 'Success'
         }
         elseif ($addResult) {
             Show-Toast -Message "Failed to add rules: $($addResult.Error)" -Type 'Error'
         }
         else {
-            Show-Toast -Message "Add rules operation returned no result for '$policyName'." -Type 'Error'
+            Show-Toast -Message "Add rules operation returned no result for '$policyNameValue'." -Type 'Error'
         }
-    }.GetNewClosure() -OnError {
-        param($ErrorMessage)
-        Show-Toast -Message "Failed to add rules: $ErrorMessage" -Type 'Error'
-    }.GetNewClosure()
+
+        $global:GA_PolicyAdd_Window = $null
+        $global:GA_PolicyAdd_PolicyId = $null
+        $global:GA_PolicyAdd_PolicyName = $null
+    }
+
+    $onTimeout = {
+        param($TimeoutMessage)
+        $global:GA_PolicyAdd_Window = $null
+        $global:GA_PolicyAdd_PolicyId = $null
+        $global:GA_PolicyAdd_PolicyName = $null
+        Show-Toast -Message "Failed to add rules: $TimeoutMessage" -Type 'Error'
+    }
+
+    Invoke-BackgroundWork -ScriptBlock $bgWork `
+        -ArgumentList @($modulePath, $script:SelectedPolicyId, @($ruleIds)) `
+        -OnComplete $onComplete `
+        -OnTimeout $onTimeout `
+        -NoLoadingOverlay `
+        -TimeoutSeconds 180
 }
 
 function global:Invoke-RemoveRulesFromPolicy {
@@ -862,29 +899,66 @@ function global:Invoke-RemoveRulesFromPolicy {
         $ruleIds = @($policy.RuleIds)
         $policyName = $policy.Name
 
-        Invoke-AsyncOperation -ScriptBlock {
-            param($PolicyId, $RuleIds)
-            Remove-RuleFromPolicy -PolicyId $PolicyId -RuleId $RuleIds
-        } -Arguments @{ PolicyId = $script:SelectedPolicyId; RuleIds = $ruleIds } -LoadingMessage 'Updating policy rules...' -OnComplete {
+        $modulePath = (Get-Module GA-AppLocker).ModuleBase
+        $global:GA_PolicyRemove_Window = $Window
+        $global:GA_PolicyRemove_PolicyId = $script:SelectedPolicyId
+        $global:GA_PolicyRemove_PolicyName = $policyName
+
+        $bgWork = {
+            param($ModulePath, $PolicyId, $RuleIds)
+
+            $modulesDir = Join-Path $ModulePath 'Modules'
+            foreach ($mod in @('GA-AppLocker.Core', 'GA-AppLocker.Policy')) {
+                $modPath = Join-Path $modulesDir "$mod\$mod.psd1"
+                if (Test-Path $modPath) {
+                    Import-Module $modPath -Force -ErrorAction Stop
+                }
+            }
+
+            return Remove-RuleFromPolicy -PolicyId $PolicyId -RuleId $RuleIds
+        }
+
+        $onComplete = {
             param($removeResult)
 
-            Update-PoliciesDataGrid -Window $Window -Force
-            Update-SelectedPolicyInfo -Window $Window
+            $win = $global:GA_PolicyRemove_Window
+            $policyNameValue = $global:GA_PolicyRemove_PolicyName
+
+            if ($win) {
+                Update-PoliciesDataGrid -Window $win -Force
+                Update-SelectedPolicyInfo -Window $win
+            }
 
             if ($removeResult -and $removeResult.Success) {
-                $message = if ($removeResult.Message) { $removeResult.Message } else { "Removed rules from '$policyName'." }
+                $message = if ($removeResult.Message) { $removeResult.Message } else { "Removed rules from '$policyNameValue'." }
                 Show-Toast -Message $message -Type 'Success'
             }
             elseif ($removeResult) {
                 Show-Toast -Message "Failed to remove rules: $($removeResult.Error)" -Type 'Error'
             }
             else {
-                Show-Toast -Message "Remove rules operation returned no result for '$policyName'." -Type 'Error'
+                Show-Toast -Message "Remove rules operation returned no result for '$policyNameValue'." -Type 'Error'
             }
-        }.GetNewClosure() -OnError {
-            param($ErrorMessage)
-            Show-Toast -Message "Failed to remove rules: $ErrorMessage" -Type 'Error'
-        }.GetNewClosure()
+
+            $global:GA_PolicyRemove_Window = $null
+            $global:GA_PolicyRemove_PolicyId = $null
+            $global:GA_PolicyRemove_PolicyName = $null
+        }
+
+        $onTimeout = {
+            param($TimeoutMessage)
+            $global:GA_PolicyRemove_Window = $null
+            $global:GA_PolicyRemove_PolicyId = $null
+            $global:GA_PolicyRemove_PolicyName = $null
+            Show-Toast -Message "Failed to remove rules: $TimeoutMessage" -Type 'Error'
+        }
+
+        Invoke-BackgroundWork -ScriptBlock $bgWork `
+            -ArgumentList @($modulePath, $script:SelectedPolicyId, @($ruleIds)) `
+            -OnComplete $onComplete `
+            -OnTimeout $onTimeout `
+            -NoLoadingOverlay `
+            -TimeoutSeconds 180
     }
 }
 

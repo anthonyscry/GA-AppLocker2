@@ -415,10 +415,15 @@ function global:Invoke-DeploySelectedJob {
     # Re-resolve selected job each click to avoid stale/invalid selection state
     Update-SelectedJobInfo -Window $Window
 
-    if ([string]::IsNullOrWhiteSpace($script:SelectedDeploymentJobId)) {
+    # Capture a stable JobId before any UI refresh/filter changes
+    $selectedJobId = [string]$script:SelectedDeploymentJobId
+
+    if ([string]::IsNullOrWhiteSpace($selectedJobId)) {
         Show-Toast -Message 'Please select a deployment job.' -Type 'Warning'
         return
     }
+    $selectedJobId = $selectedJobId.Trim()
+    $script:SelectedDeploymentJobId = $selectedJobId
 
     $confirm = Show-AppLockerMessageBox 'Start deployment now? This will apply the policy to the target GPO.' 'Confirm Deployment' 'YesNo' 'Question'
 
@@ -439,7 +444,7 @@ function global:Invoke-DeploySelectedJob {
     # Create synchronized hashtable for cross-thread communication
     $script:DeploySyncHash = [hashtable]::Synchronized(@{
         Window     = $Window
-        JobId      = ([string]$script:SelectedDeploymentJobId).Trim()
+        JobId      = $selectedJobId
         Result     = $null
         Error      = $null
         IsComplete = $false

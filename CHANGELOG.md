@@ -2,6 +2,15 @@
 
 All notable changes to GA-AppLocker will be documented in this file.
 
+## [1.2.82] - 2026-02-06
+
+### Fixed
+- **Policy Builder add/remove rules intermittent no-result path** -- Policy panel add/remove rule actions now run through `Invoke-BackgroundWork` with targeted sub-module imports (`GA-AppLocker.Core`, `GA-AppLocker.Policy`) and explicit timeout handling/cleanup.
+- **Deploy selected job intermittent empty JobId at execution time** -- Deploy action now captures and uses a stable selected job id before UI/filter refresh side effects, reducing transient empty-id deploy failures.
+
+### Added
+- **Curated regression guardrails for recent fixes** -- Expanded must-pass gate with `Tests/Behavioral/GUI/RecentRegressions.Tests.ps1` and additional policy behavior assertions; curated gate now runs 23 tests.
+
 ## [1.2.81] - 2026-02-06
 
 ### Fixed

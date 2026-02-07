@@ -19,6 +19,7 @@ $mustPassTests = @(
     (Join-Path $PSScriptRoot 'Behavioral\Workflows\CoreFlows.E2E.Tests.ps1'),
     (Join-Path $PSScriptRoot 'Behavioral\Core\Rules.Behavior.Tests.ps1'),
     (Join-Path $PSScriptRoot 'Behavioral\Core\Policy.Behavior.Tests.ps1'),
+    (Join-Path $PSScriptRoot 'Behavioral\GUI\RecentRegressions.Tests.ps1'),
     (Join-Path $PSScriptRoot 'Behavioral\GUI\ADDiscovery.AutoRefresh.Tests.ps1'),
     (Join-Path $PSScriptRoot 'Behavioral\GUI\Dashboard.WinRMButton.Tests.ps1')
 )

@@ -38,4 +38,26 @@ Describe 'Behavioral Policy: create and attach rules' -Tag @('Behavioral','Core'
         $policy.Success | Should -BeTrue
         $policy.Data.RuleIds | Should -Contain $script:ruleId
     }
+
+    It 'Add-RuleToPolicy does not duplicate an existing rule id' {
+        (Add-RuleToPolicy -PolicyId $script:policyId -RuleId @($script:ruleId)).Success | Should -BeTrue
+        (Add-RuleToPolicy -PolicyId $script:policyId -RuleId @($script:ruleId)).Success | Should -BeTrue
+
+        $policy = Get-Policy -PolicyId $script:policyId
+        $policy.Success | Should -BeTrue
+
+        $matches = @($policy.Data.RuleIds | Where-Object { $_ -eq $script:ruleId })
+        $matches.Count | Should -Be 1
+    }
+
+    It 'Remove-RuleFromPolicy detaches an attached rule id' {
+        (Add-RuleToPolicy -PolicyId $script:policyId -RuleId @($script:ruleId)).Success | Should -BeTrue
+
+        $removeResult = Remove-RuleFromPolicy -PolicyId $script:policyId -RuleId @($script:ruleId)
+        $removeResult.Success | Should -BeTrue
+
+        $policy = Get-Policy -PolicyId $script:policyId
+        $policy.Success | Should -BeTrue
+        $policy.Data.RuleIds | Should -Not -Contain $script:ruleId
+    }
 }
